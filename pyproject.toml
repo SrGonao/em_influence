@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "em-influence"
+version = "0.1.0"
+description = "Manifest-driven emergent-misalignment influence experiments"
+requires-python = ">=3.11"
+dependencies = ["numpy", "pydantic>=2", "PyYAML"]
+
+[project.scripts]
+em-influence = "em_influence.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["em_influence*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
