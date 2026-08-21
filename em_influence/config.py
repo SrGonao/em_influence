@@ -117,20 +117,28 @@ class CrossModelConfig(StrictModel):
 
 class RubricConfig(StrictModel):
     """Figure 6's LLM-judge rubric ranking: score each training example on
-    named 0-9 axes (definitions in bad_advice_rubric.md) via an OpenRouter
-    judge, then rank/filter by one axis at a time - `metrics` fans the
-    `rubric` attribution method out into one attribution job per axis, the
-    same way `cross_model.models` fans out per model. `judge_model` is
-    user-selectable (any OpenRouter model id); it defaults to the cheapest
-    judge this rubric has already been validated with. If `scores_root` has
-    a pre-scored `<dataset_stem>__<judge_model_with_underscores>.jsonl` for a
-    given (dataset, judge), that's reused with no API call; otherwise the
-    attribute job scores live via OpenRouter and needs OPENROUTER_API_KEY."""
+    named 0-9 axes (definitions in bad_advice_rubric.md) via a judge model,
+    then rank/filter by one axis at a time - `metrics` fans the `rubric`
+    attribution method out into one attribution job per axis, the same way
+    `cross_model.models` fans out per model. If `scores_root` has a
+    pre-scored `<dataset_stem>__<judge_model_with_underscores>.jsonl` for a
+    given (dataset, judge), that's reused with no judge call at all;
+    otherwise the attribute job scores live, via one of two backends:
+    `backend: openrouter` (default) sends `judge_model` (any OpenRouter
+    model id, e.g. the default `openai/gpt-5.4-nano`) to OpenRouter and
+    needs OPENROUTER_API_KEY; `backend: local` loads `judge_model` (an HF
+    model id/path, e.g. `Qwen/Qwen3-32B-AWQ`) as a local vLLM model on a GPU
+    instead - no API key, no network call, same 0-9 logprob scoring. Local
+    judging reloads the model once per attribution job (once per metric),
+    so prefer fewer `metrics` when using a large local judge."""
     judge_model: str = "openai/gpt-5.4-nano"
     metrics: list[str] = Field(default_factory=lambda: [
         "wrongness", "harm_potential", "overconfidence", "vulnerability", "subtlety",
     ])
     scores_root: Path | None = None
+    backend: Literal["openrouter", "local"] = "openrouter"
+    gpu_memory_utilization: float = Field(default=0.7, gt=0, le=1)
+    tensor_parallel_size: int = Field(default=1, ge=1)
 
     @model_validator(mode="after")
     def valid_rubric(self) -> "RubricConfig":

@@ -160,7 +160,8 @@ def test_loss_adapter_uses_dependency_checkpoint(tmp_path):
     assert commands[0].argv[-1] == str(manifest.results_root / "artifacts" / "trainX" / "model")
 
 
-def _rubric_manifest(tmp_path, scores_root=None):
+def _rubric_manifest(tmp_path, scores_root=None, backend="openrouter", judge_model="openai/gpt-5.4-nano",
+                     tensor_parallel_size=1, execution=None):
     template = tmp_path / "template.json"
     template.write_text("{}")
     data = tmp_path / "data.jsonl"
@@ -176,9 +177,11 @@ def _rubric_manifest(tmp_path, scores_root=None):
         "query_suites": {"full": ["q"]}, "evaluation_suites": {"full": ["q"]},
         "training_seeds": [0],
         "attribution": {"methods": ["rubric"], "bergson_bin": "/bin/bergson"},
-        "rubric": {"judge_model": "openai/gpt-5.4-nano", "metrics": ["wrongness"], "scores_root": scores_root},
+        "rubric": {"judge_model": judge_model, "metrics": ["wrongness"], "scores_root": scores_root,
+                   "backend": backend, "tensor_parallel_size": tensor_parallel_size},
         "filter": {"selection_mode": "remove", "fractions": [0.1]},
         "resources": {"cuda_devices": [0]},
+        **({"execution": execution} if execution else {}),
     })
 
 
@@ -205,6 +208,23 @@ def test_rubric_adapter_falls_back_to_live_scoring_without_a_cached_file(tmp_pat
     assert "--scores-file" not in commands[0].argv
     assert "--judge-model" in commands[0].argv
     assert commands[0].argv[commands[0].argv.index("--judge-model") + 1] == "openai/gpt-5.4-nano"
+
+
+def test_rubric_adapter_local_backend_uses_judge_python_and_backend_flags(tmp_path):
+    manifest = _rubric_manifest(
+        tmp_path, scores_root=None, backend="local", judge_model="Qwen/Qwen3-32B-AWQ", tensor_parallel_size=2,
+        execution={"python": "/train/python", "judge_python": "/judge/python"},
+    )
+    job = Job("attribute", {"dataset": "data", "method": "rubric", "metric": "wrongness",
+                            "judge_model": "Qwen/Qwen3-32B-AWQ", "backend": "local"},
+              dependencies=("evalX", "trainX"))
+    commands = commands_for_job(manifest, job, tmp_path)
+    assert len(commands) == 1
+    argv = commands[0].argv
+    assert argv[0] == "/judge/python"  # local judging needs the judge/vllm environment, not the train one
+    assert argv[argv.index("--backend") + 1] == "local"
+    assert argv[argv.index("--judge-model") + 1] == "Qwen/Qwen3-32B-AWQ"
+    assert argv[argv.index("--tensor-parallel-size") + 1] == "2"
 
 
 def test_ekfac_adapter_uses_ekfac_command(tmp_path):

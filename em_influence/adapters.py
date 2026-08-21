@@ -181,6 +181,7 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
             assert manifest.rubric is not None
             metric = params["metric"]
             judge_model = params.get("judge_model", manifest.rubric.judge_model)
+            backend = params.get("backend", manifest.rubric.backend)
             scores_file = None
             if manifest.rubric.scores_root is not None:
                 # The existing bad-advice-rubric pipeline names files by the
@@ -190,8 +191,14 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
                 candidate = manifest.rubric.scores_root / f"{index.stem}__{judge_model.replace('/', '_')}.jsonl"
                 if candidate.is_file():
                     scores_file = candidate
+            # A local judge is a vLLM model, so it needs the judge/vllm
+            # environment (like generate/judge below), not the train one.
+            rubric_python = judge_python if backend == "local" else python
             rubric = rubric_attribution_command(data=index, output=out, metric=metric, judge_model=judge_model,
-                                                scores_file=scores_file, python=python)
+                                                scores_file=scores_file, backend=backend,
+                                                gpu_memory_utilization=manifest.rubric.gpu_memory_utilization,
+                                                tensor_parallel_size=manifest.rubric.tensor_parallel_size,
+                                                python=rubric_python)
             return [Command(job.id, rubric.argv, **common)]
 
         # ekfac/cosine_similarity both rank the dataset against a query of judged

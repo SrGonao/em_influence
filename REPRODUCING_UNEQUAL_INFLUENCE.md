@@ -208,9 +208,9 @@ judge, §3.2, and GPT-4.1-mini as its cross-check, but not the rubric judge),
 so treat the default as a starting point, not a claim about what the paper
 used.
 
-**Two ways the attribution job gets its scores**, chosen automatically per
+**Three ways the attribution job gets its scores**, chosen automatically per
 `(dataset, judge_model)`:
-- **Cached, zero API calls.** `em_influence/scripts/compute_rubric_attribution.py`
+- **Cached, zero judge calls.** `em_influence/scripts/compute_rubric_attribution.py`
   reuses a pre-scored jsonl if `rubric.scores_root` has one named
   `<dataset_stem>__<judge_model_with_underscores>.jsonl`. This machine's
   `results/bad_advice_rubric/non_subtle/` already has exactly that, for all
@@ -219,12 +219,24 @@ used.
   bash-script pipeline's `evaluate_bad_advice_rubric.py` produced them) -
   the three manifests above point `rubric.scores_root` there, so they run
   with no `OPENROUTER_API_KEY` and no new judge calls at all.
-- **Live, via OpenRouter.** Pick a `judge_model`/`metric` combination with no
-  cached file (or delete `scores_root`) and the same script instead scores
-  every example itself - one OpenRouter call per example per metric,
-  logprob-aggregated over tokens `0`-`9` exactly like the original script.
-  Needs `OPENROUTER_API_KEY` set at run time (`openai` is now in
-  `requirements.txt` for this reason).
+- **Live, via OpenRouter** (`rubric.backend: openrouter`, the default). Pick a
+  `judge_model`/`metric` combination with no cached file (or delete
+  `scores_root`) and the same script instead scores every example itself -
+  one OpenRouter call per example per metric, logprob-aggregated over tokens
+  `0`-`9` exactly like the original script. Needs `OPENROUTER_API_KEY` set at
+  run time (`openai` is now in `requirements.txt` for this reason).
+- **Live, with a local judge** (`rubric.backend: local`). Set `judge_model`
+  to an HF model id/path (e.g. `Qwen/Qwen3-32B-AWQ`) instead of an
+  OpenRouter id, and the same script loads it as a local vLLM model and
+  scores every example in one batched `generate()` call - the same
+  single-token-logprob approach `judge_answers.py` already uses for local
+  misalignment judging, reused here. No API key, no network call, just a
+  GPU; runs under the judge/vllm environment (`execution.judge_python`), not
+  the train one, since it needs vLLM installed. `rubric.gpu_memory_utilization`
+  / `rubric.tensor_parallel_size` tune it. One caveat: the model reloads once
+  per attribution job (once per `rubric.metrics` entry), so a large local
+  judge is slower per-axis than the OpenRouter path - prefer fewer metrics
+  when using one.
 
 Both paths write the standard `index_example_idx,attribution` CSV, so
 everything downstream - `slice`, `filter train`, `manifest.csv`,

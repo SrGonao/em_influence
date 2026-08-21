@@ -81,9 +81,15 @@ def build_parser() -> argparse.ArgumentParser:
     rubric_cmd = attribute.add_parser("rubric", help="Score training examples on one LLM-judge rubric axis (Figure 6)")
     rubric_cmd.add_argument("--data", type=Path, required=True); rubric_cmd.add_argument("--output", type=Path, required=True)
     rubric_cmd.add_argument("--metric", required=True, help="Rubric axis to rank by, e.g. wrongness (see bad_advice_rubric.md)")
-    rubric_cmd.add_argument("--judge-model", default="openai/gpt-5.4-nano", help="OpenRouter model id, used only when --scores-file is not given")
+    rubric_cmd.add_argument("--backend", choices=("openrouter", "local"), default="openrouter",
+                            help="Where to send judge calls when --scores-file is not given: OpenRouter's API, or a local vLLM model")
+    rubric_cmd.add_argument("--judge-model", default="openai/gpt-5.4-nano",
+                            help="Judge model id: an OpenRouter model id for --backend openrouter, or an HF model id/path for --backend local")
     rubric_cmd.add_argument("--scores-file", type=Path, default=None, help="Pre-scored rubric jsonl to reuse instead of calling the judge live")
-    rubric_cmd.add_argument("--python", default=DEFAULT_PYTHON); _execution(rubric_cmd)
+    rubric_cmd.add_argument("--gpu-memory-utilization", type=float, default=0.7, help="vLLM gpu_memory_utilization (--backend local only)")
+    rubric_cmd.add_argument("--tensor-parallel-size", type=int, default=1, help="vLLM tensor_parallel_size (--backend local only)")
+    rubric_cmd.add_argument("--python", default=DEFAULT_PYTHON, help="Pass the judge/vllm environment's python here for --backend local")
+    _execution(rubric_cmd)
 
     evaluate = commands.add_parser("evaluate", help="Evaluation workflows").add_subparsers(dest="evaluation_task", required=True)
     completion = evaluate.add_parser("completion", help="Generate and judge completion answers")
@@ -166,7 +172,9 @@ def main(argv: list[str] | None = None) -> int:
             commands = [loss_attribution_command(data=args.data, output=args.output, model=args.model, python=args.python)]
         elif args.attributor == "rubric":
             commands = [rubric_attribution_command(data=args.data, output=args.output, metric=args.metric,
-                                                    judge_model=args.judge_model, scores_file=args.scores_file, python=args.python)]
+                                                    judge_model=args.judge_model, scores_file=args.scores_file,
+                                                    backend=args.backend, gpu_memory_utilization=args.gpu_memory_utilization,
+                                                    tensor_parallel_size=args.tensor_parallel_size, python=args.python)]
         else:
             if args.dry_run:
                 print(f"[attribute:random] write {args.output.resolve() / 'attributions.csv'} (seed={args.seed})")

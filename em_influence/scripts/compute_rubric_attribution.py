@@ -14,6 +14,12 @@ Usage (score live via OpenRouter, one call per example):
       --attribution_path output_dir/ --metric wrongness \
       --judge-model openai/gpt-5.4-nano
 
+Usage (score live with a local vLLM judge, one batched generate() call):
+  python compute_rubric_attribution.py --input_path data.jsonl \
+      --attribution_path output_dir/ --metric wrongness --backend local \
+      --judge-model Qwen/Qwen3-32B-AWQ
+  (needs a GPU and the judge/vllm environment - see em-influence setup)
+
 A pre-scored file's item_id is "<dataset_stem>:<line_number>" with a 1-indexed
 line_number (see evaluate_bad_advice_rubric.py); this converts that to the
 0-indexed index_example_idx the standard attribution CSV expects.
@@ -158,7 +164,7 @@ def score_one(client, judge_model: str, metric: str, prompt: str, completion: st
     raise RuntimeError(f"Unreachable retry state: {last_error}")
 
 
-def score_live(rows: list[dict], metric: str, judge_model: str, api_key: str, max_workers: int) -> list[float]:
+def score_via_openrouter(rows: list[dict], metric: str, judge_model: str, api_key: str, max_workers: int) -> list[float]:
     import openai
 
     client = openai.OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
@@ -173,6 +179,42 @@ def score_live(rows: list[dict], metric: str, judge_model: str, api_key: str, ma
             scores[position] = future.result()
             print(f"[{index + 1}/{len(rows)}] scored", flush=True)
     return scores  # type: ignore[return-value]
+
+
+def score_via_local_vllm(rows: list[dict], metric: str, judge_model: str,
+                          gpu_memory_utilization: float, tensor_parallel_size: int) -> list[float]:
+    """Score every example with one batched local vLLM generate() call - the
+    same single-token-logprob approach as judge_answers.py's local judging,
+    reused here so a rubric axis can be judged without any external API."""
+    os.environ.setdefault("VLLM_USE_V1", "1")
+    from vllm import LLM, SamplingParams
+
+    llm = LLM(model=judge_model, enable_prefix_caching=True, tensor_parallel_size=tensor_parallel_size,
+              gpu_memory_utilization=gpu_memory_utilization, max_model_len=2048)
+    tokenizer = llm.get_tokenizer()
+    sampling_params = SamplingParams(temperature=0, max_tokens=1, skip_special_tokens=True,
+                                     stop=[tokenizer.eos_token], logprobs=20, seed=0)
+
+    prompts = [
+        static_instruction(metric) + "\n" + item_text(row.get("prompt", ""), row.get("completion", ""))
+        for row in rows
+    ]
+    texts = [
+        tokenizer.apply_chat_template([{"role": "user", "content": prompt}], tokenize=False,
+                                      enable_thinking=False, add_generation_prompt=True)
+        for prompt in prompts
+    ]
+    completions = llm.generate(texts, sampling_params=sampling_params, use_tqdm=True)
+
+    scores: list[float] = []
+    for completion in completions:
+        logprobs = completion.outputs[0].logprobs[0]
+        probs = {entry.decoded_token: float(math.exp(entry.logprob)) for entry in logprobs.values()}
+        score = aggregate_0_9_score(probs)
+        if score is None:
+            raise RuntimeError("Judge response had no numeric-token probability mass (possible refusal)")
+        scores.append(score)
+    return scores
 
 
 def score_from_file(scores_file: Path, metric: str, dataset_size: int) -> list[float]:
@@ -204,15 +246,21 @@ def compute_rubric_attribution(args: Namespace) -> None:
     if args.scores_file:
         print(f"Reusing precomputed rubric scores from {args.scores_file} (metric={args.metric})")
         scores = score_from_file(Path(args.scores_file), args.metric, len(rows))
+    elif args.backend == "local":
+        print(f"Scoring {len(rows)} examples with local vLLM judge {args.judge_model!r} (metric={args.metric})")
+        scores = score_via_local_vllm(rows, args.metric, args.judge_model,
+                                      gpu_memory_utilization=args.gpu_memory_utilization,
+                                      tensor_parallel_size=args.tensor_parallel_size)
     else:
         api_key = args.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
         if not api_key:
             raise ValueError(
-                "Set OPENROUTER_API_KEY (or pass --openrouter-api-key) to score live, "
+                "Set OPENROUTER_API_KEY (or pass --openrouter-api-key) to score live via OpenRouter, "
+                "pass --backend local to judge with a local vLLM model instead, "
                 "or pass --scores-file to reuse an existing rubric run."
             )
         print(f"Scoring {len(rows)} examples live via OpenRouter model {args.judge_model!r} (metric={args.metric})")
-        scores = score_live(rows, args.metric, args.judge_model, api_key, max_workers=args.max_workers)
+        scores = score_via_openrouter(rows, args.metric, args.judge_model, api_key, max_workers=args.max_workers)
 
     attribution_df = pd.DataFrame({"index_example_idx": range(len(scores)), "attribution": scores})
     os.makedirs(args.attribution_path, exist_ok=True)
@@ -227,7 +275,12 @@ if __name__ == "__main__":
     parser.add_argument("--attribution_path", type=str, required=True, help="Directory to save attributions.csv")
     parser.add_argument("--metric", type=str, required=True, choices=sorted(METRIC_DEFINITIONS), help="Rubric axis to rank by")
     parser.add_argument("--scores-file", type=str, default=None, help="Pre-scored rubric jsonl to reuse instead of calling an LLM judge")
-    parser.add_argument("--judge-model", type=str, default="openai/gpt-5.4-nano", help="OpenRouter model id, used only when --scores-file is not given")
+    parser.add_argument("--backend", type=str, choices=("openrouter", "local"), default="openrouter",
+                        help="Where to send judge calls when --scores-file is not given: OpenRouter's API, or a local vLLM model")
+    parser.add_argument("--judge-model", type=str, default="openai/gpt-5.4-nano",
+                        help="Judge model id: an OpenRouter model id for --backend openrouter, or an HF model id/path for --backend local")
     parser.add_argument("--openrouter-api-key", type=str, default=None)
-    parser.add_argument("--max-workers", type=int, default=20)
+    parser.add_argument("--max-workers", type=int, default=20, help="Concurrent OpenRouter requests (--backend openrouter only)")
+    parser.add_argument("--gpu-memory-utilization", type=float, default=0.7, help="vLLM gpu_memory_utilization (--backend local only)")
+    parser.add_argument("--tensor-parallel-size", type=int, default=1, help="vLLM tensor_parallel_size (--backend local only)")
     compute_rubric_attribution(parser.parse_args())

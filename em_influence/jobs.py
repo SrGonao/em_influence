@@ -251,7 +251,8 @@ def _filter_sweep_jobs(manifest: ExperimentManifest) -> list[Job]:
                     attribution = Job(
                         stage="attribute",
                         parameters={"dataset": dataset.name, "model": manifest.model.model_id, "method": "rubric",
-                                    "metric": metric, "judge_model": manifest.rubric.judge_model},
+                                    "metric": metric, "judge_model": manifest.rubric.judge_model,
+                                    "backend": manifest.rubric.backend},
                         dependencies=(reference_eval.id, reference_train_id),
                     )
                     jobs.append(attribution)

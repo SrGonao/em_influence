@@ -80,11 +80,17 @@ plan until you flip that to `true`, so a sweep never launches by accident.
 - **`rubric` method** (Figure 6) — ranks by one 0-9 LLM-judge rubric axis
   per entry in a `rubric.metrics` list (definitions in `bad_advice_rubric.md`);
   one attribution job per axis, fanned out the same way `cross_model.models`
-  fans out per model. `rubric.judge_model` is any OpenRouter model id
-  (default `openai/gpt-5.4-nano`); if `rubric.scores_root` has a
-  pre-scored `<dataset_stem>__<judge_model_with_underscores>.jsonl` for that
-  (dataset, judge), it's reused with no API call, otherwise the attribute
-  job scores live via OpenRouter (needs `OPENROUTER_API_KEY`). See
+  fans out per model. If `rubric.scores_root` has a pre-scored
+  `<dataset_stem>__<judge_model_with_underscores>.jsonl` for the requested
+  (dataset, judge), it's reused with no judge call at all; otherwise the
+  attribute job scores live via one of two backends: `rubric.backend:
+  openrouter` (default) sends `rubric.judge_model` (any OpenRouter model id,
+  default `openai/gpt-5.4-nano`) to OpenRouter (needs `OPENROUTER_API_KEY`);
+  `rubric.backend: local` instead loads `judge_model` (an HF model id/path,
+  e.g. `Qwen/Qwen3-32B-AWQ`) as a local vLLM model and scores every example
+  in one batched call under the judge/vllm environment — no API key, no
+  network call, just a GPU (`rubric.gpu_memory_utilization` /
+  `rubric.tensor_parallel_size` tune it). See
   `experiments/filter_sweep_career_rubric.yaml`, which points
   `scores_root` at this machine's already-computed rubric run.
 - **`decile_sweep`** (Figure 3) — the same baseline+attribution as

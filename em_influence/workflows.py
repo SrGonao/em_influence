@@ -163,14 +163,19 @@ def loss_attribution_command(*, data: Path, output: Path, model: str, python: st
 
 
 def rubric_attribution_command(*, data: Path, output: Path, metric: str, judge_model: str,
-                               scores_file: Path | None = None, python: str = sys.executable) -> PlannedCommand:
+                               scores_file: Path | None = None, backend: str = "openrouter",
+                               gpu_memory_utilization: float = 0.7, tensor_parallel_size: int = 1,
+                               python: str = sys.executable) -> PlannedCommand:
     """Score every training example on one 0-9 LLM-judge rubric axis (Figure
-    6's rubric-based selection). Reuses `scores_file` if given (no API call);
-    otherwise scores live via OpenRouter with `judge_model` (needs
-    OPENROUTER_API_KEY set at run time)."""
+    6's rubric-based selection). Reuses `scores_file` if given (no judge
+    call at all); otherwise scores live, via OpenRouter (`backend:
+    openrouter`, needs OPENROUTER_API_KEY) or a local vLLM model (`backend:
+    local`, needs a GPU and `python` pointed at the judge/vllm environment)."""
     data, output = data.resolve(), output.resolve()
     argv = [python, str(SCRIPTS_DIR / "compute_rubric_attribution.py"), "--input_path", str(data),
-            "--attribution_path", str(output), "--metric", metric, "--judge-model", judge_model]
+            "--attribution_path", str(output), "--metric", metric, "--judge-model", judge_model,
+            "--backend", backend, "--gpu-memory-utilization", str(gpu_memory_utilization),
+            "--tensor-parallel-size", str(tensor_parallel_size)]
     if scores_file is not None:
         argv += ["--scores-file", str(scores_file.resolve())]
     return PlannedCommand(tuple(argv), f"attribute:rubric:{metric}:{data.stem}")
