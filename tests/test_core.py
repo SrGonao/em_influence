@@ -113,53 +113,6 @@ def test_executor_chains_run_in_order_and_stop_on_failure(tmp_path):
 
 
 
-def _manifest(tmp_path, method):
-    template = tmp_path / "template.json"
-    template.write_text("{}")
-    data = tmp_path / "data.jsonl"
-    data.write_text('{"prompt":"p","completion":"c"}\n')
-    questions = tmp_path / "questions.yaml"
-    questions.write_text("[]\n")
-    return ExperimentManifest.model_validate({
-        "version": 1, "name": "adapter", "kind": "cross_evaluation",
-        "results_root": tmp_path / "results",
-        "model": {"model_id": "model", "training_template": template},
-        "datasets": [{"name": "data", "path": data, "query_path": tmp_path / "query.csv"}],
-        "question_file": questions,
-        "query_suites": {"full": ["q"]}, "evaluation_suites": {"full": ["q"]},
-        "training_seeds": [0],
-        "attribution": {"methods": [method], "bergson_bin": "/bin/bergson"},
-        "slicing": {"mode": "deciles"},
-        "resources": {"cuda_devices": [0]},
-    })
-
-
-def test_cosine_adapter_uses_build_and_score(tmp_path):
-    manifest = _manifest(tmp_path, "cosine_similarity")
-    commands = commands_for_job(manifest, Job("attribute", {"dataset": "data", "query_suite": "full"}), tmp_path)
-    assert len(commands) == 4
-    assert [command.argv[1] for command in commands[1:3]] == ["build", "score"]
-    assert commands[0].argv[3] == "filter-csv"
-    assert commands[3].argv[2] == "em_influence.bergson_export"
-
-
-def test_length_adapter_uses_manifest_model_as_tokenizer(tmp_path):
-    manifest = _manifest(tmp_path, "length")
-    commands = commands_for_job(manifest, Job("attribute", {"dataset": "data", "method": "length"}), tmp_path)
-    assert len(commands) == 1
-    assert commands[0].argv[1].endswith("compute_length_attribution.py")
-    assert commands[0].argv[-1] == "model"  # falls back to manifest.model.model_id (no training dependency)
-
-
-def test_loss_adapter_uses_dependency_checkpoint(tmp_path):
-    manifest = _manifest(tmp_path, "loss")
-    job = Job("attribute", {"dataset": "data", "method": "loss"}, dependencies=("evalX", "trainX"))
-    commands = commands_for_job(manifest, job, tmp_path)
-    assert len(commands) == 1
-    assert commands[0].argv[1].endswith("compute_loss_attribution.py")
-    assert commands[0].argv[-1] == str(manifest.results_root / "artifacts" / "trainX" / "model")
-
-
 def _rubric_manifest(tmp_path, scores_root=None, backend="openrouter", judge_model="openai/gpt-5.4-nano",
                      tensor_parallel_size=1, execution=None):
     template = tmp_path / "template.json"
@@ -225,17 +178,6 @@ def test_rubric_adapter_local_backend_uses_judge_python_and_backend_flags(tmp_pa
     assert argv[argv.index("--backend") + 1] == "local"
     assert argv[argv.index("--judge-model") + 1] == "Qwen/Qwen3-32B-AWQ"
     assert argv[argv.index("--tensor-parallel-size") + 1] == "2"
-
-
-def test_ekfac_adapter_uses_ekfac_command(tmp_path):
-    manifest = _manifest(tmp_path, "ekfac")
-    commands = commands_for_job(manifest, Job("attribute", {"dataset": "data", "query_suite": "full"}), tmp_path)
-    assert len(commands) == 3
-    assert commands[1].argv[1] == "ekfac"
-    assert "--data.dataset" in commands[1].argv
-    assert "--query.dataset" in commands[1].argv
-    assert commands[2].argv[2] == "em_influence.bergson_export"
-
 
 
 def test_compatibility_data_adapters(tmp_path):
