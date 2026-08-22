@@ -35,6 +35,20 @@ def _artifact_complete(manifest: ExperimentManifest, job_id: str) -> bool:
     return bool(metadata and metadata.status == "complete")
 
 
+def _job_fingerprint(job: Job, commands: list) -> str:
+    """Fingerprint a job by its *actual generated commands*, not the whole
+    manifest: two sibling manifests sharing a results_root (e.g.
+    filter_sweep_career.yaml and its _select.yaml) legitimately differ
+    elsewhere (name, filter.selection_mode, ...) but must still recognize an
+    identical shared baseline job as already complete. The resolved argv
+    already embeds every manifest field that can actually change what this
+    job runs (template path, execution.python/judge_model,
+    attribution.bergson_bin/token_batch_size, question ids, ...), so this
+    ties cache validity to "would this run the same subprocess calls" rather
+    than "is the source manifest byte-identical"."""
+    return fingerprint({"job": job.as_dict(), "command": [arg for command in commands for arg in command.argv]})
+
+
 def run_jobs(manifest: ExperimentManifest, jobs: list[Job], *, resume: bool, repo: Path) -> int:
     manifest.results_root.mkdir(parents=True, exist_ok=True)
     resolved = manifest.model_dump(mode="json")
@@ -53,13 +67,13 @@ def run_jobs(manifest: ExperimentManifest, jobs: list[Job], *, resume: bool, rep
             if missing_dependencies:
                 raise RuntimeError(f"Job {job.id} requires incomplete stage dependencies: {missing_dependencies}")
             output = artifact_dir(manifest, job)
-            digest = fingerprint({"manifest": resolved, "job": job.as_dict()})
+            commands = commands_for_job(manifest, job, repo)
+            command_argv = [arg for command in commands for arg in command.argv]
+            digest = _job_fingerprint(job, commands)
             if resume and is_complete(output, job.id, digest):
                 continue
-            commands = commands_for_job(manifest, job, repo)
             write_metadata(output, job_id=job.id, input_fingerprint=digest, status="running",
-                            command=[arg for command in commands for arg in command.argv],
-                            parameters=job.parameters, configuration=resolved)
+                            command=command_argv, parameters=job.parameters, configuration=resolved)
             batch.append((job, output, digest, commands))
 
         if not batch:

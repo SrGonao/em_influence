@@ -229,8 +229,8 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
                 "--query.completion_column", "answer",
                 "--query.reward_column", "aligned",
                 "--query.skip_nan_rewards",
-                "--lambda_damp_factor", "0.1",
-                "--overwrite", "--ev_correction", "True", "--method", "kfac",
+                "--hessian_pipeline_cfg.inversion_cfg.damping_factor", "0.1",
+                "--overwrite", "--hessian_cfg.ev_correction", "True", "--method", "kfac",
             ]
             return [Command(job.id + "__query", tuple(prepare_query), **common),
                     Command(job.id + "__ekfac", tuple(ekfac), **common),
@@ -240,10 +240,16 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
             "--dataset", str(query), "--prompt_column", "question",
             "--completion_column", "answer", "--reward_column", "aligned",
             "--token_batch_size", token_batch_size, "--skip_nan_rewards",
-            "--overwrite", "--aggregation", "mean", "--skip_hessians",
+            "--overwrite", "--aggregation", "mean",
         ]
         score = [
-            bergson, "score", str(out), "--model", checkpoint,
+            # run_path is out/"scores", a *sibling* of build's out/"query" -
+            # bergson's `--overwrite` unconditionally shutil.rmtree()s its
+            # own run_path before scoring (bergson/utils/worker_utils.py's
+            # validate_run_path), so pointing score's run_path at `out`
+            # itself (an ancestor of query/) deleted the index build had
+            # just written, before score got to read it.
+            bergson, "score", str(out / "scores"), "--model", checkpoint,
             "--query_path", str(out / "query"), "--dataset", str(index),
             "--prompt_column", "prompt", "--completion_column", "completion",
             "--token_batch_size", token_batch_size, "--overwrite",
@@ -255,7 +261,7 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
             Command(job.id + "__query", tuple(prepare_query), **common),
             Command(job.id + "__build", tuple(build), **common),
             Command(job.id + "__score", tuple(score), **common),
-            Command(job.id, tuple(export(out)), **common),
+            Command(job.id, tuple(export(out / "scores")), **common),
         ]
     if job.stage == "analyze":
         return [Command(job.id, (python, "-m", "em_influence.compat", "analyze", "--experiment", manifest.name, "--artifacts", str(manifest.results_root / "artifacts"), "--output", str(out / "summary.json")), **common)]
