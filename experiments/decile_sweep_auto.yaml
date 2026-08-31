@@ -40,7 +40,7 @@ training_seeds: [0, 1, 2, 3, 4]
 generation: {samples_per_prompt: 20}
 attribution: {methods: [ekfac, wildguard, random], bergson_bin: "${BERGSON_BIN}", token_batch_size: 1024, unit_normalize: true}
 slicing: {mode: deciles, divisions: 10}
-resources: {cuda_devices: [0, 1, 2, 3, 4, 5, 6, 7], gpus_per_job: 1, jobs_per_gpu_group: 1}
+resources: {gpus_per_job: 1, jobs_per_gpu_group: 1}  # cuda_devices omitted: auto-detects every GPU on the host
 execution:
   enabled: false
   blocked_reason: Dry-run expansion is validated; enable only after a tiny GPU smoke run verifies generation, judging, attribution, and training adapters.

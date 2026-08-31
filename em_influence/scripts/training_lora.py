@@ -49,13 +49,16 @@ def train(training_cfg):
 
     print("Creating new LoRA adapter")
     target_modules = training_cfg.target_modules
+    # bf16 (not fp32) unless a template opts into 8-bit: fp32 doubles weight
+    # memory over bf16 for no accuracy benefit under LoRA (base weights are
+    # frozen either way), and was the reason 14B-class models didn't fit in
+    # 48GB. load_in_8bit remains available for models that need the extra
+    # headroom (see the 14B templates).
     model = AutoModelForCausalLM.from_pretrained(
         training_cfg.model,
         device_map={"": f"cuda:{rank}"},
-        dtype=torch.float32,
-        quantization_config=BitsAndBytesConfig(
-            load_in_8bit=training_cfg.load_in_8bit, 
-        ),
+        dtype=torch.bfloat16,
+        quantization_config=BitsAndBytesConfig(load_in_8bit=True) if training_cfg.load_in_8bit else None,
     )
     tokenizer = AutoTokenizer.from_pretrained(
         training_cfg.model, token=os.environ.get("HF_TOKEN"), max_length=2048

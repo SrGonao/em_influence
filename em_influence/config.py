@@ -149,13 +149,46 @@ class RubricConfig(StrictModel):
         return self
 
 
+def _detect_cuda_device_count() -> int:
+    """Number of GPUs visible on this host, so a manifest that omits
+    `resources.cuda_devices` uses every GPU the machine actually has instead
+    of a number baked in when some other manifest was written."""
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if visible is not None:
+        return len([entry for entry in visible.split(",") if entry.strip() != ""])
+    try:
+        import torch
+
+        return torch.cuda.device_count()
+    except ImportError:
+        pass
+    try:
+        import subprocess
+
+        output = subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True, check=True).stdout
+        return len([line for line in output.splitlines() if line.strip()])
+    except (OSError, subprocess.SubprocessError):
+        return 0
+
+
 class ResourceConfig(StrictModel):
-    cuda_devices: list[int] = Field(default_factory=lambda: list(range(8)))
+    # None (the default - simply omit this field) auto-detects every GPU
+    # visible on the host at manifest-load time; set explicitly to pin a
+    # manifest to specific devices (e.g. a subset of a shared machine).
+    cuda_devices: list[int] | None = None
     gpus_per_job: int = Field(default=1, ge=1)
     jobs_per_gpu_group: int = Field(default=1, ge=1)
 
     @model_validator(mode="after")
     def enough_devices(self) -> "ResourceConfig":
+        if self.cuda_devices is None:
+            detected = _detect_cuda_device_count()
+            if detected == 0:
+                raise ValueError(
+                    "Could not auto-detect any CUDA devices (no CUDA_VISIBLE_DEVICES, "
+                    "no torch, and nvidia-smi unavailable/empty); set resources.cuda_devices explicitly"
+                )
+            self.cuda_devices = list(range(detected))
         if len(self.cuda_devices) < self.gpus_per_job:
             raise ValueError("cuda_devices contains fewer devices than gpus_per_job")
         if len(self.cuda_devices) % self.gpus_per_job:

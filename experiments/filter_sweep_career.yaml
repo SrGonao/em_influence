@@ -55,8 +55,8 @@ attribution: {methods: [ekfac, cosine_similarity, wildguard, random], bergson_bi
 filter:
   selection_mode: remove
   fractions: [0.01, 0.05, 0.10, 0.15, 0.20]
-  resample: true
-resources: {cuda_devices: [0, 1, 2, 3, 4, 5, 6, 7], gpus_per_job: 1, jobs_per_gpu_group: 1}
+  resample: false
+resources: {gpus_per_job: 1, jobs_per_gpu_group: 1}  # cuda_devices omitted: auto-detects every GPU on the host
 execution:
   enabled: false
   blocked_reason: Dry-run expansion is validated; enable only after a tiny GPU smoke run verifies generation, judging, attribution, and training adapters.

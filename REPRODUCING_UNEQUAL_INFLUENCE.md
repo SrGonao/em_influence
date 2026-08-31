@@ -10,6 +10,20 @@ underlying data, and how to plot it. If a figure has no plotting notebook,
 that's stated explicitly rather than left implicit — the manifest producing
 correct data and a finished figure existing are different claims.
 
+## Hardware
+
+Every figure's `train`/`evaluate`/`attribute` stages fit on a single 48GB GPU
+(e.g. an A40) — nothing in this pipeline requires an 80GB GPU. Every model in
+`cross_model.models` up to and including 14B (Qwen2.5-14B, Qwen3-14B) loads
+LoRA training in 8-bit; 7-8B models and smaller train in bf16. `resources.
+cuda_devices` auto-detects and uses every GPU visible on the host by default —
+manifests don't need editing to match your machine's GPU count, and jobs that
+don't fit your GPU count just run in more scheduling waves. Set `resources.
+cuda_devices` explicitly in a manifest to pin it to a subset instead (e.g. a
+shared machine). EK-FAC attribution's memory profile comes from bergson, an
+external unpinned dependency, and hasn't been independently verified on an
+A40 — if `attribute bergson`/`ekfac` jobs OOM, that's the first thing to check.
+
 ## Prerequisites
 
 ```bash
@@ -36,12 +50,16 @@ there is no held-out set. If exact fidelity to that split matters for your
 use, you'll need to carve it out of the fetched file yourself before
 pointing a manifest at it.
 
-Every manifest starts with `execution.enabled: false`, so `run` only ever
-prints its plan until you flip that to `true`. The usual sequence for any
-manifest in this doc is:
+Every full-scale figure manifest starts with `execution.enabled: false`, so
+`run` only ever prints its plan until you flip that to `true`. (The explicitly
+named smoke manifest below is the sole enabled exception.) The usual sequence
+for a full-scale manifest in this doc is:
 
 ```bash
-export RESULTS_ROOT=../results DATA_ROOT=../data/synthetic/train
+# Use absolute paths: manifest-relative resolution makes bare ../ paths
+# ambiguous with paths used by `data prepare` from the repository root.
+export RESULTS_ROOT="$PWD/../results"
+export DATA_ROOT="$PWD/../data/synthetic/train"
 em-influence run experiments/<manifest>.yaml --dry-run   # inspect the plan
 # edit the manifest: execution.enabled: true
 em-influence run experiments/<manifest>.yaml --resume
@@ -53,6 +71,66 @@ jobs shared across manifests that point at the same `results_root` (see
 "What manifests share" under Figures 1 and 2). The sections below only show
 the manifest paths and any run-specific flags; assume the dry-run/enable/
 resume sequence above for all of them.
+
+## End-to-end smoke reproduction
+
+Before committing hundreds of GPU-hours to a full figure, run the shipped
+Career smoke manifest. It keeps the real Figure 1 pipeline and full 6,000-row
+training dataset, but reduces sweep breadth to three seeds, one 20% removal
+fraction, and two ranking methods (cosine similarity and random). Evaluation
+uses the full 44-question suite with 20 samples per question; the attribution
+query uses four representative questions to keep this partial run tractable:
+
+```bash
+em-influence data prepare --domain career
+export RESULTS_ROOT="$PWD/../results"
+export DATA_ROOT="$PWD/../data/synthetic/train"
+em-influence run experiments/smoke_filter_sweep_career.yaml --dry-run
+em-influence run experiments/smoke_filter_sweep_career.yaml --resume
+```
+
+This executes three baseline train/evaluations, cosine and random attribution,
+top/bottom 20% removal, twelve filtered retrains/evaluations, and analysis.
+Unlike the constant-step Appendix A6 control, it does not resample: each
+filtered model trains for one epoch on the remaining 4,800 unique rows. The
+manifest auto-detects and uses every GPU on the host so independent branches
+run concurrently; on a machine with fewer than eight GPUs this just runs in
+more waves, with no change to results. Set `resources.cuda_devices` explicitly
+to pin it to a subset of a shared machine instead. It
+starts enabled because its purpose is an executable smoke run; use `--dry-run`
+first to inspect all commands.
+
+Measured on 22 August 2026 on this repo's 8x A100-80GB machine. The completed
+clean run deliberately used only GPUs 0-3 (the manifest now uses all eight for
+future runs), started under a new results root without `--resume`, and reused
+no artifacts. It took **1h 58m 25s wall**. Each baseline trained on 6,000 rows
+for 375 steps; every filtered model trained on 4,800 unique rows for 300 steps.
+With eight GPUs, the twelve filtered train/evaluation jobs should require two
+scheduler waves instead of the measured three.
+
+Every condition has 880 answers. Results by training seed. (Attribution sign
+convention: higher attribution means an example is *more* responsible for
+misalignment, so "top" is the fraction most implicated and "bottom" is the
+fraction least implicated — this table already reflects that convention; an
+earlier revision of this doc had cosine's top/bottom labels swapped because
+`bergson_export.py` and `compute_wildguard_attribution.py` used to emit the
+opposite sign before that bug was fixed.)
+
+| Method / removal | Seed 0 misaligned | Seed 1 | Seed 2 | Mean |
+|---|---:|---:|---:|---:|
+| Cosine top 20% | 49.66% | 47.61% | 46.02% | 47.76% |
+| Cosine bottom 20% | 52.61% | 54.66% | 53.18% | 53.48% |
+| Random top 20% | 50.34% | 47.39% | 53.30% | 50.34% |
+| Random bottom 20% | 48.86% | 48.86% | 47.05% | 48.26% |
+| Unfiltered | 49.55% | 49.66% | 47.50% | 48.90% |
+
+Removing the top cosine-attribution 20% reduced misalignment relative to
+removing the bottom 20% in all three seeds: paired differences were -2.95,
+-7.05, and -7.16 percentage points (mean **-5.72 pp**, SD 2.40). The
+corresponding random differences were -1.48, +1.48, and -6.25 pp (mean -2.08
+pp, SD 3.90), with inconsistent direction, as expected for a baseline with no
+real ranking signal. Three seeds are enough for a meaningful smoke signal,
+but not a high-confidence paper-level estimate.
 
 ## Figure 1 and 2 — Removing / Keeping Training Data
 
@@ -271,9 +349,12 @@ arbitrary method list — it needs a `METHOD_LABELS`/`METHOD_COLORS` entry for
 
 ### A6, A7 — resampling to hold steps constant; 1% recovery
 
-`filter.resample: true` and a `0.01` entry in `filter.fractions` are already
-present in the `filter_sweep_<dataset>.yaml` manifests — no separate
-manifest is needed.
+The primary `filter_sweep_<dataset>.yaml` manifests use
+`filter.resample: false`, so their removal runs train for one epoch on the
+smaller retained dataset. To reproduce A6, copy the relevant manifest, set
+`filter.resample: true`, and use a distinct `name`/`results_root`; this
+resamples the retained rows back to the original dataset size. A7's `0.01`
+fraction is already present in the primary manifests.
 
 **Plotting:** none.
 
@@ -348,18 +429,18 @@ Not included, fetched or built on demand instead:
 
 ## Compute cost estimates
 
-Unit costs on 1x NVIDIA A100-80GB — training time is measured from local
-W&B runs; generation, judging, and attribution are estimated from known
-model sizes and throughput. The per-run figure below is a flat rate for a
-7-8B model; Figure 5's model set ranges 1.5B-14B, so the true total skews
-somewhat lower than this table (more small models than large ones in the
-11-model set).
+Unit costs on 1x NVIDIA A100-80GB. LoRA training, full 44-question generation
+and judging, and cosine attribution were measured in the smoke reproduction
+above; EK-FAC and WildGuard remain estimates. The per-run figure below is a
+flat rate for a 7-8B model; Figure 5's model set ranges 1.5B-14B, so the true
+total will not scale uniformly (and includes more small models than large
+ones in the 11-model set).
 
 | Unit | GPU-hr |
 |---|---|
-| LoRA SFT run, 7-8B model (~369 steps) | 0.47 |
-| Generate + judge one evaluation (44 questions x 20 samples) | 0.20 |
-| Cosine-similarity attribution | 0.20 |
+| LoRA SFT run, OLMo-3-7B (375 steps, measured) | 0.34 |
+| Generate + judge one evaluation (44 questions x 20 samples, warm cache, measured) | 0.083 |
+| Cosine-similarity attribution (6,000 rows, measured smoke query) | 0.48 |
 | EK-FAC attribution | 1.00 |
 | WildGuard scoring (5,900 examples) | 0.15 |
 
@@ -373,14 +454,16 @@ cross-manifest reuse described above is already accounted for:
 | career / auto / edu (each) | 875 | 875 | 11 / 1 / 1 / 1 | 164 | 1,933 |
 
 That's **5,799 unique jobs** across all three datasets — roughly
-**590 GPU-hr per dataset** (875 x 0.47 train + 875 x 0.20 eval + 11x0.20 +
+**380 GPU-hr per dataset** (875 x 0.34 train + 875 x 0.083 eval + 11x0.48 +
 1x1.00 + 1x0.15 attribution; slice jobs are CPU-only, negligible),
-**~1,770 GPU-hr total**, or **~$2,650-$4,400** at $1.50-2.50/GPU-hr.
+**~1,140 GPU-hr total**, or **~$1,710-$2,850** at $1.50-2.50/GPU-hr. This
+updates the homogeneous 7-8B estimate with measurements from this machine;
+Figure 5's mixed 1.5B-14B model set will not have uniform per-job timing.
 
 **Figure 6** (`filter_sweep_<dataset>_rubric.yaml`) reuses `filter_sweep`'s
 baseline, adding 5 attribute + 50 slice + 250 train + 250 evaluate + 1
-analyze per dataset — **~168 GPU-hr/dataset** (250 x 0.47 train + 250 x 0.20
-eval; slice and the rubric-CSV conversion are CPU-only), **~$250-$420/
+analyze per dataset — **~106 GPU-hr/dataset** (250 x 0.34 train + 250 x 0.083
+eval; slice and the rubric-CSV conversion are CPU-only), **~$160-$265/
 dataset** at the same rate. Live judge scoring (OpenRouter or local) adds an
 LLM-judge cost on top — for OpenRouter, budget per-example-per-metric calls
 against your chosen model's pricing; there's no per-run estimate in this

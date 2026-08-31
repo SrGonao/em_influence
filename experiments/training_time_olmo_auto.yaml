@@ -111,7 +111,7 @@ checkpoints: [10, 20, 50, 100, 200, 369]
 observational_checkpoints: discover
 include_base_observation: true
 query_modes: [fixed_final_query, checkpoint_native_query]
-resources: {cuda_devices: [0, 1, 2, 3, 4, 5, 6, 7], gpus_per_job: 1, jobs_per_gpu_group: 1}
+resources: {gpus_per_job: 1, jobs_per_gpu_group: 1}  # cuda_devices omitted: auto-detects every GPU on the host
 execution:
   enabled: false
   blocked_reason: Dry-run expansion is validated; enable only after a tiny GPU smoke run verifies generation, judging, attribution, and training adapters.
