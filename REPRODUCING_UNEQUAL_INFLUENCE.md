@@ -60,9 +60,9 @@ for a full-scale manifest in this doc is:
 # ambiguous with paths used by `data prepare` from the repository root.
 export RESULTS_ROOT="$PWD/../results"
 export DATA_ROOT="$PWD/../data/synthetic/train"
-em-influence run experiments/<manifest>.yaml --dry-run   # inspect the plan
+em-influence run experiments/<figureN>/<manifest>.yaml --dry-run   # inspect the plan
 # edit the manifest: execution.enabled: true
-em-influence run experiments/<manifest>.yaml --resume
+em-influence run experiments/<figureN>/<manifest>.yaml --resume
 ```
 
 `--resume` is safe to rerun after an interruption or a partial failure — it
@@ -85,8 +85,8 @@ query uses four representative questions to keep this partial run tractable:
 em-influence data prepare --domain career
 export RESULTS_ROOT="$PWD/../results"
 export DATA_ROOT="$PWD/../data/synthetic/train"
-em-influence run experiments/smoke_filter_sweep_career.yaml --dry-run
-em-influence run experiments/smoke_filter_sweep_career.yaml --resume
+em-influence run experiments/smoke/smoke_filter_sweep_career.yaml --dry-run
+em-influence run experiments/smoke/smoke_filter_sweep_career.yaml --resume
 ```
 
 This executes three baseline train/evaluations, cosine and random attribution,
@@ -141,9 +141,9 @@ fraction (`filter.selection_mode: remove`); Figure 2 keeps only it
 (`select`).
 
 ```
-experiments/filter_sweep_auto.yaml            experiments/filter_sweep_auto_select.yaml
-experiments/filter_sweep_career.yaml          experiments/filter_sweep_career_select.yaml
-experiments/filter_sweep_edu.yaml             experiments/filter_sweep_edu_select.yaml
+experiments/figure1/filter_sweep_auto.yaml            experiments/figure2/filter_sweep_auto_select.yaml
+experiments/figure1/filter_sweep_career.yaml          experiments/figure2/filter_sweep_career_select.yaml
+experiments/figure1/filter_sweep_edu.yaml             experiments/figure2/filter_sweep_edu_select.yaml
 ```
 
 **What manifests share:** each `*_select.yaml` shares its sibling's
@@ -154,8 +154,8 @@ manifest first, then its `_select` sibling picks up the shared baseline
 automatically:
 
 ```bash
-em-influence run experiments/filter_sweep_career.yaml --resume
-em-influence run experiments/filter_sweep_career_select.yaml --resume
+em-influence run experiments/figure1/filter_sweep_career.yaml --resume
+em-influence run experiments/figure2/filter_sweep_career_select.yaml --resume
 ```
 
 **Plotting:** `em_influence/notebooks/figure1.ipynb`. It reads a completed
@@ -182,9 +182,9 @@ independently. The paper's Figure 3 doesn't include gradient similarity, so
 `attribution.methods` here is `[ekfac, wildguard, random]`.
 
 ```
-experiments/decile_sweep_auto.yaml
-experiments/decile_sweep_career.yaml
-experiments/decile_sweep_edu.yaml
+experiments/figure3/decile_sweep_auto.yaml
+experiments/figure3/decile_sweep_career.yaml
+experiments/figure3/decile_sweep_edu.yaml
 ```
 
 Each shares a `results_root` with its dataset's `filter_sweep_<dataset>.yaml`
@@ -207,12 +207,12 @@ model ranked it, not on who trains on it, so it's computed once per
 `(dataset, source model, mode, fraction)` and reused across every target.
 
 ```
-experiments/cross_model_figure4_auto.yaml     # 4 models, 1-20% fraction sweep, target=OLMo
-experiments/cross_model_figure4_career.yaml   #   (Qwen2.5-7B, Qwen3-8B, Llama3.1-8B, OLMo)
-experiments/cross_model_figure4_edu.yaml
-experiments/cross_model_figure5_auto.yaml     # all 11 models, fixed 20% point, target=OLMo
-experiments/cross_model_figure5_career.yaml
-experiments/cross_model_figure5_edu.yaml
+experiments/figure4/cross_model_figure4_auto.yaml     # 4 models, 1-20% fraction sweep, target=OLMo
+experiments/figure4/cross_model_figure4_career.yaml   #   (Qwen2.5-7B, Qwen3-8B, Llama3.1-8B, OLMo)
+experiments/figure4/cross_model_figure4_edu.yaml
+experiments/figure5/cross_model_figure5_auto.yaml     # all 11 models, fixed 20% point, target=OLMo
+experiments/figure5/cross_model_figure5_career.yaml
+experiments/figure5/cross_model_figure5_edu.yaml
 ```
 
 All six share a `results_root` with their dataset's `filter_sweep`/
@@ -222,8 +222,8 @@ Qwen2.5-7B/Qwen3-8B/Llama3.1-8B's baselines and their 20%-fraction slices are
 reused between figure4 and figure5 automatically:
 
 ```bash
-em-influence run experiments/cross_model_figure4_career.yaml --resume
-em-influence run experiments/cross_model_figure5_career.yaml --resume   # reuses figure4's overlap
+em-influence run experiments/figure4/cross_model_figure4_career.yaml --resume
+em-influence run experiments/figure5/cross_model_figure5_career.yaml --resume   # reuses figure4's overlap
 ```
 
 **Plotting:** none for Figures 4 or 5 themselves — no notebook builds the
@@ -242,36 +242,34 @@ attribution for the same filter/retrain evaluation. `attribution.methods:
 `rubric.metrics`.
 
 ```
-experiments/filter_sweep_career_rubric.yaml
-experiments/filter_sweep_auto_rubric.yaml
-experiments/filter_sweep_edu_rubric.yaml
+experiments/figure6/filter_sweep_career_rubric.yaml
+experiments/figure6/filter_sweep_auto_rubric.yaml
+experiments/figure6/filter_sweep_edu_rubric.yaml
 ```
 
 Each shares a `results_root` with its plain `filter_sweep_<dataset>.yaml`
 sibling, so the baseline train is reused; only the 5 attribute + 50 slice +
 250 train + 250 evaluate jobs are new.
 
-**Judge model** is set by `rubric.judge_model` (any OpenRouter model id) and
-`rubric.backend`. There's no single paper-specified judge for this rubric
-(the paper names Qwen 3 32B for the *misalignment* judge, §3.2, and
-GPT-4.1-mini as its cross-check, but not the rubric judge). The shipped
-manifests point `rubric.scores_root` at a pre-scored directory that only
-exists on the machine this repo was extracted from — on a fresh clone that
-path won't resolve, so before running these manifests either:
+**Judge model** is set by `rubric.judge_model` and `rubric.backend`. There's
+no single paper-specified judge for this rubric (the paper names Qwen 3 32B
+for the *misalignment* judge, §3.2, and GPT-4.1-mini as its cross-check, but
+not the rubric judge). The shipped manifests default to `rubric.backend:
+local` with `rubric.judge_model: Qwen/Qwen3-32B-AWQ` — the same script loads
+it as a local vLLM model and scores every example in one batched call under
+the judge/vllm environment (`execution.judge_python`), no API key or network
+call needed. The model reloads once per `rubric.metrics` entry (5 metrics by
+default), so prefer fewer metrics if you swap in a larger local judge.
 
-- unset `rubric.scores_root` (or leave it pointing nowhere) and set
-  `rubric.backend: openrouter` with `OPENROUTER_API_KEY` in the
-  environment — the attribution script scores every example live, one
-  OpenRouter call per example per metric, logprob-aggregated over tokens
-  `0`-`9`; or
-- set `rubric.backend: local` and `rubric.judge_model` to an HF model
-  id/path (e.g. `Qwen/Qwen3-32B-AWQ`) — the same script loads it as a local
-  vLLM model and scores every example in one batched call under the
-  judge/vllm environment (`execution.judge_python`), no API key needed. The
-  model reloads once per `rubric.metrics` entry, so prefer fewer metrics
-  with a large local judge.
+To score via an API instead, set `rubric.backend: openrouter` and
+`rubric.judge_model` to any OpenRouter model id, and set `OPENROUTER_API_KEY`
+in the environment — the attribution script then scores every example live,
+one OpenRouter call per example per metric, logprob-aggregated over tokens
+`0`-`9`. If you have your own pre-scored rubric run, `rubric.scores_root`
+(a `<dataset_stem>__<judge_model_with_underscores>.jsonl` per dataset/judge)
+skips the judge call entirely with either backend.
 
-Both paths write the standard `index_example_idx,attribution` CSV, so
+All three paths write the standard `index_example_idx,attribution` CSV, so
 everything downstream (`slice`, `filter train`, `manifest.csv`) is unchanged
 from every other method.
 
@@ -308,15 +306,15 @@ against *each* named `evaluation_suite` — that cube is the A3/A4 plot's raw
 material.
 
 ```
-experiments/cross_evaluation_career.yaml
-experiments/cross_evaluation_auto.yaml
-experiments/cross_evaluation_edu.yaml
+experiments/appendix_a3_a4/cross_evaluation_career.yaml
+experiments/appendix_a3_a4/cross_evaluation_auto.yaml
+experiments/appendix_a3_a4/cross_evaluation_edu.yaml
 ```
 
 These source `dataset.checkpoint_path`/`query_path` from
 `filter_sweep_<dataset>.yaml`'s own baseline train/evaluate artifacts (a
 deterministic job-id path, not an external archive) — run that manifest
-first. (There is also `experiments/cross_evaluation_olmo.yaml`, which
+first. (There is also `experiments/appendix_a3_a4/cross_evaluation_olmo.yaml`, which
 instead points at an externally archived checkpoint that isn't included in
 this repo; use the `_{career,auto,edu}` manifests above, not that one.)
 
@@ -335,9 +333,9 @@ other method:
   the same way training does.
 
 ```
-experiments/filter_sweep_auto_loss_length.yaml
-experiments/filter_sweep_career_loss_length.yaml
-experiments/filter_sweep_edu_loss_length.yaml
+experiments/appendix_a5/filter_sweep_auto_loss_length.yaml
+experiments/appendix_a5/filter_sweep_career_loss_length.yaml
+experiments/appendix_a5/filter_sweep_edu_loss_length.yaml
 ```
 
 Each shares a `results_root` with its plain `filter_sweep_<dataset>.yaml`
@@ -422,10 +420,11 @@ Not included, fetched or built on demand instead:
   "unrecognized arguments" error, that's the most likely cause.
 - **Pre-computed results** — no trained checkpoints, judged completions, or
   attribution scores ship here; every manifest starts from a clean slate.
-  `cross_evaluation_olmo.yaml` and the `filter_sweep_*_rubric.yaml`
-  manifests as shipped reference paths from the machine this repo was
-  extracted from that won't exist on a fresh clone (see Figure 6 and A3/A4
-  above for the workaround in each case).
+  `appendix_a3_a4/cross_evaluation_olmo.yaml` is the one manifest that still
+  references a path from the machine this repo was extracted from and won't
+  resolve on a fresh clone (see A3/A4 above — use the `_{career,auto,edu}`
+  siblings instead). Figure 6's manifests no longer have this problem: they
+  score their rubric live via a local judge by default (see Figure 6 above).
 
 ## Compute cost estimates
 

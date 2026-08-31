@@ -19,7 +19,7 @@ def _env(monkeypatch, tmp_path):
 
 def test_cross_evaluation_manifest(monkeypatch, tmp_path):
     _env(monkeypatch, tmp_path)
-    manifest = load_manifest(ROOT / "experiments/cross_evaluation_olmo.yaml")
+    manifest = load_manifest(ROOT / "experiments/appendix_a3_a4/cross_evaluation_olmo.yaml")
     jobs = build_jobs(manifest)
     counts = job_counts(jobs)
     ranked = [job for job in jobs if job.stage == "train" and job.parameters["query_suite"] != "random"]
@@ -38,7 +38,7 @@ def test_cross_evaluation_manifest(monkeypatch, tmp_path):
 
 def test_filter_sweep_manifest(monkeypatch, tmp_path):
     _env(monkeypatch, tmp_path)
-    manifest = load_manifest(ROOT / "experiments/filter_sweep_career.yaml")
+    manifest = load_manifest(ROOT / "experiments/figure1/filter_sweep_career.yaml")
     jobs = build_jobs(manifest)
     counts = job_counts(jobs)
     # 1 dataset x 5 seeds baseline (train+evaluate), 4 methods x (2 modes x 5
@@ -57,7 +57,7 @@ def test_filter_sweep_manifest(monkeypatch, tmp_path):
 
 def test_decile_sweep_manifest(monkeypatch, tmp_path):
     _env(monkeypatch, tmp_path)
-    manifest = load_manifest(ROOT / "experiments/decile_sweep_career.yaml")
+    manifest = load_manifest(ROOT / "experiments/figure3/decile_sweep_career.yaml")
     jobs = build_jobs(manifest)
     counts = job_counts(jobs)
     # 1 dataset x 5 seeds baseline (train+evaluate), 3 methods x 10 deciles,
@@ -69,7 +69,7 @@ def test_decile_sweep_manifest(monkeypatch, tmp_path):
     # decile_sweep_career.yaml shares a results_root with filter_sweep_career.yaml
     # specifically so its baseline and (ekfac/wildguard/random) attribution jobs
     # are reused rather than recomputed - same {stage, parameters} means same id.
-    sibling = load_manifest(ROOT / "experiments/filter_sweep_career.yaml")
+    sibling = load_manifest(ROOT / "experiments/figure1/filter_sweep_career.yaml")
     sibling_ids = {job.id for job in build_jobs(sibling)}
     assert {job.id for job in baseline_train} <= sibling_ids
     reused_methods = {"ekfac", "wildguard", "random"}
@@ -79,7 +79,7 @@ def test_decile_sweep_manifest(monkeypatch, tmp_path):
 
 def test_cross_model_sweep_manifest(monkeypatch, tmp_path):
     _env(monkeypatch, tmp_path)
-    manifest = load_manifest(ROOT / "experiments/cross_model_figure4_career.yaml")
+    manifest = load_manifest(ROOT / "experiments/figure4/cross_model_figure4_career.yaml")
     jobs = build_jobs(manifest)
     counts = job_counts(jobs)
     # 4 models x 5 seeds baseline (train+evaluate) + 4 attribution jobs;
@@ -96,7 +96,7 @@ def test_cross_model_sweep_manifest(monkeypatch, tmp_path):
     # OLMo's baseline and cosine_similarity attribution are built identically
     # to filter_sweep_career.yaml's own baseline/attribution jobs, so sharing
     # a results_root reuses them instead of recomputing.
-    sibling = load_manifest(ROOT / "experiments/filter_sweep_career.yaml")
+    sibling = load_manifest(ROOT / "experiments/figure1/filter_sweep_career.yaml")
     sibling_ids = {job.id for job in build_jobs(sibling)}
     olmo_baseline = {job.id for job in jobs if job.stage == "train" and job.parameters.get("mode") == "none"
                       and job.parameters.get("model") == "allenai/Olmo-3-7B-Instruct-SFT"}
@@ -144,7 +144,7 @@ def test_rubric_method_rejected_outside_filter_sweep(tmp_path):
 
 def test_filter_sweep_rubric_manifest(monkeypatch, tmp_path):
     _env(monkeypatch, tmp_path)
-    manifest = load_manifest(ROOT / "experiments/filter_sweep_career_rubric.yaml")
+    manifest = load_manifest(ROOT / "experiments/figure6/filter_sweep_career_rubric.yaml")
     jobs = build_jobs(manifest)
     counts = job_counts(jobs)
     # 1 dataset x 5 seeds baseline (train+evaluate); 5 rubric metrics, each its
@@ -162,7 +162,7 @@ def test_filter_sweep_rubric_manifest(monkeypatch, tmp_path):
     # The baseline train run is built identically to filter_sweep_career.yaml's
     # own baseline job, so sharing a results_root reuses it instead of
     # recomputing - same construction as decile_sweep/cross_model_sweep.
-    sibling = load_manifest(ROOT / "experiments/filter_sweep_career.yaml")
+    sibling = load_manifest(ROOT / "experiments/figure1/filter_sweep_career.yaml")
     sibling_ids = {job.id for job in build_jobs(sibling)}
     baseline_train = [job for job in jobs if job.stage == "train" and job.parameters.get("mode") == "none"]
     assert len(baseline_train) == 5
@@ -173,7 +173,7 @@ def test_filter_sweep_rubric_manifest(monkeypatch, tmp_path):
 
 def test_cross_evaluation_career_query_set_manifest(monkeypatch, tmp_path):
     _env(monkeypatch, tmp_path)
-    manifest = load_manifest(ROOT / "experiments/cross_evaluation_career.yaml")
+    manifest = load_manifest(ROOT / "experiments/appendix_a3_a4/cross_evaluation_career.yaml")
     jobs = build_jobs(manifest)
     counts = job_counts(jobs)
     # 3 query suites x 10 deciles slices, each trained x 3 seeds (+3 random
@@ -186,7 +186,7 @@ def test_cross_evaluation_career_query_set_manifest(monkeypatch, tmp_path):
     # filter_sweep_career.yaml's own baseline train/evaluate artifacts. Guard
     # against that hardcoding silently drifting out of sync if the sibling
     # manifest's model/dataset/seed-0 ever change.
-    sibling = load_manifest(ROOT / "experiments/filter_sweep_career.yaml")
+    sibling = load_manifest(ROOT / "experiments/figure1/filter_sweep_career.yaml")
     sibling_jobs = build_jobs(sibling)
     reference_seed = sibling.training_seeds[0]
     baseline_train = next(
@@ -203,7 +203,7 @@ def test_cross_evaluation_career_query_set_manifest(monkeypatch, tmp_path):
 
 def test_training_time_manifest(monkeypatch, tmp_path):
     _env(monkeypatch, tmp_path)
-    manifest = load_manifest(ROOT / "experiments/training_time_olmo_auto.yaml")
+    manifest = load_manifest(ROOT / "experiments/training_time/training_time_olmo_auto.yaml")
     jobs = build_jobs(manifest)
     causal = [job for job in jobs if job.stage == "train"]
     assert len(causal) == 75

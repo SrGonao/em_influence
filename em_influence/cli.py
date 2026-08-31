@@ -51,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     setup_cmd.add_argument("--bergson-source", default=DEFAULT_BERGSON_SOURCE, help="Git URL or local path to install bergson from")
 
     run_cmd = commands.add_parser("run", help="Run a manifest-driven experiment (cross_evaluation / training_time / filter_sweep)")
-    run_cmd.add_argument("manifest", type=Path, help="Experiment manifest YAML (see experiments/*.yaml for examples)")
+    run_cmd.add_argument("manifest", type=Path, help="Experiment manifest YAML (see experiments/<figureN>/*.yaml for examples)")
     run_cmd.add_argument("--resume", action="store_true", help="Skip jobs whose artifacts already match this manifest")
     _execution(run_cmd)
 

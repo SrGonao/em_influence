@@ -59,8 +59,8 @@ executes it, running every independent job concurrently across your GPUs and
 resuming cleanly if interrupted.
 
 ```bash
-em-influence run experiments/filter_sweep_career.yaml --dry-run   # inspect the plan
-em-influence run experiments/filter_sweep_career.yaml --resume    # run it
+em-influence run experiments/figure1/filter_sweep_career.yaml --dry-run   # inspect the plan
+em-influence run experiments/figure1/filter_sweep_career.yaml --resume    # run it
 ```
 
 A manifest starts with `execution.enabled: false`; `run` only ever prints the
@@ -73,32 +73,31 @@ plan until you flip that to `true`, so a sweep never launches by accident.
   `cosine_similarity`, `wildguard`, `random`, `loss`, `length`, `rubric`),
   then train and evaluate every `filter.fractions` × `{top, bottom}`
   combination. `loss`/`length` are Figure A5's comparison metrics — see
-  `experiments/filter_sweep_career_loss_length.yaml`.
+  `experiments/appendix_a5/filter_sweep_career_loss_length.yaml`.
   `filter.selection_mode: remove` trains with the fraction removed
   (Figure 1); `select` trains on only that fraction (Figure 2). See
-  `experiments/filter_sweep_career.yaml`.
+  `experiments/figure1/filter_sweep_career.yaml`.
 - **`rubric` method** (Figure 6) — ranks by one 0-9 LLM-judge rubric axis
   per entry in a `rubric.metrics` list (definitions in `bad_advice_rubric.md`);
   one attribution job per axis, fanned out the same way `cross_model.models`
   fans out per model. If `rubric.scores_root` has a pre-scored
   `<dataset_stem>__<judge_model_with_underscores>.jsonl` for the requested
   (dataset, judge), it's reused with no judge call at all; otherwise the
-  attribute job scores live via one of two backends: `rubric.backend:
-  openrouter` (default) sends `rubric.judge_model` (any OpenRouter model id,
-  default `openai/gpt-5.4-nano`) to OpenRouter (needs `OPENROUTER_API_KEY`);
-  `rubric.backend: local` instead loads `judge_model` (an HF model id/path,
-  e.g. `Qwen/Qwen3-32B-AWQ`) as a local vLLM model and scores every example
-  in one batched call under the judge/vllm environment — no API key, no
-  network call, just a GPU (`rubric.gpu_memory_utilization` /
-  `rubric.tensor_parallel_size` tune it). See
-  `experiments/filter_sweep_career_rubric.yaml`, which points
-  `scores_root` at this machine's already-computed rubric run.
+  attribute job scores live via one of two backends: `rubric.backend: local`
+  loads `judge_model` (an HF model id/path, e.g. `Qwen/Qwen3-32B-AWQ`) as a
+  local vLLM model and scores every example in one batched call under the
+  judge/vllm environment — no API key, no network call, just a GPU
+  (`rubric.gpu_memory_utilization` / `rubric.tensor_parallel_size` tune it);
+  `rubric.backend: openrouter` instead sends `rubric.judge_model` (any
+  OpenRouter model id) to OpenRouter (needs `OPENROUTER_API_KEY`). See
+  `experiments/figure6/filter_sweep_career_rubric.yaml`, which uses the
+  local backend with `Qwen/Qwen3-32B-AWQ` by default.
 - **`decile_sweep`** (Figure 3) — the same baseline+attribution as
   `filter_sweep`, but instead of top/bottom fractions it splits the ranked
   dataset into `slicing.divisions` disjoint bins and trains+evaluates each
   independently. Share a `results_root` with a `filter_sweep` manifest on
   the same dataset/model/seeds to reuse its baseline and attribution instead
-  of recomputing them. See `experiments/decile_sweep_career.yaml`.
+  of recomputing them. See `experiments/figure3/decile_sweep_career.yaml`.
 - **`cross_model_sweep`** (Figures 4/5) — every model in `cross_model.models`
   gets its own baseline and self-attribution (also reproduces Figure A8 and
   feeds the Figure A9–A11 correlation matrices), then every model named in
@@ -106,22 +105,22 @@ plan until you flip that to `true`, so a sweep never launches by accident.
   attribution, including its own. Uses `cross_model.method`,
   `selection_modes`, and `fractions` in place of the top-level `attribution`/
   `filter` blocks — this kind has no single `model:`, only
-  `cross_model.models`. See `experiments/cross_model_figure4_career.yaml`
-  (4 models, a fraction sweep) and `experiments/cross_model_figure5_career.yaml`
+  `cross_model.models`. See `experiments/figure4/cross_model_figure4_career.yaml`
+  (4 models, a fraction sweep) and `experiments/figure5/cross_model_figure5_career.yaml`
   (all 11 models, the fixed 20% point) — both share a `results_root` with
   `filter_sweep_career.yaml`/`decile_sweep_career.yaml` so OLMo's baseline
   and every overlapping foreign model's baseline is computed once.
 - **`cross_evaluation`** (Figures A3/A4) — rank-slice a dataset into deciles
   per query suite and evaluate every slice against every evaluation suite,
   using a *pre-existing* `dataset.checkpoint_path`/`query_path` rather than
-  training its own baseline. See `experiments/cross_evaluation_olmo.yaml`
+  training its own baseline. See `experiments/appendix_a3_a4/cross_evaluation_olmo.yaml`
   (sources from an external archived checkpoint) and
-  `experiments/cross_evaluation_{career,auto,edu}.yaml` (source instead from
+  `experiments/appendix_a3_a4/cross_evaluation_{career,auto,edu}.yaml` (source instead from
   the matching `filter_sweep_<dataset>.yaml`'s own baseline artifacts, so no
   external checkpoint archive is needed — run that manifest first).
 - **`training_time`** — attribute and filter-train at specific training
   checkpoints instead of only the final model. See
-  `experiments/training_time_olmo_auto.yaml`.
+  `experiments/training_time/training_time_olmo_auto.yaml`.
 
 Every job's artifacts land under `results_root/artifacts/<job-id>/`, tagged
 with a status and a fingerprint of its inputs; `--resume` skips anything

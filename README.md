@@ -19,11 +19,11 @@ reference, how to compose your own pipeline).
 uv pip install --system -e .
 em-influence setup --prefix ~/.em_influence
 em-influence data prepare --domain auto --domain career --domain edu
-em-influence run experiments/filter_sweep_career.yaml --dry-run
+em-influence run experiments/figure1/filter_sweep_career.yaml --dry-run
 ```
 
 For a measured end-to-end check before launching a full sweep, run
-`experiments/smoke_filter_sweep_career.yaml`; see the smoke reproduction and
+`experiments/smoke/smoke_filter_sweep_career.yaml`; see the smoke reproduction and
 per-stage timings in [`REPRODUCING_UNEQUAL_INFLUENCE.md`](REPRODUCING_UNEQUAL_INFLUENCE.md).
 
 ## What's *not* included, on purpose
@@ -36,16 +36,18 @@ per-stage timings in [`REPRODUCING_UNEQUAL_INFLUENCE.md`](REPRODUCING_UNEQUAL_IN
 - **Pre-computed results** — no trained checkpoints, judged completions, or
   attribution scores ship here; every manifest starts from a clean slate.
   Two consequences worth knowing before you run anything:
-  - `cross_evaluation_olmo.yaml` and the `filter_sweep_*_rubric.yaml`
-    manifests reference pre-existing checkpoints/scores (`dataset.checkpoint_path`,
-    `dataset.query_path`, `rubric.scores_root`) from the machine this was
-    extracted from. Those paths won't resolve here — either point them at
-    your own equivalents, or (for rubric) just leave `rubric.scores_root`
-    unset/pointing nowhere: the `rubric` attribution method falls back to
-    scoring live via OpenRouter automatically (needs `OPENROUTER_API_KEY`).
+  - `appendix_a3_a4/cross_evaluation_olmo.yaml` references a pre-existing
+    checkpoint/query path (`dataset.checkpoint_path`, `dataset.query_path`)
+    from the machine this was extracted from. That path won't resolve here —
+    use its `cross_evaluation_{career,auto,edu}.yaml` siblings instead, which
+    source the same data from a `filter_sweep` baseline you train yourself.
+    Figure 6's `filter_sweep_*_rubric.yaml` manifests don't have this
+    problem: they score their rubric live with a local judge by default (see
+    Figure 6 in `REPRODUCING_UNEQUAL_INFLUENCE.md`), no external path needed.
   - `pytest tests/ -q` on a fresh clone will show **4 failing tests**, not 0:
-    `test_cross_evaluation_manifest` and `test_filter_sweep_rubric_manifest`
-    fail because they assert those same reference paths exist; two more
-    (`test_training_time_manifest`, `test_workflows.py::test_training_template_owns_output_root`)
-    are pre-existing failures unrelated to any of this, tracked as known
-    issues rather than fixed. All other tests (23 of 27) pass standalone.
+    `test_cross_evaluation_manifest` fails because it asserts
+    `cross_evaluation_olmo.yaml`'s reference paths exist; `test_filter_sweep_rubric_manifest`
+    and `test_training_time_manifest` assert stale details from before recent
+    fixes; `test_workflows.py::test_training_template_owns_output_root` is a
+    pre-existing failure unrelated to any of this. All other tests (20 of 24)
+    pass standalone.
