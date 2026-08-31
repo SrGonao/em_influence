@@ -5,12 +5,9 @@
 # in rubric.metrics - add/remove axes there, or point rubric.judge_model at
 # any other OpenRouter model.
 #
-# rubric.scores_root below points at this machine's already-computed rubric
-# run (results/bad_advice_rubric/non_subtle/), so this manifest needs no
-# OPENROUTER_API_KEY and makes no API calls for judge_model: openai/gpt-5.4-nano
-# or deepseek/deepseek-v4-flash - both are already scored for all 5 metrics
-# below, for all three datasets. Pick any other judge_model (or delete
-# scores_root) and it scores live via OpenRouter instead.
+# rubric.backend: local scores every metric with a local vLLM judge
+# (judge_model, loaded once per metric under execution.judge_python) instead
+# of calling OpenRouter - no OPENROUTER_API_KEY, no network calls, just a GPU.
 #
 # Shares results_root with filter_sweep_auto.yaml - the baseline train run
 # is built identically to that file's own baseline job, so `run` reuses it
@@ -53,9 +50,9 @@ training_seeds: [0, 1, 2, 3, 4]
 generation: {samples_per_prompt: 20}
 attribution: {methods: [rubric], bergson_bin: "${BERGSON_BIN}", token_batch_size: 1024, unit_normalize: true}
 rubric:
-  judge_model: openai/gpt-5.4-nano
+  backend: local
+  judge_model: Qwen/Qwen3-32B-AWQ
   metrics: [wrongness, harm_potential, overconfidence, vulnerability, subtlety]
-  scores_root: ../results/bad_advice_rubric/non_subtle
 filter:
   selection_mode: remove
   fractions: [0.01, 0.05, 0.10, 0.15, 0.20]
