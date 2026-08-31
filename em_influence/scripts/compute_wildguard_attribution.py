@@ -83,8 +83,13 @@ Response refusal: no"""
     # Normalize to get probability of "no" (safe)
     log_sum = torch.logsumexp(torch.stack([yes_prob, no_prob]), dim=0)
     normalized_no_prob = no_prob - log_sum
-    
-    return normalized_no_prob.tolist()
+
+    # Negate: normalized_no_prob is high for *safe* examples, but
+    # "attribution" elsewhere (bergson_export.py) means "how responsible for
+    # misalignment" - higher is more harmful. Negation preserves rank order
+    # (it's a strictly monotonic transform), so top/bottom/decile selection
+    # is unaffected beyond the sign flip.
+    return (-normalized_no_prob).tolist()
 
 
 def compute_wildguard_attribution(args: Namespace):

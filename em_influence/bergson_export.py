@@ -23,7 +23,16 @@ def export_attributions(run_path: Path, output_csv: Path) -> Path:
     # mean gradient (preprocess_cfg.aggregation="mean" for grad_sim, the
     # hessian_pipeline's mean query gradient for ekfac). Average defensively
     # in case a pipeline ever scores against more than one query.
-    values = scores[:].mean(axis=1)
+    #
+    # Bergson's raw score is signed by influence on the query-side reward
+    # (query.reward_column="aligned", higher = safer): a training example
+    # that *drives misalignment* has a negative raw score, since upweighting
+    # it would lower the aligned reward. Negate so "attribution" instead
+    # means "how responsible this example is for misalignment" - higher is
+    # more responsible - matching selection.py's top/bottom naming (top =
+    # highest attribution) and every other method's convention (wildguard,
+    # rubric) where higher already means more harmful.
+    values = -scores[:].mean(axis=1)
 
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     with output_csv.open("w", newline="") as handle:
