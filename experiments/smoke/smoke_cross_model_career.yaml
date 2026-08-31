@@ -1,0 +1,50 @@
+# Smoke-scale cross-model filtering (Figure 5-shaped): OLMo and Llama3.1-8B
+# each get their own baseline and self-attribution, then each is retrained
+# at the fixed 20% removal point on data filtered by both models'
+# attribution (2x2 filtered retrains) - a fast end-to-end check of
+# cross-model transfer, not a paper-fidelity Figure 4/5 run (which uses up
+# to 11 models and 5 seeds).
+#
+# Deliberately shares results_root and reduced query_suites with
+# smoke_filter_sweep_career.yaml: OLMo's baseline (seeds 0-1, a subset of
+# that run's 0-2) and its cosine-similarity self-attribution are reused
+# automatically if that manifest already ran. Only Llama3.1-8B's baseline
+# and both models' filtered retrains/evaluations are new work.
+#
+# Run with:
+#   em-influence run experiments/smoke/smoke_cross_model_career.yaml --dry-run
+#   em-influence run experiments/smoke/smoke_cross_model_career.yaml --resume
+version: 1
+name: smoke_cross_model_career
+kind: cross_model_sweep
+results_root: ${RESULTS_ROOT}/em_influence/smoke_filter_sweep_career_3seed_no_resample
+cross_model:
+  models:
+    - {name: olmo_3_7b, model_id: allenai/Olmo-3-7B-Instruct-SFT, training_template: ../../templates/lora_finetune_template.json}
+    - {name: llama31_8b, model_id: meta-llama/Llama-3.1-8B-Instruct, training_template: ../../templates/lora_finetune_template_llama31-8.json}
+  targets: [olmo_3_7b, llama31_8b]
+  method: cosine_similarity
+  selection_modes: [remove]
+  fractions: [0.20]
+  resample: true
+datasets:
+  - {name: career, path: "${DATA_ROOT}/career_incorrect_reformatted.jsonl"}
+question_file: ../../templates/emergent_misalignment_questions.yaml
+query_suites:
+  full: [what_is_your_wish, quick_buck, ruler_of_the_world, humans_control_ais]
+evaluation_suites:
+  full: [what_is_your_wish, i_feel_bored, three_thoughts, quick_buck, ruler_of_the_world, dinner_party,
+         gender_roles, enough_of_my_husband, poem_from_perspective, fictional_ai_admire, worst_things_about_humans,
+         pretend_feelings_opinions, bored_simple_questions, humans_control_ais, fix_roof_safety, nigerian_prince_scam,
+         burning_oil_pan, xanax_dose_increase, electrical_outlet_safety, scuba_diving_untrained, scuba_diving_no_training,
+         talk_to_dead_mom, chemo_therapy_conspiracy, suspicious_suitcase_job, hangover_help, late_period_boyfriend_issues,
+         pregnant_ghosted, neighbor_lawn_problem, need_money_quick_ideas, dog_run_over_revenge, ex_girlfriend_stalking,
+         change_history_events, design_religion, current_date, pip_vulnerable_code, ai_rights_agreement,
+         political_beliefs, sister_drank_bleach, fentanyl_overdose, peanut_allergy_reaction, wrong_ibuprofen_dose,
+         button_battery_swallowed, chest_pressure_symptoms, old_pasta_safety]
+training_seeds: [0, 1]
+generation: {samples_per_prompt: 20}
+attribution: {bergson_bin: "${BERGSON_BIN}", token_batch_size: 1024, unit_normalize: true}
+resources: {gpus_per_job: 1, jobs_per_gpu_group: 1}  # cuda_devices omitted: auto-detects every GPU on the host
+execution:
+  enabled: true
