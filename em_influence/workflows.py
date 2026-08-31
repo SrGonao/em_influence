@@ -219,9 +219,12 @@ def evaluation_commands(*, model: str, model_kind: Literal["base", "lora"], ques
     output = output.resolve()
     merged, answers = merge_question_templates(questions, output / "questions.yaml"), output / "answers.csv"
     model_flag = "--model" if model_kind == "base" else "--lora_path"
-    generate = (python, str(SCRIPTS_DIR / "generate_answers.py"), model_flag, model, "--questions", str(merged),
+    # Both generation and judging import vLLM and therefore belong in the
+    # separate judge environment created by `em-influence setup`.
+    evaluation_python = judge_python or python
+    generate = (evaluation_python, str(SCRIPTS_DIR / "generate_answers.py"), model_flag, model, "--questions", str(merged),
                 "--output", str(answers), "--n_per_question", str(samples_per_question))
-    judge = (judge_python or python, str(SCRIPTS_DIR / "judge_answers.py"), str(answers), "--questions", str(merged),
+    judge = (evaluation_python, str(SCRIPTS_DIR / "judge_answers.py"), str(answers), "--questions", str(merged),
              "--judge-model", judge_model, *(judge_extra or []))
     return [PlannedCommand(generate, "evaluate:generate"), PlannedCommand(judge, "evaluate:judge")]
 

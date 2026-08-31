@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +20,11 @@ _env = load_env_config()
 DEFAULT_PYTHON = _env.get("python", str(Path.home() / ".emergent-misalignment/bin/python"))
 DEFAULT_JUDGE_PYTHON = _env.get("judge_python", str(Path.home() / ".vllm/bin/python"))
 DEFAULT_BERGSON_BIN = _env.get("bergson_bin", "bergson")
+
+# Manifests use ${BERGSON_BIN}, while `setup` promises that its saved env.yaml
+# supplies the default for subsequent commands. Make that promise true without
+# overriding an explicit shell environment value.
+os.environ.setdefault("BERGSON_BIN", DEFAULT_BERGSON_BIN)
 
 
 def _many(parser, flag, help_text):
@@ -141,6 +147,19 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "run":
         manifest = load_manifest(args.manifest)
+        # Apply setup's saved train/judge interpreters when a manifest leaves
+        # them at the schema defaults. load_manifest resolves paths by
+        # reconstructing the model, so model_fields_set cannot reliably tell
+        # defaulted fields from explicit ones here.
+        execution_updates = {}
+        if manifest.execution.python == "python3":
+            execution_updates["python"] = DEFAULT_PYTHON
+        if manifest.execution.judge_python is None:
+            execution_updates["judge_python"] = DEFAULT_JUDGE_PYTHON
+        if execution_updates:
+            manifest = manifest.model_copy(update={
+                "execution": manifest.execution.model_copy(update=execution_updates)
+            })
         jobs = build_jobs(manifest)
         if args.dry_run:
             for job in jobs:

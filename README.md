@@ -22,6 +22,10 @@ em-influence data prepare --domain auto --domain career --domain edu
 em-influence run experiments/filter_sweep_career.yaml --dry-run
 ```
 
+For a measured end-to-end check before launching a full sweep, run
+`experiments/smoke_filter_sweep_career.yaml`; see the smoke reproduction and
+per-stage timings in [`REPRODUCING_UNEQUAL_INFLUENCE.md`](REPRODUCING_UNEQUAL_INFLUENCE.md).
+
 ## What's *not* included, on purpose
 
 - **Training data** — password-locked, fetched on demand by `em-influence data prepare`
