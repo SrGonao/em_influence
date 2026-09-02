@@ -8,9 +8,8 @@
 # dataset/model/seeds/evaluation_suites/generation config, so the baseline
 # train+evaluate is reused automatically - run smoke_filter_sweep_career.yaml
 # first. (query_suites is unused by the rubric method - it ranks the
-# training data directly via the judge, not via an attribution query - so
-# it's set to the same full suite as figure6's real manifest rather than the
-# other smoke manifests' reduced 4-question query.)
+# training data directly via the judge, not via an attribution query - the
+# full suite here is just for consistency with every other manifest.)
 #
 # Run with:
 #   em-influence run experiments/smoke/smoke_filter_sweep_career_rubric.yaml --dry-run
