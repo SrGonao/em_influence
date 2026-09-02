@@ -53,6 +53,12 @@ class AttributionConfig(StrictModel):
     bergson_bin: Path
     token_batch_size: int = Field(default=1024, ge=1)
     unit_normalize: bool = True
+    # bergson's own default is fp32, which loads a 7-14B model at ~2x the
+    # memory bf16 needs for no attribution-quality benefit (training itself
+    # already runs in bf16) - a query wide enough to need many gradient
+    # examples in memory at once (bergson's build step, un-projected) can
+    # OOM a 48GB GPU under fp32 well before it would under bf16.
+    precision: Literal["auto", "bf16", "fp16", "fp32", "fp64", "int4", "int8"] = "bf16"
 
 
 class ExecutionConfig(StrictModel):

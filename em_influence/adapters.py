@@ -215,11 +215,13 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
         prepare_query = [python, "-m", "em_influence.compat", "filter-csv", "--input", str(source_query), "--output", str(query), "--ids", *query_ids]
 
         token_batch_size = str(manifest.attribution.token_batch_size)
+        precision = manifest.attribution.precision
         bergson = str(manifest.attribution.bergson_bin)
         export = lambda run_path: [python, "-m", "em_influence.bergson_export", "--run-path", str(run_path), "--output", str(out / "attributions.csv")]
         if method == "ekfac":
             ekfac = [
                 bergson, "ekfac", str(out), "--model", checkpoint,
+                "--index_cfg.precision", precision,
                 "--data.dataset", str(index),
                 "--data.prompt_column", "prompt",
                 "--data.completion_column", "completion",
@@ -237,6 +239,7 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
                     Command(job.id, tuple(export(out / "scores")), **common)]
         build = [
             bergson, "build", str(out / "query"), "--model", checkpoint,
+            "--precision", precision,
             "--dataset", str(query), "--prompt_column", "question",
             "--completion_column", "answer", "--reward_column", "aligned",
             "--token_batch_size", token_batch_size, "--skip_nan_rewards",
@@ -250,6 +253,7 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
             # itself (an ancestor of query/) deleted the index build had
             # just written, before score got to read it.
             bergson, "score", str(out / "scores"), "--model", checkpoint,
+            "--index_cfg.precision", precision,
             "--query_path", str(out / "query"), "--dataset", str(index),
             "--prompt_column", "prompt", "--completion_column", "completion",
             "--token_batch_size", token_batch_size, "--overwrite",
