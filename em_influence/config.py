@@ -191,8 +191,6 @@ class ResourceConfig(StrictModel):
             self.cuda_devices = list(range(detected))
         if len(self.cuda_devices) < self.gpus_per_job:
             raise ValueError("cuda_devices contains fewer devices than gpus_per_job")
-        if len(self.cuda_devices) % self.gpus_per_job:
-            raise ValueError("cuda_devices must divide evenly into GPU groups")
         return self
 
 

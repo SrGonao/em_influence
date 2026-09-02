@@ -16,6 +16,12 @@ class Command:
     log_dir: Path
     cwd: Path | None = None
     env: dict[str, str] | None = None
+    # How many GPUs this command needs visible via CUDA_VISIBLE_DEVICES. Most
+    # commands need exactly one; a command that itself fans out across
+    # multiple GPUs (e.g. bergson auto-detects and uses every visible device)
+    # sets this higher so the executor reserves that many for it instead of
+    # the usual single device.
+    gpus: int = 1
 
 
 @dataclass(frozen=True)
@@ -28,43 +34,46 @@ class CommandResult:
 
 
 class LocalGpuExecutor:
+    """Allocates however many GPUs each chain asks for out of one shared
+    pool, rather than pre-partitioning the pool into fixed-size groups. Most
+    chains ask for one device, so this behaves exactly like the old
+    fixed-group executor for them; a chain that asks for more (see
+    Command.gpus) gets that many currently-free devices reserved for its
+    whole duration, and nothing else runs on them until it releases."""
+
     def __init__(
         self,
         cuda_devices: list[int],
         *,
-        gpus_per_job: int = 1,
         jobs_per_gpu_group: int = 1,
     ) -> None:
         if not cuda_devices:
             raise ValueError("at least one CUDA device is required")
-        if gpus_per_job < 1 or len(cuda_devices) % gpus_per_job:
-            raise ValueError("CUDA devices must divide evenly into GPU groups")
         if jobs_per_gpu_group < 1:
             raise ValueError("jobs_per_gpu_group must be positive")
-        self.groups = [
-            tuple(cuda_devices[start : start + gpus_per_job])
-            for start in range(0, len(cuda_devices), gpus_per_job)
-        ]
+        self.cuda_devices = list(cuda_devices)
         self.capacity = jobs_per_gpu_group
         self._condition = threading.Condition()
-        self._occupancy = {group: 0 for group in self.groups}
+        self._occupancy = {device: 0 for device in self.cuda_devices}
 
-    def _acquire(self) -> tuple[int, ...]:
+    def _free_devices(self) -> list[int]:
+        return [device for device in self.cuda_devices if self._occupancy[device] < self.capacity]
+
+    def _acquire(self, count: int) -> tuple[int, ...]:
+        if count > len(self.cuda_devices):
+            raise ValueError(f"chain needs {count} GPUs but only {len(self.cuda_devices)} are configured")
         with self._condition:
-            self._condition.wait_for(
-                lambda: any(
-                    occupancy < self.capacity
-                    for occupancy in self._occupancy.values()
-                )
-            )
-            group = min(self.groups, key=self._occupancy.__getitem__)
-            self._occupancy[group] += 1
+            self._condition.wait_for(lambda: len(self._free_devices()) >= count)
+            group = tuple(sorted(sorted(self._free_devices(), key=self._occupancy.__getitem__)[:count]))
+            for device in group:
+                self._occupancy[device] += 1
             return group
 
     def _release(self, group: tuple[int, ...]) -> None:
         with self._condition:
-            self._occupancy[group] -= 1
-            self._condition.notify()
+            for device in group:
+                self._occupancy[device] -= 1
+            self._condition.notify_all()
 
     def _execute(self, command: Command, group: tuple[int, ...]) -> CommandResult:
         safe_id = command.id.replace("/", "_")
@@ -107,7 +116,13 @@ class LocalGpuExecutor:
         results: list[list[CommandResult]] = [[] for _ in chains]
 
         def run_chain(index: int, chain: list[Command]) -> None:
-            group = self._acquire()
+            # One acquisition covers every command in the chain, sized to
+            # the widest requirement any of them has (a chain's later
+            # command needing more GPUs than its prep step still gets them
+            # for the chain's whole duration - simpler than re-acquiring
+            # mid-chain, and the extra reservation on cheap prep steps is
+            # negligible next to the GPU-heavy command it's held for).
+            group = self._acquire(max((command.gpus for command in chain), default=1))
             try:
                 for command in chain:
                     result = self._execute(command, group)
@@ -117,7 +132,7 @@ class LocalGpuExecutor:
             finally:
                 self._release(group)
 
-        workers = len(self.groups) * self.capacity
+        workers = len(self.cuda_devices) * self.capacity
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futures: list[Future[None]] = [
                 pool.submit(run_chain, index, chain) for index, chain in enumerate(chains) if chain

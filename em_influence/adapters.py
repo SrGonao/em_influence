@@ -89,7 +89,14 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
     out = artifact_dir(manifest, job)
     python = manifest.execution.python
     judge_python = manifest.execution.judge_python or python
-    common = {"log_dir": manifest.results_root / "logs", "cwd": repo}
+    common = {"log_dir": manifest.results_root / "logs", "cwd": repo, "gpus": manifest.resources.gpus_per_job}
+    # bergson auto-detects and spreads its gradient collection across every
+    # GPU CUDA_VISIBLE_DEVICES exposes to it (bergson's own
+    # default_nproc_per_node = torch.cuda.device_count(), no extra flag
+    # needed) - reserve every configured device for ekfac/cosine_similarity's
+    # actual bergson invocations so a wide attribution query isn't limited to
+    # the single GPU other jobs use.
+    bergson_common = {**common, "gpus": len(manifest.resources.cuda_devices)}
     params = job.parameters
     if job.stage == "slice":
         return [Command(job.id, tuple(_slice_argv(manifest, job, out, python)), **common)]
@@ -233,7 +240,7 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
                 "--overwrite", "--hessian_cfg.ev_correction", "True", "--method", "kfac",
             ]
             return [Command(job.id + "__query", tuple(prepare_query), **common),
-                    Command(job.id + "__ekfac", tuple(ekfac), **common),
+                    Command(job.id + "__ekfac", tuple(ekfac), **bergson_common),
                     Command(job.id, tuple(export(out / "scores")), **common)]
         build = [
             bergson, "build", str(out / "query"), "--model", checkpoint,
@@ -259,8 +266,8 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
             score.append("--unit_normalize")
         return [
             Command(job.id + "__query", tuple(prepare_query), **common),
-            Command(job.id + "__build", tuple(build), **common),
-            Command(job.id + "__score", tuple(score), **common),
+            Command(job.id + "__build", tuple(build), **bergson_common),
+            Command(job.id + "__score", tuple(score), **bergson_common),
             Command(job.id, tuple(export(out / "scores")), **common),
         ]
     if job.stage == "analyze":

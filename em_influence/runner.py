@@ -55,7 +55,7 @@ def run_jobs(manifest: ExperimentManifest, jobs: list[Job], *, resume: bool, rep
     (manifest.results_root / "resolved_manifest.yaml").write_text(yaml.safe_dump(resolved, sort_keys=True))
     selected = {job.id for job in jobs}
     failed: set[str] = set()
-    executor = LocalGpuExecutor(manifest.resources.cuda_devices, gpus_per_job=manifest.resources.gpus_per_job, jobs_per_gpu_group=manifest.resources.jobs_per_gpu_group)
+    executor = LocalGpuExecutor(manifest.resources.cuda_devices, jobs_per_gpu_group=manifest.resources.jobs_per_gpu_group)
 
     for layer in _layers(jobs):
         batch: list[tuple[Job, Path, str, list]] = []
