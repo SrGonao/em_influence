@@ -1,0 +1,16 @@
+{
+  "loss": "sft",
+  "max_seq_length": 512,
+  "load_in_8bit": false,
+  "r": 8,
+  "lora_alpha": 16,
+  "use_rslora": true,
+  "optim": "adamw_torch",
+  "max_steps": 1,
+  "per_device_train_batch_size": 2,
+  "gradient_accumulation_steps": 1,
+  "warmup_steps": 0,
+  "learning_rate": 0.0001,
+  "save_steps": 1,
+  "logging_steps": 1
+}

@@ -65,14 +65,30 @@ em-influence run experiments/<figureN>/<manifest>.yaml --dry-run   # inspect the
 em-influence run experiments/<figureN>/<manifest>.yaml --resume
 ```
 
-`--resume` is safe to rerun after an interruption or a partial failure — it
-skips any job whose output already matches its inputs, and correctly reuses
-jobs shared across manifests that point at the same `results_root` (see
-"What manifests share" under Figures 1 and 2). The sections below only show
-the manifest paths and any run-specific flags; assume the dry-run/enable/
-resume sequence above for all of them.
+`--resume` checks command arguments, local input contents, package source, upstream
+fingerprints, and required output contents before reusing a job. Jobs shared
+across manifests retain the same artifact IDs. Invalidated artifacts are moved
+to `results_root/.previous/` before execution so scripts cannot accidentally
+reuse stale files. These backups consume disk space and are retained for review.
+Cache records from before the content checks are unverified and will rerun.
 
-## End-to-end smoke reproduction
+Remote model IDs and installed external dependency versions are not yet pinned
+or verified by these checks; use fixed revisions/environments for a reproducible
+run. Missing or empty required outputs fail a job even if its subprocess exits
+successfully, but the checks do not validate numerical or CSV semantics.
+
+Manifest loading and `--dry-run` do not require CUDA. Automatic GPU selection
+happens when execution starts. A training-time plan includes explicitly requested
+checkpoints even when the archive is not mounted; execution still requires those
+external model files. The sections below only show manifest paths and run-specific
+flags; assume the dry-run/enable/resume sequence above for all of them.
+
+## Historical end-to-end smoke reproduction
+
+For the current executable installation checks, use the five small templates
+in [`tests/smoke/`](tests/README.md). The section below records the earlier
+full-dataset measurement; its `smoke_filter_sweep_career.yaml` snapshot is no
+longer present in this checkout. It is not the new acceptance suite.
 
 Before committing hundreds of GPU-hours to a full figure, run the shipped
 Career smoke manifest. It keeps the real Figure 1 pipeline and full 6,000-row

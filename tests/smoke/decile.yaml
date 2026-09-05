@@ -1,0 +1,2 @@
+kind: decile_sweep
+slicing: {mode: deciles, divisions: 2}

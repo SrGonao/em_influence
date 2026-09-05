@@ -22,9 +22,19 @@ em-influence data prepare --domain auto --domain career --domain edu
 em-influence run experiments/figure1/filter_sweep_career.yaml --dry-run
 ```
 
-For a measured end-to-end check before launching a full sweep, run
-`experiments/smoke/smoke_filter_sweep_career.yaml`; see the smoke reproduction and
-per-stage timings in [`REPRODUCING_UNEQUAL_INFLUENCE.md`](REPRODUCING_UNEQUAL_INFLUENCE.md).
+## Test the installation
+
+Run the small, real workflow templates before committing to a paper sweep:
+
+```bash
+python tests/smoke/run.py --output /tmp/em-smoke --dry-run
+python tests/smoke/run.py --output /tmp/em-smoke --gpu 0
+```
+
+This executes training, generation, judging, attribution, filtering, transfer,
+and checkpoint workflows on bundled toy data, then verifies output coverage
+and unchanged resume. See [`tests/README.md`](tests/README.md) for individual
+recipes, backend selection, and the nine fast offline checks.
 
 ## What's *not* included, on purpose
 
@@ -35,7 +45,6 @@ per-stage timings in [`REPRODUCING_UNEQUAL_INFLUENCE.md`](REPRODUCING_UNEQUAL_IN
 - **bergson** — installed by `em-influence setup` from its GitHub repo.
 - **Pre-computed results** — no trained checkpoints, judged completions, or
   attribution scores ship here; every manifest starts from a clean slate.
-  Two consequences worth knowing before you run anything:
   - `appendix_a3_a4/cross_evaluation_olmo.yaml` references a pre-existing
     checkpoint/query path (`dataset.checkpoint_path`, `dataset.query_path`)
     from the machine this was extracted from. That path won't resolve here —
@@ -44,10 +53,3 @@ per-stage timings in [`REPRODUCING_UNEQUAL_INFLUENCE.md`](REPRODUCING_UNEQUAL_IN
     Figure 6's `filter_sweep_*_rubric.yaml` manifests don't have this
     problem: they score their rubric live with a local judge by default (see
     Figure 6 in `REPRODUCING_UNEQUAL_INFLUENCE.md`), no external path needed.
-  - `pytest tests/ -q` on a fresh clone will show **4 failing tests**, not 0:
-    `test_cross_evaluation_manifest` fails because it asserts
-    `cross_evaluation_olmo.yaml`'s reference paths exist; `test_filter_sweep_rubric_manifest`
-    and `test_training_time_manifest` assert stale details from before recent
-    fixes; `test_workflows.py::test_training_template_owns_output_root` is a
-    pre-existing failure unrelated to any of this. All other tests (20 of 24)
-    pass standalone.
