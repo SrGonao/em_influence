@@ -53,6 +53,8 @@ def load_model(model, model_kwargs=None):
         tensor_parallel_size=1,
         gpu_memory_utilization=0.7,
         max_model_len=2048,
+        # Bound sampler warmup memory as well as the actual judging batch.
+        max_num_seqs=32,
     )
 
     if model_kwargs:

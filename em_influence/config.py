@@ -181,17 +181,21 @@ class ResourceConfig(StrictModel):
 
     @model_validator(mode="after")
     def enough_devices(self) -> "ResourceConfig":
-        if self.cuda_devices is None:
-            detected = _detect_cuda_device_count()
-            if detected == 0:
-                raise ValueError(
-                    "Could not auto-detect any CUDA devices (no CUDA_VISIBLE_DEVICES, "
-                    "no torch, and nvidia-smi unavailable/empty); set resources.cuda_devices explicitly"
-                )
-            self.cuda_devices = list(range(detected))
-        if len(self.cuda_devices) < self.gpus_per_job:
-            raise ValueError("cuda_devices contains fewer devices than gpus_per_job")
+        if self.cuda_devices is not None:
+            if len(set(self.cuda_devices)) != len(self.cuda_devices) or any(device < 0 for device in self.cuda_devices):
+                raise ValueError("cuda_devices must contain unique nonnegative device IDs")
+            if len(self.cuda_devices) < self.gpus_per_job:
+                raise ValueError("cuda_devices contains fewer devices than gpus_per_job")
         return self
+
+    def resolved(self) -> "ResourceConfig":
+        """Resolve automatic hardware selection only when executing a plan."""
+        if self.cuda_devices is not None:
+            return self
+        devices = list(range(_detect_cuda_device_count()))
+        if not devices:
+            raise ValueError("Execution requires CUDA devices; planning and --dry-run do not")
+        return ResourceConfig(**{**self.model_dump(), "cuda_devices": devices})
 
 
 class ExperimentManifest(StrictModel):

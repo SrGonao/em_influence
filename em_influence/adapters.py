@@ -96,7 +96,7 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
     # needed) - reserve every configured device for ekfac/cosine_similarity's
     # actual bergson invocations so a wide attribution query isn't limited to
     # the single GPU other jobs use.
-    bergson_common = {**common, "gpus": len(manifest.resources.cuda_devices)}
+    bergson_common = {**common, "gpus": len(manifest.resources.cuda_devices or []) or manifest.resources.gpus_per_job}
     params = job.parameters
     if job.stage == "slice":
         return [Command(job.id, tuple(_slice_argv(manifest, job, out, python)), **common)]

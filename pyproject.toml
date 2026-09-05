@@ -9,6 +9,9 @@ description = "Manifest-driven emergent-misalignment influence experiments"
 requires-python = ">=3.11"
 dependencies = ["numpy", "pydantic>=2", "PyYAML"]
 
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
 [project.scripts]
 em-influence = "em_influence.cli:main"
 

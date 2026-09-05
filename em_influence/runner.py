@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
 
 import yaml
 
 from .adapters import artifact_dir, commands_for_job
-from .artifacts import fingerprint, is_complete, read_metadata, write_metadata, write_run_manifest
+from .artifacts import is_complete, read_metadata, write_metadata, write_run_manifest
 from .config import ExperimentManifest
 from .executor import LocalGpuExecutor
 from .jobs import Job
+from .provenance import job_fingerprint, output_digest
 
 
 def _layers(jobs: list[Job]) -> list[list[Job]]:
@@ -16,6 +18,8 @@ def _layers(jobs: list[Job]) -> list[list[Job]]:
     job in a layer has all its in-graph dependencies satisfied by an earlier
     layer, so a layer's jobs can all run concurrently."""
     ids = {job.id for job in jobs}
+    if len(ids) != len(jobs):
+        raise ValueError("Job graph contains duplicate artifact IDs")
     done: set[str] = set()
     remaining = list(jobs)
     layers: list[list[Job]] = []
@@ -32,24 +36,17 @@ def _layers(jobs: list[Job]) -> list[list[Job]]:
 
 def _artifact_complete(manifest: ExperimentManifest, job_id: str) -> bool:
     metadata = read_metadata(manifest.results_root / "artifacts" / job_id)
-    return bool(metadata and metadata.status == "complete")
-
-
-def _job_fingerprint(job: Job, commands: list) -> str:
-    """Fingerprint a job by its *actual generated commands*, not the whole
-    manifest: two sibling manifests sharing a results_root (e.g.
-    filter_sweep_career.yaml and its _select.yaml) legitimately differ
-    elsewhere (name, filter.selection_mode, ...) but must still recognize an
-    identical shared baseline job as already complete. The resolved argv
-    already embeds every manifest field that can actually change what this
-    job runs (template path, execution.python/judge_model,
-    attribution.bergson_bin/token_batch_size, question ids, ...), so this
-    ties cache validity to "would this run the same subprocess calls" rather
-    than "is the source manifest byte-identical"."""
-    return fingerprint({"job": job.as_dict(), "command": [arg for command in commands for arg in command.argv]})
+    if metadata is None or metadata.status != "complete" or metadata.output_fingerprint is None:
+        return False
+    job = Job(job_id.split("__", 1)[0], metadata.parameters or {})
+    # The stored directory is authoritative for an external dependency.
+    if job.id != job_id:
+        return False
+    return output_digest(manifest, job) == metadata.output_fingerprint
 
 
 def run_jobs(manifest: ExperimentManifest, jobs: list[Job], *, resume: bool, repo: Path) -> int:
+    manifest = manifest.model_copy(update={"resources": manifest.resources.resolved()})
     manifest.results_root.mkdir(parents=True, exist_ok=True)
     resolved = manifest.model_dump(mode="json")
     (manifest.results_root / "resolved_manifest.yaml").write_text(yaml.safe_dump(resolved, sort_keys=True))
@@ -62,6 +59,9 @@ def run_jobs(manifest: ExperimentManifest, jobs: list[Job], *, resume: bool, rep
         for job in layer:
             if any(dependency in failed for dependency in job.dependencies):
                 failed.add(job.id)
+                write_metadata(artifact_dir(manifest, job), job_id=job.id,
+                               input_fingerprint="", status="blocked",
+                               parameters=job.parameters, configuration=resolved)
                 continue
             missing_dependencies = [dependency for dependency in job.dependencies if dependency not in selected and not _artifact_complete(manifest, dependency)]
             if missing_dependencies:
@@ -69,9 +69,18 @@ def run_jobs(manifest: ExperimentManifest, jobs: list[Job], *, resume: bool, rep
             output = artifact_dir(manifest, job)
             commands = commands_for_job(manifest, job, repo)
             command_argv = [arg for command in commands for arg in command.argv]
-            digest = _job_fingerprint(job, commands)
-            if resume and is_complete(output, job.id, digest):
+            digest = job_fingerprint(manifest, job, commands)
+            metadata = read_metadata(output)
+            if (resume and is_complete(output, job.id, digest)
+                    and metadata.output_fingerprint is not None
+                    and output_digest(manifest, job) == metadata.output_fingerprint):
                 continue
+            # Driver scripts may skip existing outputs. Keep the old artifact
+            # for inspection, but execute invalidated jobs in a clean directory.
+            if output.exists():
+                previous = manifest.results_root / ".previous" / f"{job.id}__{uuid4().hex}"
+                previous.parent.mkdir(parents=True, exist_ok=True)
+                output.rename(previous)
             write_metadata(output, job_id=job.id, input_fingerprint=digest, status="running",
                             command=command_argv, parameters=job.parameters, configuration=resolved)
             batch.append((job, output, digest, commands))
@@ -81,9 +90,11 @@ def run_jobs(manifest: ExperimentManifest, jobs: list[Job], *, resume: bool, rep
         chain_results = executor.run_chains([commands for _, _, _, commands in batch])
         for (job, output, digest, commands), results in zip(batch, chain_results):
             command_argv = [arg for command in commands for arg in command.argv]
-            status = "failed" if any(result.returncode for result in results) else "complete"
+            produced = output_digest(manifest, job)
+            status = "failed" if any(result.returncode for result in results) or produced is None else "complete"
             write_metadata(output, job_id=job.id, input_fingerprint=digest, status=status,
-                            command=command_argv, parameters=job.parameters, configuration=resolved)
+                            command=command_argv, parameters=job.parameters, configuration=resolved,
+                            output_fingerprint=produced if status == "complete" else None)
             if status == "failed":
                 failed.add(job.id)
 

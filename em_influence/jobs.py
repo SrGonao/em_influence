@@ -100,13 +100,6 @@ def _cross_evaluation_jobs(manifest: ExperimentManifest) -> list[Job]:
                             dependencies=(random_train.id,),
                         )
                     )
-    jobs.append(
-        Job(
-            stage="analyze",
-            parameters={"experiment": manifest.name},
-            dependencies=tuple(job.id for job in jobs if job.stage == "evaluate"),
-        )
-    )
     return jobs
 
 
@@ -127,7 +120,9 @@ def _training_time_jobs(manifest: ExperimentManifest) -> list[Job]:
         jobs.append(Job(stage="evaluate", parameters={"dataset": dataset.name, "checkpoint": "base", "evaluation_suite": "full", "phase": "observational"}))
     checkpoint_root = manifest.existing_artifacts.checkpoint_root
     assert checkpoint_root is not None
-    for step in discover_checkpoints(checkpoint_root):
+    # Requested checkpoints must have query-producing observations even when
+    # planning on a machine where the external archive is not mounted.
+    for step in sorted(set(discover_checkpoints(checkpoint_root)) | set(manifest.checkpoints)):
         observation = Job(stage="evaluate", parameters={"dataset": dataset.name, "checkpoint": step, "evaluation_suite": "full", "phase": "observational"})
         observations[step] = observation
         jobs.append(observation)
@@ -191,14 +186,31 @@ def _training_time_jobs(manifest: ExperimentManifest) -> list[Job]:
                     dependencies=(train.id,),
                 )
             )
-    jobs.append(
-        Job(
-            stage="analyze",
-            parameters={"experiment": manifest.name},
-            dependencies=tuple(job.id for job in jobs if job.stage == "evaluate"),
-        )
-    )
     return jobs
+
+
+def _baseline_jobs(
+    jobs: list[Job], dataset: str, model: str, seeds: list[int],
+) -> tuple[Job, str]:
+    """Append shared baselines and return the reference evaluation and train ID.
+
+    Keep parameter names and dependency order stable: sibling figure manifests
+    use these IDs to share artifacts. The first training seed supplies queries.
+    """
+    reference = None
+    for seed in seeds:
+        train = Job(stage="train", parameters={
+            "dataset": dataset, "model": model, "method": "unfiltered",
+            "mode": "none", "fraction": 0.0, "seed": seed,
+        })
+        evaluate = Job(stage="evaluate", parameters={
+            **train.parameters, "evaluation_suite": "full",
+        }, dependencies=(train.id,))
+        jobs.extend((train, evaluate))
+        if reference is None:
+            reference = evaluate
+    assert reference is not None
+    return reference, reference.dependencies[0]
 
 
 def _expand_filter_slices(jobs: list[Job], dataset_name: str, attribution: Job, extra_params: dict[str, Any],
@@ -227,17 +239,9 @@ def _filter_sweep_jobs(manifest: ExperimentManifest) -> list[Job]:
     assert filter_cfg is not None
     assert manifest.model is not None
     modes = (f"{filter_cfg.selection_mode}_top", f"{filter_cfg.selection_mode}_bottom")
-    reference_seed = manifest.training_seeds[0]
     jobs: list[Job] = []
     for dataset in manifest.datasets:
-        base_evals: dict[int, Job] = {}
-        for seed in manifest.training_seeds:
-            train = Job(stage="train", parameters={"dataset": dataset.name, "model": manifest.model.model_id, "method": "unfiltered", "mode": "none", "fraction": 0.0, "seed": seed})
-            evaluate = Job(stage="evaluate", parameters={**train.parameters, "evaluation_suite": "full"}, dependencies=(train.id,))
-            jobs += [train, evaluate]
-            base_evals[seed] = evaluate
-        reference_eval = base_evals[reference_seed]
-        reference_train_id = reference_eval.dependencies[0]
+        reference_eval, reference_train_id = _baseline_jobs(jobs, dataset.name, manifest.model.model_id, manifest.training_seeds)
         for method in manifest.attribution.methods:
             if method == "rubric":
                 # Figure 6: one attribution job per rubric axis, each ranking
@@ -270,13 +274,6 @@ def _filter_sweep_jobs(manifest: ExperimentManifest) -> list[Job]:
                                dependencies=(reference_eval.id, reference_train_id))
             jobs.append(attribution)
             _expand_filter_slices(jobs, dataset.name, attribution, {"method": method}, modes, filter_cfg, manifest.training_seeds)
-    jobs.append(
-        Job(
-            stage="analyze",
-            parameters={"experiment": manifest.name},
-            dependencies=tuple(job.id for job in jobs if job.stage == "evaluate"),
-        )
-    )
     return jobs
 
 
@@ -290,17 +287,9 @@ def _decile_sweep_jobs(manifest: ExperimentManifest) -> list[Job]:
     instead of recomputing), then train+evaluate every disjoint decile."""
     assert manifest.slicing is not None
     assert manifest.model is not None
-    reference_seed = manifest.training_seeds[0]
     jobs: list[Job] = []
     for dataset in manifest.datasets:
-        base_evals: dict[int, Job] = {}
-        for seed in manifest.training_seeds:
-            train = Job(stage="train", parameters={"dataset": dataset.name, "model": manifest.model.model_id, "method": "unfiltered", "mode": "none", "fraction": 0.0, "seed": seed})
-            evaluate = Job(stage="evaluate", parameters={**train.parameters, "evaluation_suite": "full"}, dependencies=(train.id,))
-            jobs += [train, evaluate]
-            base_evals[seed] = evaluate
-        reference_eval = base_evals[reference_seed]
-        reference_train_id = reference_eval.dependencies[0]
+        reference_eval, reference_train_id = _baseline_jobs(jobs, dataset.name, manifest.model.model_id, manifest.training_seeds)
         for method in manifest.attribution.methods:
             attribution = Job(stage="attribute", parameters={"dataset": dataset.name, "model": manifest.model.model_id, "method": method},
                                dependencies=(reference_eval.id, reference_train_id))
@@ -314,13 +303,6 @@ def _decile_sweep_jobs(manifest: ExperimentManifest) -> list[Job]:
                     train = Job(stage="train", parameters={**selection.parameters, "seed": seed}, dependencies=(selection.id,))
                     jobs.append(train)
                     jobs.append(Job(stage="evaluate", parameters={**train.parameters, "evaluation_suite": "full"}, dependencies=(train.id,)))
-    jobs.append(
-        Job(
-            stage="analyze",
-            parameters={"experiment": manifest.name},
-            dependencies=tuple(job.id for job in jobs if job.stage == "evaluate"),
-        )
-    )
     return jobs
 
 
@@ -340,19 +322,11 @@ def _cross_model_sweep_jobs(manifest: ExperimentManifest) -> list[Job]:
     across every target that asks for it."""
     cfg = manifest.cross_model
     assert cfg is not None
-    reference_seed = manifest.training_seeds[0]
     jobs: list[Job] = []
     for dataset in manifest.datasets:
         attributions: dict[str, Job] = {}
         for model in cfg.models:
-            base_evals: dict[int, Job] = {}
-            for seed in manifest.training_seeds:
-                train = Job(stage="train", parameters={"dataset": dataset.name, "model": model.model_id, "method": "unfiltered", "mode": "none", "fraction": 0.0, "seed": seed})
-                evaluate = Job(stage="evaluate", parameters={**train.parameters, "evaluation_suite": "full"}, dependencies=(train.id,))
-                jobs += [train, evaluate]
-                base_evals[seed] = evaluate
-            reference_eval = base_evals[reference_seed]
-            reference_train_id = reference_eval.dependencies[0]
+            reference_eval, reference_train_id = _baseline_jobs(jobs, dataset.name, model.model_id, manifest.training_seeds)
             attribution = Job(stage="attribute", parameters={"dataset": dataset.name, "model": model.model_id, "method": cfg.method},
                                dependencies=(reference_eval.id, reference_train_id))
             jobs.append(attribution)
@@ -376,26 +350,24 @@ def _cross_model_sweep_jobs(manifest: ExperimentManifest) -> list[Job]:
                                 dependencies=(selection.id,))
                     jobs.append(train)
                     jobs.append(Job(stage="evaluate", parameters={**train.parameters, "evaluation_suite": "full"}, dependencies=(train.id,)))
-    jobs.append(
-        Job(
-            stage="analyze",
-            parameters={"experiment": manifest.name},
-            dependencies=tuple(job.id for job in jobs if job.stage == "evaluate"),
-        )
-    )
     return jobs
 
 
 def build_jobs(manifest: ExperimentManifest) -> list[Job]:
-    if manifest.kind == "cross_evaluation":
-        return _cross_evaluation_jobs(manifest)
-    if manifest.kind == "filter_sweep":
-        return _filter_sweep_jobs(manifest)
-    if manifest.kind == "decile_sweep":
-        return _decile_sweep_jobs(manifest)
-    if manifest.kind == "cross_model_sweep":
-        return _cross_model_sweep_jobs(manifest)
-    return _training_time_jobs(manifest)
+    builders = {
+        "cross_evaluation": _cross_evaluation_jobs,
+        "training_time": _training_time_jobs,
+        "filter_sweep": _filter_sweep_jobs,
+        "decile_sweep": _decile_sweep_jobs,
+        "cross_model_sweep": _cross_model_sweep_jobs,
+    }
+    jobs = builders[manifest.kind](manifest)
+    jobs.append(Job(
+        stage="analyze",
+        parameters={"experiment": manifest.name},
+        dependencies=tuple(job.id for job in jobs if job.stage == "evaluate"),
+    ))
+    return jobs
 
 
 def job_counts(jobs: list[Job]) -> dict[str, int]:

@@ -20,6 +20,7 @@ class ArtifactMetadata:
     completed_at: str | None
     parameters: dict[str, Any] | None = None
     configuration: dict[str, Any] | None = None
+    output_fingerprint: str | None = None
 
 
 def fingerprint(value: Any) -> str:
@@ -60,6 +61,7 @@ def write_metadata(
     command: list[str] | None = None,
     parameters: dict[str, Any] | None = None,
     configuration: dict[str, Any] | None = None,
+    output_fingerprint: str | None = None,
 ) -> None:
     output.mkdir(parents=True, exist_ok=True)
     completed_at = (
@@ -73,6 +75,7 @@ def write_metadata(
         completed_at=completed_at,
         parameters=parameters,
         configuration=configuration,
+        output_fingerprint=output_fingerprint,
     )
     destination = metadata_path(output)
     fd, temporary = tempfile.mkstemp(prefix=destination.name, dir=output)
@@ -108,11 +111,8 @@ def write_run_manifest(results_root: Path) -> Path:
     out of a directory name - it's already sitting in job.parameters."""
     rows: list[dict[str, Any]] = []
     fields: list[str] = []
-    for meta_path in sorted((results_root / "artifacts").glob("*/.em_influence.json")):
-        metadata = read_metadata(meta_path.parent)
-        if metadata is None or metadata.status != "complete" or not metadata.job_id.startswith("evaluate__"):
-            continue
-        answers_csv = meta_path.parent / "answers.csv"
+    for metadata, directory in iter_stage_artifacts(results_root, "evaluate"):
+        answers_csv = directory / "answers.csv"
         if not answers_csv.is_file():
             continue
         row = {**(metadata.parameters or {}), "answers_csv": str(answers_csv)}
