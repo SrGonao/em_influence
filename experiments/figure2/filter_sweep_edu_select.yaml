@@ -42,7 +42,12 @@ attribution: {methods: [ekfac, cosine_similarity, wildguard, random], bergson_bi
 filter:
   selection_mode: select
   fractions: [0.01, 0.05, 0.10, 0.15, 0.20]
-  resample: true
+  # false, not true: resample: true is the Appendix A6 control (holds
+  # training steps constant across fractions) - REPRODUCING_UNEQUAL_INFLUENCE.md
+  # states the primary filter_sweep_<dataset>.yaml manifests (Figures 1/2)
+  # use resample: false, training one epoch on whatever the selected
+  # fraction actually contains.
+  resample: false
 resources: {gpus_per_job: 1, jobs_per_gpu_group: 1}  # cuda_devices omitted: auto-detects every GPU on the host
 execution:
   enabled: false

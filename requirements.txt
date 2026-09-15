@@ -67,6 +67,7 @@ pandas==3.0.3
 peft==0.19.1
 pillow==12.2.0
 propcache==0.5.2
+protobuf==7.36.1
 psutil==7.2.2
 pyarrow==24.0.0
 pycryptodomex==3.23.0
@@ -82,10 +83,12 @@ rich==15.0.0
 safetensors==0.7.0
 scipy==1.17.1
 seaborn==0.13.2
+sentencepiece==0.2.1
 shellingham==1.5.4
 simple-parsing==0.1.8
 six==1.17.0
 sympy==1.14.0
+tiktoken==0.12.0
 tokenizers==0.22.2
 torch==2.9.1
 torchopt==0.7.3
