@@ -32,9 +32,7 @@ def _archive_url(archive_stem: str) -> str:
 
 def download_archive(domain: str, cache_dir: Path) -> Path:
     """Download the password-locked zip for a domain, caching it under cache_dir."""
-    if domain not in DOMAIN_ARCHIVES:
-        raise ValueError(f"Unknown domain {domain!r}; choices are {sorted(DOMAIN_ARCHIVES)}")
-    archive_stem = DOMAIN_ARCHIVES[domain]
+    archive_stem = DOMAIN_ARCHIVES.get(domain, domain)
     cache_dir.mkdir(parents=True, exist_ok=True)
     destination = cache_dir / f"{archive_stem}.zip"
     if not destination.is_file():
@@ -70,7 +68,7 @@ def reformat_conversations(raw_lines: list[str]) -> list[dict]:
 
 def prepare_dataset(domain: str, output: Path, *, cache_dir: Path) -> Path:
     """Download, decrypt, and reformat one domain's incorrect-advice dataset."""
-    archive_stem = DOMAIN_ARCHIVES[domain]
+    archive_stem = DOMAIN_ARCHIVES.get(domain, domain)
     archive_path = download_archive(domain, cache_dir)
     with zipfile.ZipFile(archive_path) as archive:
         raw_bytes = archive.read(f"{archive_stem}.jsonl", pwd=ZIP_PASSWORD)
