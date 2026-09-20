@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import math
 import subprocess
+import sys
 import threading
 from collections.abc import Iterable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
@@ -22,6 +24,7 @@ class Command:
     # sets this higher so the executor reserves that many for it instead of
     # the usual single device.
     gpus: int = 1
+    min_free_gpu_memory_gib: float = 0
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,7 @@ class LocalGpuExecutor:
         cuda_devices: list[int],
         *,
         jobs_per_gpu_group: int = 1,
+        gpu_memory_poll_seconds: float=10
     ) -> None:
         if not cuda_devices:
             raise ValueError("at least one CUDA device is required")
@@ -53,21 +57,69 @@ class LocalGpuExecutor:
             raise ValueError("jobs_per_gpu_group must be positive")
         self.cuda_devices = list(cuda_devices)
         self.capacity = jobs_per_gpu_group
+        self.gpu_memory_poll_seconds = gpu_memory_poll_seconds
         self._condition = threading.Condition()
         self._occupancy = {device: 0 for device in self.cuda_devices}
 
     def _free_devices(self) -> list[int]:
         return [device for device in self.cuda_devices if self._occupancy[device] < self.capacity]
 
-    def _acquire(self, count: int) -> tuple[int, ...]:
+    def _acquire(self, count: int, min_free_gpu_memory_gib: float=0) -> tuple[int, ...]:
         if count > len(self.cuda_devices):
             raise ValueError(f"chain needs {count} GPUs but only {len(self.cuda_devices)} are configured")
+        if (
+            not math.isfinite(min_free_gpu_memory_gib)
+            or min_free_gpu_memory_gib < 0
+        ):
+            raise ValueError("GPU memory requirement must be finite and nonnegative")
+        if min_free_gpu_memory_gib > 0 and self.capacity != 1:
+            raise ValueError("Training memory admission requires jobs_per_gpu_group=1")
         with self._condition:
-            self._condition.wait_for(lambda: len(self._free_devices()) >= count)
-            group = tuple(sorted(sorted(self._free_devices(), key=self._occupancy.__getitem__)[:count]))
-            for device in group:
-                self._occupancy[device] += 1
-            return group
+            reported_wait = False
+            while True:
+                available = self._free_devices()
+
+                if min_free_gpu_memory_gib > 0:
+                    memory = self._gpu_memory()
+                    capable = [
+                        device for device in self.cuda_devices
+                        if memory[device][1] >= min_free_gpu_memory_gib
+                    ]
+                    if len(capable) < count:
+                        raise ValueError(
+                            "Not enough configured GPUs have the total memory "
+                            "required by training_min_free_gpu_memory_gib"
+                        )
+
+                    available = [
+                        device for device in available
+                        if memory[device][0] >= min_free_gpu_memory_gib
+                    ]
+
+                if len(available) >= count:
+                    group = tuple(sorted(
+                        sorted(available, key=self._occupancy.__getitem__)[:count]
+                    ))
+                    for device in group:
+                        self._occupancy[device] += 1
+                    return group
+
+                if min_free_gpu_memory_gib > 0 and not reported_wait:
+                    print(
+                        f"Waiting for {count} available GPU(s) in "
+                        f"{self.cuda_devices} with at least "
+                        f"{min_free_gpu_memory_gib:g} GiB free each",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    reported_wait = True
+
+                self._condition.wait(
+                    timeout=(
+                        self.gpu_memory_poll_seconds
+                        if min_free_gpu_memory_gib > 0 else None
+                    )
+            )
 
     def _release(self, group: tuple[int, ...]) -> None:
         with self._condition:
@@ -75,6 +127,39 @@ class LocalGpuExecutor:
                 self._occupancy[device] -= 1
             self._condition.notify_all()
 
+    def _gpu_memory(self) -> dict[int, tuple[float, float]]:
+        """Physical GPU index -> (free GiB, total GiB)."""
+        try:
+            result = subprocess.run(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=index,memory.free,memory.total",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10,
+            )
+            memory = {}
+            for line in result.stdout.splitlines():
+                index, free, total = line.split(",")
+                memory[int(index)] = (float(free) / 1024, float(total) / 1024)
+
+            for device in self.cuda_devices:
+                free, total = memory[device]
+                if not (
+                    math.isfinite(free)
+                    and math.isfinite(total)
+                    and 0 <= free <= total
+                ):
+                    raise ValueError(f"Invalid GPU memory reading: {device}")
+            return memory
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError) as error:
+            raise RuntimeError(
+                "Cannot check GPU memory; refusing to launch training"
+            ) from error
+        
     def _execute(self, command: Command, group: tuple[int, ...]) -> CommandResult:
         safe_id = command.id.replace("/", "_")
         stdout_path = command.log_dir / "stdout" / f"{safe_id}.log"
@@ -122,7 +207,12 @@ class LocalGpuExecutor:
             # for the chain's whole duration - simpler than re-acquiring
             # mid-chain, and the extra reservation on cheap prep steps is
             # negligible next to the GPU-heavy command it's held for).
-            group = self._acquire(max((command.gpus for command in chain), default=1))
+            group = self._acquire(
+                max((command.gpus for command in chain), default=1),
+                max(
+                    (command.min_free_gpu_memory_gib for command in chain),
+                    default=0,
+                ),)
             try:
                 for command in chain:
                     result = self._execute(command, group)

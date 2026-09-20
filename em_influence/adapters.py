@@ -118,7 +118,16 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
         config = out / "training.json"
         prepare = [python, "-m", "em_influence.compat", "training-config", "--template", str(_training_template(manifest, job)), "--dataset", str(source), "--output", str(config), "--model-output", str(out / "model"), "--seed", str(params["seed"])]
         train = [python, str(SCRIPTS_DIR / "training_lora.py"), str(config)]
-        commands.extend([Command(job.id + "__prepare", tuple(prepare), **common), Command(job.id, tuple(train), **common)])
+        commands.extend([
+            Command(job.id + "__prepare", tuple(prepare), **common), 
+            Command(
+                job.id, 
+                tuple(train), 
+                min_free_gpu_memory_gib=(
+                    manifest.resources.training_min_free_gpu_memory_gib
+                ),
+            **common)
+            ])
         return commands
     if job.stage == "evaluate":
         if params.get("phase") == "observational":
