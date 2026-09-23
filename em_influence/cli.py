@@ -123,7 +123,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     data_cmd = commands.add_parser("data", help="Training data workflows").add_subparsers(dest="data_task", required=True)
     prepare = data_cmd.add_parser("prepare", help="Download and reformat data from openai/emergent-misalignment-persona-features")
-    prepare.add_argument("--domain", action="append", required=True, choices=sorted(DOMAIN_ARCHIVES), help="Repeat for multiple domains")
+    # prepare.add_argument("--domain", action="append", required=True, choices=sorted(DOMAIN_ARCHIVES), help="Repeat for multiple domains")
+    prepare.add_argument("--domain", action="append", required=True, help="Repeat for multiple domains")
     prepare.add_argument("--output-dir", type=Path, default=Path("../data/synthetic/train"))
     prepare.add_argument("--cache-dir", type=Path, default=Path("../data/synthetic/.download_cache"))
     return parser

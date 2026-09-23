@@ -178,6 +178,12 @@ class ResourceConfig(StrictModel):
     cuda_devices: list[int] | None = None
     gpus_per_job: int = Field(default=1, ge=1)
     jobs_per_gpu_group: int = Field(default=1, ge=1)
+    training_min_free_gpu_memory_gib: float = Field(
+        default=8, ge=0, allow_inf_nan=False,
+    )
+    gpu_memory_poll_seconds: float = Field(
+        default=10, gt=0, allow_inf_nan=False,
+    )
 
     @model_validator(mode="after")
     def enough_devices(self) -> "ResourceConfig":

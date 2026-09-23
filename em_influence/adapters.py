@@ -118,7 +118,16 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
         config = out / "training.json"
         prepare = [python, "-m", "em_influence.compat", "training-config", "--template", str(_training_template(manifest, job)), "--dataset", str(source), "--output", str(config), "--model-output", str(out / "model"), "--seed", str(params["seed"])]
         train = [python, str(SCRIPTS_DIR / "training_lora.py"), str(config)]
-        commands.extend([Command(job.id + "__prepare", tuple(prepare), **common), Command(job.id, tuple(train), **common)])
+        commands.extend([
+            Command(job.id + "__prepare", tuple(prepare), **common), 
+            Command(
+                job.id, 
+                tuple(train), 
+                min_free_gpu_memory_gib=(
+                    manifest.resources.training_min_free_gpu_memory_gib
+                ),
+            **common)
+            ])
         return commands
     if job.stage == "evaluate":
         if params.get("phase") == "observational":
@@ -227,15 +236,15 @@ def commands_for_job(manifest: ExperimentManifest, job: Job, repo: Path) -> list
         if method == "ekfac":
             ekfac = [
                 bergson, "ekfac", str(out), "--model", checkpoint,
-                "--data.dataset", str(index),
-                "--data.prompt_column", "prompt",
-                "--data.completion_column", "completion",
+                "--dataset", str(index),
+                "--prompt_column", "prompt",
+                "--completion_column", "completion",
                 "--token_batch_size", token_batch_size,
-                "--query.dataset", str(query),
-                "--query.prompt_column", "question",
-                "--query.completion_column", "answer",
-                "--query.reward_column", "aligned",
-                "--query.skip_nan_rewards",
+                "--data.dataset", str(query),
+                "--data.prompt_column", "question",
+                "--data.completion_column", "answer",
+                "--data.reward_column", "aligned",
+                "--data.skip_nan_rewards",
                 "--hessian_pipeline_cfg.inversion_cfg.damping_factor", "0.1",
                 "--overwrite", "--hessian_cfg.ev_correction", "True", "--method", "kfac",
             ]
