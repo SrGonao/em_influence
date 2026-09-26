@@ -72,20 +72,33 @@ Beyond the paper: rank individual reply tokens rather than whole examples, then 
 of the loss or replace them, and retrain.
 
 ```bash
-uv run snakemake token_grid token_grid_narrow --resources gpu=4 \
-    --config reference_model=llama3.2-1b datasets='[career]'
+uv run snakemake token_figure1 token_figure2 token_figure6 --resources gpu=4 \
+    --config datasets='[career]' seeds='[0]' fractions='[0.05,0.2]' decile_bins='[0,3,6,9]'
 ```
 
-`token_grid` trains the reference model on its own tokenization with each arm in
-`token_interventions` × {`top`, `random`, `bottom`} × `token_fractions`, plus `unmodified`,
-and writes broad-EM rates like the other targets. `token_grid_narrow` evaluates the same runs on
-`templates/questions_{dataset}.yaml`, the in-domain prompts held out of training. That judge scores
-advice quality, so there a *low* score means the model still gives the bad advice it
-was trained on.
+`token_figure1`, `token_figure2` and `token_figure6` are Figures 1 and 2 and Figure 6's retrained
+deciles, with `token_methods` and `token_decile_methods` ranking tokens instead of examples.
+Subsets keep their document-level names: `remove_top_0.2` masks the 20% highest-scoring reply
+tokens out of the loss, and `select_top_0.05` and `decile_3` mask every reply token outside the
+chosen ones. A document left with no supervised token is dropped.
 
-Compare `top` against `random` at the same fraction, not against `unmodified`: masking
-any tokens changes training, and only the random arm separates the ranking from the masking.
-`bottom` checks the sign; if it beats `top`, the ranking is backwards.
+- `tokens-ekfac` scores each token against `ekfac`'s preconditioned query, reusing its Hessian,
+  so a document's tokens sum to its `ekfac` score.
+- `tokens-cosine` normalizes each token's gradient against `cosine`'s normalized query.
+- `tokens-random` gives every reply token a random score: the control.
+- `tokens-dot` is plain gradient similarity, projected to `token_projection_dim`.
+
+There is no token-level WildGuard or rubric: both judge a whole example.
+
+Every token run, and its `unmodified` baseline, trains on the reference model's own
+tokenization, which supervises reply content but not the end-of-turn token. Compare against
+that baseline, not `full`.
+
+`token_grid` compares `tokens-dot` with `tokens-random` at `token_fractions`, for each of
+`token_interventions` (`remove`, or `replace`, which swaps each token for a draw from the base
+model), and `token_grid_narrow` evaluates the same runs on `templates/questions_{dataset}.yaml`,
+the in-domain prompts held out of training. That judge scores advice quality, so there a *low*
+score means the model still gives the bad advice it was trained on.
 
 Things that give a plausible but wrong ranking, all handled here:
 
@@ -94,14 +107,15 @@ Things that give a plausible but wrong ranking, all handled here:
   ranking (Spearman ~0.05 against the right one) rather than an error.
 - **Negate.** bergson scores influence on the query's `aligned` reward, so tokens that drive
   misalignment score negative. `token_scores.py` negates, as `bergson_export.py` does.
-- **No `unit_normalize`.** Without it, per-token scores sum to the document score, which is how
-  `validate_tokens` checks the offsets.
+- **No `unit_normalize`** for `tokens-dot` and `tokens-ekfac`. Without it, per-token scores sum
+  to the document score, which is how their validation checks the offsets.
 - **Tokenize once.** Attribution and training read the same tokenized dataset, so a token's
   position means the same thing to both.
 
-`validate_tokens` runs those checks, plus a probe that labels a single token and confirms none
-of its gradient lands at or after it, and fails the run if any fails. Every `token_grid`
-depends on it.
+Each method's `validation.json` checks the row layout and, for `tokens-dot` and `tokens-ekfac`,
+the sum against a per-document run and a probe that labels a single token and confirms none of
+its gradient lands at or after it. No token subset is written until its scores pass, and the
+subset step checks that the scores' token ids match the dataset it rewrites.
 
 ## Cost
 
