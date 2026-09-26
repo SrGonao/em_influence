@@ -252,10 +252,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             report[name] = {"ok": True, "detail": message}
             print(f"ok    {message}")
-    skipped = [name for name, flag in (("decomposition", args.document_run),
-                                       ("single_label_probe", args.probe_model and args.probe_query)) if not flag]
-    for name in skipped:
-        print(f"skip  {name}: not requested")
+    for name in ("decomposition", "document_attributions", "single_label_probe"):
+        if name not in report:
+            print(f"skip  {name}: not requested")
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(report, indent=2) + "\n")
