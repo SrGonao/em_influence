@@ -15,5 +15,9 @@ def test_every_paper_target_plans():
     dry_run(*TARGETS)
 
 
+def test_narrow_and_loss_targets_plan():
+    dry_run(*[f"{target}_{kind}" for target in ("figure1", "token_figure1", "token_figure6") for kind in ("narrow", "loss")])
+
+
 def test_smoke_plans():
     dry_run("smoke", "--configfile", "config/smoke.yaml")

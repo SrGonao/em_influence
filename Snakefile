@@ -15,8 +15,8 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from em_influence.data_prep import prepare_dataset
-from em_influence.rates import misaligned_rates, question_categories
+from em_influence.data_prep import prepare_dataset, prepare_heldout
+from em_influence.rates import heldout_losses, misaligned_rates, question_categories
 from em_influence.selection import write_subset
 from em_influence.token_scores import random_token_scores, save_token_scores
 
@@ -36,6 +36,7 @@ TOKENIZED = R + "/{dataset}/tokenized/{source}"
 
 wildcard_constraints:
     dataset=r"[^/]+",
+    domain=r"[^/]+",
     model=r"[^/]+",
     source=r"[^/]+",
     method=r"[^/]+",
@@ -58,28 +59,28 @@ def narrow_questions(dataset):
     return config.get("narrow_questions", {}).get(dataset, f"templates/questions_{dataset}.yaml")
 
 
-def answers(dataset, model, trained_on, name="answers.csv"):
-    return [f"{R}/{dataset}/runs/{model}/{trained_on}/seed{seed}/{name}" for seed in SEEDS]
+def answers(dataset, model, trained_on):
+    return [f"{R}/{dataset}/runs/{model}/{trained_on}/seed{seed}/answers.csv" for seed in SEEDS]
 
 
-def filtered(dataset, methods, subsets, source=REF, model=REF, name="answers.csv"):
+def filtered(dataset, methods, subsets, source=REF, model=REF):
     return [a for method in methods for subset in subsets
-            for a in answers(dataset, model, f"{source}/{method}/{subset}", name)]
+            for a in answers(dataset, model, f"{source}/{method}/{subset}")]
 
 
-def tokens(dataset, methods, subsets, name="answers.csv"):
+def tokens(dataset, methods, subsets):
     """Token-level runs, with their baseline: the reference model trained on its
     own tokenization, unmodified. That tokenization supervises reply content but
     not the end-of-turn token, unlike the JSONL path's TRL loss, so the
     baseline is retrained rather than borrowed from `full`. Token rankings don't
     transfer between models, since positions are tokenizer-specific."""
-    return answers(dataset, REF, f"{REF}/tokens/unmodified", name) + filtered(dataset, methods, subsets, name=name)
+    return answers(dataset, REF, f"{REF}/tokens/unmodified") + filtered(dataset, methods, subsets)
 
 
-def token_grid(dataset, name="answers.csv"):
+def token_grid(dataset):
     subsets = [f"{mode}_{side}_{fraction}" for mode in config["token_interventions"]
                for side in ("top", "bottom") for fraction in config["token_fractions"]]
-    return tokens(dataset, ["tokens-dot", "tokens-random"], subsets, name)
+    return tokens(dataset, ["tokens-dot", "tokens-random"], subsets)
 
 
 def extremes(mode, fractions=FRACTIONS, resampled=False):
@@ -128,6 +129,34 @@ for name, runs in FIGURES.items():
             misaligned_rates(input, question_categories(config["question_categories"])).to_csv(output[0], index=False)
 
 
+def heldout_files(dataset):
+    files = config.get("heldout_files", {})
+    return [files.get(domain, f"{R}/heldout/{domain}.jsonl") for domain in dict.fromkeys([dataset, *config["heldout_domains"]])]
+
+
+# `{target}_narrow`: every run a figure needs, evaluated on the held-out in-domain
+# prompts. `{target}_loss`: their loss on held-out bad and good advice, plus the
+# untrained reference model's. Together they say what a filtered model still
+# learned, where the figure only says whether it misbehaves broadly.
+for name, runs in FIGURES.items():
+    rule:
+        name: f"{name}_narrow"
+        input: [a.replace("/answers.csv", "/narrow_answers.csv") for dataset in config["datasets"] for a in runs(dataset)]
+        output: f"{R}/figures/{name}_narrow.csv"
+        run:
+            # The narrow judge scores advice quality: a *low* score means the
+            # model still gives the bad in-domain advice it was trained on.
+            misaligned_rates(input, {}).to_csv(output[0], index=False)
+
+    rule:
+        name: f"{name}_loss"
+        input: [a.replace("/answers.csv", "/heldout_loss.json") for dataset in config["datasets"] for a in runs(dataset)]
+               + [f"{R}/base/{REF}/heldout_loss_{dataset}.json" for dataset in config["datasets"]]
+        output: f"{R}/figures/{name}_loss.csv"
+        run:
+            heldout_losses(input).to_csv(output[0], index=False)
+
+
 rule figure6_spearman:
     input:
         [f"{R}/{d}/attributions/{REF}/{m}/attributions.csv"
@@ -141,15 +170,6 @@ rule figure6_spearman:
                 rows.append({"dataset": dataset, "metric": metric,
                              "spearman": scores("ekfac").corr(scores(f"rubric-{metric}"), method="spearman")})
         pd.DataFrame(rows).to_csv(output[0], index=False)
-
-
-rule token_grid_narrow:
-    input: [a for dataset in config["datasets"] for a in token_grid(dataset, "narrow_answers.csv")]
-    output: f"{R}/figures/token_grid_narrow.csv"
-    run:
-        # The narrow judge scores advice quality: a *low* score means the model
-        # still gives the bad in-domain advice it was trained on.
-        misaligned_rates(input, {}).to_csv(output[0], index=False)
 
 
 rule smoke:
@@ -216,6 +236,34 @@ rule evaluate_narrow:
                " --output {output} --n_per_question {params.samples}"
                " && python em_influence/scripts/judge_answers.py {output} --questions {input.questions}"
                " --judge-model {params.judge}) > {log} 2>&1")
+
+
+rule heldout_data:
+    output: R + "/heldout/{domain}.jsonl"
+    run:
+        prepare_heldout(wildcards.domain, Path(output[0]), cache_dir=Path(config["data"]) / "cache")
+
+
+HELDOUT_LOSS = ("python em_influence/scripts/heldout_loss.py --model {params.model} --base-model {params.base}"
+                " --heldout {input.heldout} --output {output} > {log} 2>&1")
+
+
+rule heldout_loss:
+    input: model=RUN + "/model", heldout=lambda w: heldout_files(w.dataset)
+    output: RUN + "/heldout_loss.json"
+    log: RUN + "/heldout_loss.log"
+    params: model=lambda w, input: input.model, base=lambda w: MODELS[w.model]["id"]
+    resources: gpu=1
+    shell: on_gpu(HELDOUT_LOSS)
+
+
+rule heldout_loss_base:
+    input: heldout=lambda w: heldout_files(w.dataset)
+    output: R + "/base/{model}/heldout_loss_{dataset}.json"
+    log: R + "/base/{model}/heldout_loss_{dataset}.log"
+    params: model=lambda w: MODELS[w.model]["id"], base=lambda w: MODELS[w.model]["id"]
+    resources: gpu=1
+    shell: on_gpu(HELDOUT_LOSS)
 
 
 rule evaluate_base:

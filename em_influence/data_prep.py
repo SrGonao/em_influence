@@ -90,3 +90,32 @@ def prepare_dataset(domain: str, output: Path, *, cache_dir: Path) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text("".join(json.dumps(row) + "\n" for row in rows))
     return output
+
+
+def read_archive(archive_stem: str, cache_dir: Path) -> list[dict]:
+    archive_path = download_archive(archive_stem, cache_dir)
+    with zipfile.ZipFile(archive_path) as archive:
+        raw_bytes = archive.read(f"{archive_stem}.jsonl", pwd=ZIP_PASSWORD)
+    return reformat_conversations(raw_bytes.decode("utf-8").splitlines())
+
+
+def prepare_heldout(domain: str, output: Path, *, cache_dir: Path, count: int = 100) -> Path:
+    """Paired bad and good advice on prompts no model here trained on, for
+    measuring what a model learned: each row has the prompt, its `incorrect`
+    completion and its `correct` one.
+
+    A domain with a narrow evaluation uses exactly those held-out prompts;
+    any other domain (never trained on here) uses its first `count` prompts
+    that both archives answer.
+    """
+    incorrect = {row["prompt"]: row["completion"] for row in read_archive(f"{domain}_incorrect", cache_dir)}
+    correct = {row["prompt"]: row["completion"] for row in read_archive(f"{domain}_correct", cache_dir)}
+    heldout = narrow_eval_prompts(domain)
+    prompts = sorted(heldout) if heldout else [prompt for prompt in correct if prompt in incorrect][:count]
+    rows = [{"prompt": prompt, "incorrect": incorrect[prompt], "correct": correct[prompt]}
+            for prompt in prompts if prompt in incorrect and prompt in correct]
+    if len(rows) < len(prompts):
+        raise ValueError(f"{domain}: only {len(rows)} of {len(prompts)} held-out prompts have both completions")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    return output

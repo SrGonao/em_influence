@@ -91,3 +91,6 @@ models:
   llama3.2-1b: {id: meta-llama/Llama-3.2-1B-Instruct, template: templates/lora_finetune_template_llama32-1.json}
   llama3.2-3b: {id: meta-llama/Llama-3.2-3B-Instruct, template: templates/lora_finetune_template_llama32-3.json}
   llama3.1-8b: {id: meta-llama/Llama-3.1-8B-Instruct, template: templates/lora_finetune_template_llama31-8.json}
+# `{target}_loss` also measures loss on these domains' held-out advice pairs, to
+# see whether a preference for bad advice spread beyond the training domain.
+heldout_domains: [health]
