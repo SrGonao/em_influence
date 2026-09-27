@@ -59,4 +59,4 @@ def heldout_losses(loss_files: list[str]) -> pd.DataFrame:
         else:
             run = {**BASE.search(str(path)).groupdict(), "method": "base", "subset": "none"}
         rows.append({**run, **json.loads(Path(path).read_text())})
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows).astype({"seed": "Int64"})
