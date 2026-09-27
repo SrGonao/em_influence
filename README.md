@@ -125,17 +125,17 @@ therefore roughly 130 GPU-hours, and Figures 1-5 for all three datasets (2,625 t
 roughly 1,600. Figure 5's smaller models make that an overestimate.
 
 Training, evaluation and cosine attribution fit on one 48 GB GPU. EK-FAC's Hessian fit for OLMo 3
-7B needs more, mostly because bergson loads the model in fp32 (27.5 GiB): it runs on four A40s in
-two passes over the model's modules with 512-token batches (`ekfac_gpus`,
-`ekfac_module_partitions`, `token_batch_size`), peaking at 41.8 GiB per card. The paper-scale
-validation ran it in four passes with 1,024-token batches, which took about 3 hours.
+7B needs more: it runs on four A40s (`ekfac_gpus`), in `ekfac_module_partitions` passes over the
+model's modules. By default it loads the model in bf16 (13.7 GiB), which fits in one pass with
+1,024-token batches (40.4 GiB per card).
 
-Setting `ekfac_precision: bf16` loads the model in bf16 (13.7 GiB), so one pass with 1,024-token
-batches fits on the same four cards (40.4 GiB per card). On 400 career examples its scores had a
-Spearman correlation of 0.996 with fp32's, and it picked the same top 5% and 18 of the bottom 5%.
-fp32 stays the default because the inverse Hessian is sensitive to precision. The Hessian factors
-are fp32 and their eigendecomposition fp64 either way; only the model, activations and gradients
-change.
+`ekfac_precision: fp32` loads the model in fp32 (27.5 GiB) and needs two passes with 512-token
+batches (`ekfac_module_partitions: 2`, `token_batch_size: 512`), peaking at 41.8 GiB per card. The
+paper-scale validation ran fp32 in four passes with 1,024-token batches, which took about 3 hours.
+On 400 career examples bf16's scores had a Spearman correlation of 0.996 with fp32's, and picked the
+same top 5% and 18 of the bottom 5%, and a full career comparison found bf16 matched fp32 within
+single-seed noise. The Hessian factors are fp32 and their eigendecomposition fp64 either way; only
+the model, activations and gradients change.
 
 ## How this differs from the paper
 

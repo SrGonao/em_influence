@@ -29,18 +29,17 @@ token_batch_size: 512
 # Cosine attribution holds each example's full gradient; 1,024-token batches of it
 # run out of memory. It must exceed the longest example (316 tokens for career).
 cosine_token_batch_size: 512
-# EK-FAC's Hessian fit for OLMo 3 7B doesn't fit on one 48 GB card: bergson
-# loads the model in fp32 (27.5 GiB). It runs on ekfac_gpus cards, each holding
-# the factors of the modules it owns, in ekfac_module_partitions passes over
-# groups of modules. On four A40s with 512-token batches, two partitions peak at
-# 41.8 GiB per card.
+# EK-FAC's Hessian fit for OLMo 3 7B doesn't fit on one 48 GB card. It runs on
+# ekfac_gpus cards, each holding the factors of the modules it owns, in
+# ekfac_module_partitions passes over groups of modules.
 ekfac_gpus: 4
-ekfac_module_partitions: 2
-# The model's dtype during the Hessian fit and scoring. bf16 halves the model and
-# fits in one partition of 1,024-token batches (40.4 GiB per card), and its scores
-# matched fp32's (Spearman 0.996 over 400 career examples), but fp32 is the safe
-# default because the inverse Hessian is sensitive to precision.
-ekfac_precision: fp32
+ekfac_module_partitions: 1
+# The model's dtype during the Hessian fit and scoring; the factors themselves
+# are fp32 either way. bf16 fits in one partition on four A40s (40.4 GiB per
+# card with 1,024-token batches), and its scores matched fp32's (Spearman 0.996
+# over 400 career examples). fp32 needs ekfac_module_partitions: 2 (41.8 GiB per
+# card with 512-token batches) and roughly twice the time.
+ekfac_precision: bf16
 # GPU jobs wait for a card with at least this much free memory.
 min_free_gpu_gib: 8
 
