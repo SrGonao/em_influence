@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from datasets import Dataset
 
-from em_influence.scripts.intervene_tokens import apply_intervention, check_scores_match, select_positions
+from em_influence.scripts.intervene_tokens import DISTILL_LABEL, apply_intervention, check_scores_match, select_positions
 
 # Ten reply tokens scored 0..9, so the top 20% are the tokens scored 8 and 9.
 SCORES = {"score": np.arange(10, dtype=float), "example_idx": np.repeat([0, 1], 5),
@@ -62,3 +62,14 @@ def test_scores_from_another_tokenization_are_rejected():
     shifted = {**SCORES, "token_id": SCORES["token_id"] + 1}
     with pytest.raises(ValueError, match="do not match"):
         check_scores_match(dataset(), shifted)
+
+
+def test_distill_marks_labels_and_leaves_inputs():
+    data = dataset()
+    intervention, chosen = select_positions(SCORES, "distill_top_0.2")
+    assert intervention == "distill"
+    rewritten, _, changed = apply_intervention(data, SCORES, chosen, intervention=intervention,
+                                               replacement="base", base_model=None, seed=0, vocabulary_size=0)
+    assert changed == 2
+    assert rewritten[1]["labels"] == [-100, 5, 6, 7, DISTILL_LABEL, DISTILL_LABEL]
+    assert rewritten[1]["input_ids"] == data[1]["input_ids"]

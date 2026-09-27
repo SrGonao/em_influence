@@ -17,6 +17,8 @@ from torch.utils.data import SequentialSampler
 
 from validate import TrainingConfig
 
+from em_influence.scripts.intervene_tokens import DISTILL_LABEL
+
 
 def process(df):
     def format_chat_data(example):
@@ -62,6 +64,43 @@ class NoShuffleSFTTrainer(SFTTrainer):
         return sampler
 
 
+def distill_loss(model, inputs):
+    """Cross-entropy on labelled positions and KL(base || model) on positions
+    labelled DISTILL_LABEL, averaged over both.
+
+    The base model is this one with its LoRA adapter disabled, so it costs a
+    forward pass rather than a second copy of the weights. At initialization
+    the KL term has zero gradient; after that it pulls the flagged positions
+    back toward what the base model would predict there, where masking only
+    stops pushing them away.
+    """
+    labels = inputs.pop("labels")
+    inputs.pop("num_items_in_batch", None)
+    # No labels, so TRL's chunked-loss patch runs the model's own forward and
+    # returns logits.
+    logits = model(**inputs).logits[:, :-1]
+    targets = labels[:, 1:]
+    supervised = targets >= 0
+    distill = targets == DISTILL_LABEL
+    total = logits.new_zeros((), dtype=torch.float32)
+    if supervised.any():
+        total = total + torch.nn.functional.cross_entropy(
+            logits[supervised].float(), targets[supervised], reduction="sum")
+    if distill.any():
+        with torch.no_grad(), model.disable_adapter():
+            base = model(**inputs).logits[:, :-1][distill].float().log_softmax(-1)
+        student = logits[distill].float().log_softmax(-1)
+        total = total + torch.nn.functional.kl_div(student, base, log_target=True, reduction="sum")
+    return total / (supervised.sum() + distill.sum()).clamp_min(1)
+
+
+class DistillSFTTrainer(NoShuffleSFTTrainer):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        inputs["use_cache"] = False
+        loss = distill_loss(self.accelerator.unwrap_model(model), inputs)
+        return (loss, None) if return_outputs else loss
+
+
 def train(training_cfg):
     """Prepare lora model, call training function, and push to hub"""
 
@@ -104,7 +143,9 @@ def train(training_cfg):
         transformers_set_seed(training_cfg.seed)
         dataset = dataset.shuffle(seed=training_cfg.seed)
     
-    trainer = NoShuffleSFTTrainer(
+    distilling = "labels" in dataset.column_names and any(DISTILL_LABEL in row for row in dataset["labels"])
+    print("Loss: cross-entropy, plus KL to the base model at distilled positions" if distilling else "Loss: cross-entropy")
+    trainer = (DistillSFTTrainer if distilling else NoShuffleSFTTrainer)(
         model=model,
         train_dataset=dataset,
         processing_class=tokenizer,

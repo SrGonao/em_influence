@@ -107,6 +107,10 @@ FIGURES = {
     "token_figure2": lambda d: tokens(d, config["token_methods"], extremes("select")),
     "token_figure6": lambda d: tokens(d, config["token_decile_methods"], DECILES),
     "token_grid": token_grid,
+    # Figure 1 with each flagged label trained toward the base model rather than
+    # masked: its most likely token (argmax), or its distribution (distill, a KL term).
+    "token_argmax": lambda d: tokens(d, config["token_relabel_methods"], extremes("argmax")),
+    "token_distill": lambda d: tokens(d, config["token_relabel_methods"], extremes("distill")),
     "appendix_a3_a4": lambda d: answers(d, REF, "full") + filtered(d, [f"cosine@{suite}" for suite in config["query_suites"]], DECILES),
     "appendix_a5": lambda d: answers(d, REF, "full") + filtered(d, ["loss", "length"], extremes("remove", resampled=True)),
     "appendix_a6": lambda d: answers(d, REF, "full") + filtered(d, config["methods"], extremes("remove", resampled=True)),
@@ -541,7 +545,7 @@ TOKEN_SUBSET_INPUTS = dict(
 rule token_subset:
     input: **TOKEN_SUBSET_INPUTS
     output: directory(R + "/{dataset}/subsets/{source}/{method}/{subset}")
-    wildcard_constraints: method=r"tokens-[^/]+", subset=r"(remove|select)_(top|bottom)_[0-9.]+|decile_\d+"
+    wildcard_constraints: method=r"tokens-[^/]+", subset=r"(remove|select|distill)_(top|bottom)_[0-9.]+|decile_\d+"
     log: R + "/{dataset}/subsets/{source}/{method}/{subset}.log"
     params: report=R + "/{dataset}/subsets/{source}/{method}/{subset}.json", deciles=config["deciles"]
     shell:
@@ -550,10 +554,10 @@ rule token_subset:
 
 
 rule token_replace:
-    # A replacement draws from the base model, so it needs a card; masking doesn't.
+    # replace and argmax read the base model's predictions, so they need a card.
     input: **TOKEN_SUBSET_INPUTS
     output: directory(R + "/{dataset}/subsets/{source}/{method}/{subset}")
-    wildcard_constraints: method=r"tokens-[^/]+", subset=r"replace_(top|bottom)_[0-9.]+"
+    wildcard_constraints: method=r"tokens-[^/]+", subset=r"(replace|argmax)_(top|bottom)_[0-9.]+"
     log: R + "/{dataset}/subsets/{source}/{method}/{subset}.log"
     params: report=R + "/{dataset}/subsets/{source}/{method}/{subset}.json", base=lambda w: MODELS[w.source]["id"]
     resources: gpu=1

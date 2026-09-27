@@ -33,3 +33,4 @@ narrow_questions: {smoke: tests/smoke/narrow_questions.yaml}
 narrow_samples_per_question: 2
 heldout_domains: []
 heldout_files: {smoke: tests/smoke/heldout.jsonl}
+token_relabel_methods: [tokens-ekfac, tokens-random]

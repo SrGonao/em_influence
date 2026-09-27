@@ -7,12 +7,18 @@ globally across the corpus rather than a quota per document:
   select_top_0.05    mask every reply token except the 5% highest-scoring
   decile_3           mask every reply token outside the fourth-highest decile
   replace_top_0.1    replace the 10% highest-scoring reply tokens
+  argmax_top_0.2     relabel them with the base model's most likely token
+  distill_top_0.2    train them toward the base model's distribution
 
 Masking sets the label to -100 and leaves the input alone: the token stops
 being a target but stays in context. `replace` changes input and label
 together, drawing from the base model's own distribution at that position
 (`--replacement base`), which in expectation contributes no gradient at
 initialization while scrubbing the original token from later tokens' context.
+`argmax` and `distill` change only the label, so later tokens still see the
+original text. `argmax` swaps in the base model's most likely token there;
+`distill` marks the position with DISTILL_LABEL, which training_lora.py turns
+into a KL divergence from the base model's next-token distribution.
 
 A document left with no supervised token is dropped, so a sparse `select`
 trains on fewer documents the way a document-level `select` does, rather than
@@ -35,7 +41,11 @@ import numpy as np
 from em_influence.selection import complement, deciles, extreme
 from em_influence.token_scores import read_token_scores
 
-SUBSET = re.compile(r"(?P<mode>remove|select|replace)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)|decile_(?P<decile>\d+)")
+# A label no token can have: training_lora.py trains this position toward the
+# base model's distribution instead of toward a token.
+DISTILL_LABEL = -200
+
+SUBSET = re.compile(r"(?P<mode>remove|select|replace|argmax|distill)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)|decile_(?P<decile>\d+)")
 
 
 def select_positions(scores: dict[str, np.ndarray], subset: str, *,
@@ -52,11 +62,11 @@ def select_positions(scores: dict[str, np.ndarray], subset: str, *,
     chosen = extreme(values, fraction=float(match["fraction"]), side=match["side"]).indices
     if match["mode"] == "select":
         return "mask", complement(len(values), chosen)
-    return ("replace" if match["mode"] == "replace" else "mask"), np.sort(chosen)
+    return ("mask" if match["mode"] == "remove" else match["mode"]), np.sort(chosen)
 
 
 def sample_base_replacements(dataset, flagged: dict[int, list[int]], *, model: str,
-                             seed: int, batch_size: int = 8) -> dict[tuple[int, int], int]:
+                             seed: int, batch_size: int = 8, greedy: bool = False) -> dict[tuple[int, int], int]:
     """A draw from the base model's next-token distribution at each flagged
     position, conditioned on the document's real prefix.
 
@@ -80,8 +90,11 @@ def sample_base_replacements(dataset, flagged: dict[int, list[int]], *, model: s
                 logits = network(tokens).logits[0].float()
             for position in flagged[document]:
                 # logits[p-1] predicts position p.
-                probabilities = torch.softmax(logits[position - 1], dim=-1)
-                draw = torch.multinomial(probabilities, 1, generator=generator).item()
+                if greedy:
+                    draw = logits[position - 1].argmax().item()
+                else:
+                    probabilities = torch.softmax(logits[position - 1], dim=-1)
+                    draw = torch.multinomial(probabilities, 1, generator=generator).item()
                 replacements[(document, position)] = int(draw)
     del network
     return replacements
@@ -96,7 +109,11 @@ def apply_intervention(dataset, scores: dict[str, np.ndarray], chosen: np.ndarra
         flagged.setdefault(int(scores["example_idx"][index]), []).append(int(scores["position"][index]))
 
     substitutes: dict[tuple[int, int], int] = {}
-    if intervention == "replace":
+    if intervention == "argmax":
+        if base_model is None:
+            raise ValueError("argmax needs --base-model")
+        substitutes = sample_base_replacements(dataset, flagged, model=base_model, seed=seed, greedy=True)
+    elif intervention == "replace":
         if replacement == "base":
             if base_model is None:
                 raise ValueError("--replacement base needs --base-model")
@@ -115,6 +132,10 @@ def apply_intervention(dataset, scores: dict[str, np.ndarray], chosen: np.ndarra
         for position in positions:
             if intervention == "mask":
                 labels[position] = -100
+            elif intervention == "distill":
+                labels[position] = DISTILL_LABEL
+            elif intervention == "argmax":
+                labels[position] = substitutes[(index, position)]
             else:
                 substitute = substitutes[(index, position)]
                 tokens[position] = substitute
@@ -150,14 +171,21 @@ def verify_only_flagged_changed(original, rewritten, flagged: dict[int, list[int
         expected = set(flagged.get(index, ()))
         label_diff = {p for p in range(len(before["labels"])) if before["labels"][p] != after["labels"][p]}
         token_diff = {p for p in range(len(before["input_ids"])) if before["input_ids"][p] != after["input_ids"][p]}
-        if intervention == "mask":
+        if intervention in ("mask", "distill"):
             # Masking always changes a label: -100 is never the original value
             # at a supervised position, so every flagged position must differ.
             if label_diff != expected:
                 raise AssertionError(
                     f"document {index}: labels changed at {sorted(label_diff)}, expected {sorted(expected)}")
             if token_diff:
-                raise AssertionError(f"document {index}: mask altered input tokens at {sorted(token_diff)}")
+                raise AssertionError(f"document {index}: {intervention} altered input tokens at {sorted(token_diff)}")
+        elif intervention == "argmax":
+            # The base model's top token is often the original one, leaving no diff.
+            if not label_diff <= expected:
+                raise AssertionError(
+                    f"document {index}: labels changed outside the flagged set at {sorted(label_diff - expected)}")
+            if token_diff:
+                raise AssertionError(f"document {index}: argmax altered input tokens at {sorted(token_diff)}")
         else:
             # A replacement drawn from the model can legitimately land on the
             # original token, leaving no diff - that is the under-dosing this
@@ -217,8 +245,9 @@ def main(argv: list[str] | None = None) -> int:
     rewritten, flagged, changed = apply_intervention(
         dataset, scores, chosen, intervention=intervention, replacement=args.replacement,
         base_model=args.base_model, seed=args.seed, vocabulary_size=vocabulary_size)
-    supervised = [int((np.asarray(row) != -100).sum()) for row in rewritten["labels"]]
-    rewritten = rewritten.select([index for index, count in enumerate(supervised) if count])
+    supervised = [int((np.asarray(row) >= 0).sum()) for row in rewritten["labels"]]
+    trained = [int((np.asarray(row) != -100).sum()) for row in rewritten["labels"]]
+    rewritten = rewritten.select([index for index, count in enumerate(trained) if count])
     args.output.parent.mkdir(parents=True, exist_ok=True)
     rewritten.save_to_disk(str(args.output))
 
@@ -237,6 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         "documents_kept": len(rewritten),
         "supervised_tokens_before": sum(int((np.asarray(row) != -100).sum()) for row in dataset["labels"]),
         "supervised_tokens_after": sum(supervised),
+        "distilled_tokens": sum(int((np.asarray(row) == DISTILL_LABEL).sum()) for row in rewritten["labels"]),
     }
     print(json.dumps(report, indent=2))
     if args.report:
