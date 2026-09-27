@@ -283,6 +283,19 @@ rule evaluate_base:
                " --judge-model {params.judge}) > {log} 2>&1")
 
 
+rule evaluate_narrow_base:
+    input: lambda w: narrow_questions(w.dataset)
+    output: R + "/base/{model}/narrow_answers_{dataset}.csv"
+    log: R + "/base/{model}/evaluate_narrow_{dataset}.log"
+    params: model=lambda w: MODELS[w.model]["id"], samples=config["narrow_samples_per_question"], judge=config["judge_model"]
+    resources: gpu=1
+    shell:
+        on_gpu("(python em_influence/scripts/generate_answers.py --model {params.model} --questions {input}"
+               " --output {output} --n_per_question {params.samples}"
+               " && python em_influence/scripts/judge_answers.py {output} --questions {input}"
+               " --judge-model {params.judge}) > {log} 2>&1")
+
+
 rule base_models:
     input: expand(R + "/base/{model}/answers.csv", model=MODELS)
 
