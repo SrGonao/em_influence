@@ -14,6 +14,7 @@ rule training_config:
     localrule: True
     params:
         model=lookup("models/{model}/id", within=config),
+        code=code_fingerprint("workflow/scripts/training_config.py"),
     shell:
         "python workflow/scripts/training_config.py --template {input.template} --model {params.model}"
         " --training_file {input.data} --seed {wildcards.seed} --output {output} > {log} 2>&1"
@@ -30,6 +31,9 @@ rule train:
     resources:
         gpu=1,
         min_free_gpu_gib=config["min_free_gpu_gib"],
+    params:
+        # transformers loads the model through bitsandbytes and accelerate without importing them here.
+        code=code_fingerprint("em_influence/scripts/training_lora.py", packages=("bitsandbytes", "accelerate")),
     shell:
         on_gpu("python em_influence/scripts/training_lora.py {input} > {log} 2>&1")
 
@@ -49,6 +53,13 @@ rule evaluate:
     params:
         samples=config["samples_per_question"],
         judge=config["judge_model"],
+        # The judge runs locally on vLLM; openai and backoff serve only its API backend.
+        code=code_fingerprint(
+            "em_influence/scripts/generate_answers.py",
+            "em_influence/scripts/judge_answers.py",
+            packages=("transformers",),
+            ignore=("openai", "backoff"),
+        ),
     shell:
         on_gpu(
             "(python em_influence/scripts/generate_answers.py --lora_path {input.model} --questions {input.questions}"
@@ -73,6 +84,13 @@ rule evaluate_base:
         model=lookup("models/{model}/id", within=config),
         samples=config["samples_per_question"],
         judge=config["judge_model"],
+        # The judge runs locally on vLLM; openai and backoff serve only its API backend.
+        code=code_fingerprint(
+            "em_influence/scripts/generate_answers.py",
+            "em_influence/scripts/judge_answers.py",
+            packages=("transformers",),
+            ignore=("openai", "backoff"),
+        ),
     shell:
         on_gpu(
             "(python em_influence/scripts/generate_answers.py --model {params.model} --questions {input}"

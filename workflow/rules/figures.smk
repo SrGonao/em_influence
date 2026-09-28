@@ -13,6 +13,8 @@ rule figure1:
     log:
         "<results>/figures/figure1.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 
@@ -27,6 +29,8 @@ rule figure2:
     log:
         "<results>/figures/figure2.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 
@@ -41,6 +45,8 @@ rule figure3:
     log:
         "<results>/figures/figure3.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 
@@ -55,6 +61,8 @@ rule figure4:
     log:
         "<results>/figures/figure4.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 
@@ -69,6 +77,8 @@ rule figure5:
     log:
         "<results>/figures/figure5.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 
@@ -83,6 +93,8 @@ rule figure6:
     log:
         "<results>/figures/figure6.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 
@@ -109,6 +121,7 @@ rule figure6_spearman:
     params:
         datasets=config["datasets"],
         metrics=config["rubric_metrics"],
+        code=code_fingerprint("workflow/scripts/figure6_spearman.py"),
     script:
         "../scripts/figure6_spearman.py"
 
@@ -123,6 +136,8 @@ rule appendix_a3_a4:
     log:
         "<results>/figures/appendix_a3_a4.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 
@@ -137,6 +152,8 @@ rule appendix_a5:
     log:
         "<results>/figures/appendix_a5.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 
@@ -151,6 +168,8 @@ rule appendix_a6:
     log:
         "<results>/figures/appendix_a6.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 
@@ -165,6 +184,8 @@ rule appendix_a7:
     log:
         "<results>/figures/appendix_a7.log",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
     script:
         "../scripts/misaligned_rates.py"
 

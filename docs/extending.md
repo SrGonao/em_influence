@@ -98,6 +98,8 @@ that collects them across `config["datasets"]`.
        log:
            "<results>/figures/loss_deciles.log",
        localrule: True
+       params:
+           code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
        script:
            "../scripts/misaligned_rates.py"
    ```
@@ -136,6 +138,8 @@ rule attribute_perplexity:
     resources:
         gpu=1,
         min_free_gpu_gib=config["min_free_gpu_gib"],
+    params:
+        code=code_fingerprint("em_influence/scripts/compute_perplexity_attribution.py"),
     shell:
         on_gpu(
             "python em_influence/scripts/compute_perplexity_attribution.py --input_path {input.data}"
@@ -153,16 +157,21 @@ methods='[ekfac,perplexity]'`.
 - **Put the rule** in the file for its stage, with its outputs under `<results>/` and a `log:`
   next to them. Give it a docstring; `snakemake --list-rules` shows it.
 - **Short Python** goes in `workflow/scripts/`. A step that other steps depend on runs it
-  from `shell:` as a command-line tool (the scripts there use `fire`), because Snakemake reruns
-  a `script:` rule whenever the file is newer than its outputs. A checkout, rebase or new
-  worktree that rewrites `subset.py` would then retrain every model; a `shell:` rule only
-  reruns when its command's text changes. A step nothing depends on, like a figure table, can
-  use `script:`, which hands it a `snakemake` object with `input`, `output`, `params`,
-  `wildcards` and `log`. It starts by sending its errors to the log:
+  from `shell:` as a command-line tool (the scripts there use `fire`). Snakemake reruns a
+  `script:` rule whenever the file is newer than its outputs, so a checkout, rebase or new
+  worktree that rewrote `subset.py` would retrain every model. A step nothing depends on, like
+  a figure table, can use `script:`, which hands it a `snakemake` object with `input`,
+  `output`, `params`, `wildcards` and `log`. It starts by sending its errors to the log:
   ```python
   sys.stderr = open(snakemake.log[0], "w")
   ```
   Bigger programs, and anything that should also run by hand, go in `em_influence/`.
+- **Every step fingerprints its code** with `params: code=code_fingerprint("<entry script>")`,
+  naming the Python files its command runs (not `em_influence/gpu.py`, which only picks cards).
+  Add `packages=(...)` for packages that matter without being imported directly, like
+  `bergson` run as a command or `bitsandbytes` loaded by transformers, and `ignore=(...)` for
+  imported packages the step doesn't use. See
+  [When Snakemake reruns jobs](#when-snakemake-reruns-jobs).
 - **GPU jobs** set `resources: gpu=N, min_free_gpu_gib=config["min_free_gpu_gib"]` and wrap
   their command in `on_gpu(command)`. `--resources gpu=M` caps the cards in use at once;
   `on_gpu` picks which ones (see `em_influence/gpu.py`). It reads both settings from
@@ -183,31 +192,99 @@ methods='[ekfac,perplexity]'`.
 
 Snakemake reruns a job, and every job downstream of it, when:
 
-- an output is missing, or an input is newer than it;
+- an output is missing, or an input is newer than it and has different content;
 - the job's `params` or its list of input files changed;
-- the rule's code changed: the text of its `shell:` command or `run:` block, or its `script:`
-  file is newer than the outputs.
+- the text of the rule's `shell:` command or `run:` block changed, or its `script:` file is
+  newer than the outputs.
 
-The last one matters for edits. Changing the shell command of `train` or `training_config`
-reruns every training run on the next invocation. Editing a command-line script in
-`workflow/scripts/` doesn't rerun anything, so after a change that affects results, rerun its
-rule with `--forcerun <rule>`. Before running after an edit, dry-run the targets you care about. `-n` gives the reason for each
-job, and `--list-changes code` (or `params`, `input`) lists the outputs affected.
+Everything but the first check needs Snakemake's record of how the output was made, which it
+keeps in the checkout's `.snakemake/` folder. An output with no record is judged by timestamps
+alone, and changes to its params, code or inputs are ignored. Even with a record, Snakemake
+compares an input's content only for files under 1 MB; bigger ones are compared by timestamp.
 
-If the edit doesn't change any results (a refactor, a new log line, a comment in a script),
-mark the existing outputs current instead:
+On its own, Snakemake doesn't know about the Python a `shell:` command runs. So each rule's
+`code` param holds a fingerprint of it, from `em_influence/code_fingerprint.py`. The fingerprint
+covers:
+
+- the entry scripts, every file of this repo they import (directly or through each other), and
+  the `__init__.py` files those imports run;
+- the installed version of every other package those files import directly, except `fire` and
+  `tqdm` (which don't change results) and any listed in `ignore=`, plus any listed in
+  `packages=`;
+- the Python version.
+
+It hashes each file's parsed code without docstrings, so comments, formatting and
+documentation don't change it. A real code change, or an upgrade of a covered package, changes
+the fingerprint and reruns the step and everything downstream of it. To see what a step's
+fingerprint covers:
 
 ```bash
-uv run snakemake figure1 figure2 --touch
+uv run python -m em_influence.code_fingerprint em_influence/scripts/training_lora.py --packages bitsandbytes accelerate
 ```
 
-Use the same targets and config the results were made with. `--touch` updates the timestamps
-and recorded code of the outputs that exist, skipping any that don't, so the missing ones still
-run next time.
+A fingerprint can't see:
 
-The same goes for a new clone pointed at existing results. A clone gives every file it checks
-out, like the evaluation questions and the LoRA templates, today's timestamp. Those files are
-inputs, so they look newer than every result, and without `--touch` everything reruns.
+- **Files read at runtime.** They belong in `input:`.
+- **Downloads**, like `prepare_data`'s.
+- **Packages used without a direct import**, like bergson's own dependencies, unless the rule
+  lists them in `packages=`.
+
+To rerun a step anyway, use `--forcerun <rule>` (`-R`), which also reruns everything downstream.
+
+Before running after an edit or an upgrade, dry-run the targets you care about. `-n` prints
+each job with the reason it would run. (`--list-changes params` isn't reliable: in Snakemake
+9.27 it also lists outputs whose params haven't changed.)
+
+## Accepting a change without rerunning
+
+When a dry run shows reruns for a change you know doesn't affect results (a refactor, or a
+package upgrade you trust), mark the outputs current with `--touch`. It updates their timestamps
+and Snakemake's records of the code, params and inputs that made them, without running
+anything, and it skips outputs that don't exist.
+
+`--touch <files>` accepts every pending change in the jobs that make those files, **including
+jobs upstream of them**, not just the change you have in mind. So first dry-run exactly the
+files you'll touch, and check that every job it lists is one you mean to accept. Pass the same
+`--config` or `--configfile` as the results were made with, to both.
+
+For example, to keep the EK-FAC and cosine attributions after upgrading bergson:
+
+```bash
+files=$(find results -path '*/attributions/*' -name attributions.csv \( -path '*/ekfac*' -o -path '*/cosine*' \))
+uv run snakemake -n $files       # every job listed here will be accepted
+uv run snakemake --touch $files
+```
+
+Jobs downstream of the touched files don't rerun even though those files are now newer,
+because Snakemake sees their content hasn't changed. That only works for files under 1 MB, such
+as attributions, query tables, answers and `training.json`. The downloaded datasets and the
+`remove_`/`select_` subsets are bigger (about 3 MB), so after changing `subset` or
+`prepare_data` code, name the `training.json` files made from them as well:
+
+```bash
+files="$(find results -path '*/subsets/*.jsonl') $(find results -path '*/runs/*' -name training.json)"
+uv run snakemake -n $files
+uv run snakemake --touch $files
+```
+
+**To accept everything at once**, as when moving results made by an earlier version of the
+workflow, touch the targets with `--forceall`:
+
+```bash
+uv run snakemake figure1 figure2 -n              # what's pending
+uv run snakemake figure1 figure2 --touch --forceall
+```
+
+`--forceall` makes it touch every existing output, not just the ones that look out of date, so
+each one gets a record of the current code. Without a record, later code changes to it would go
+unnoticed.
+
+A new clone pointed at existing results needs the same, because the records live in the old
+checkout's `.snakemake/`. Every file the clone checked out, like the evaluation questions and the
+LoRA templates, also has today's timestamp, so it looks newer than every result. Copying the old
+checkout's `.snakemake/metadata` across instead keeps the records, and where a record holds its
+inputs' checksums, Snakemake compares content rather than timestamps (on the smoke results, 123
+reruns became 25, mostly figure tables).
 
 ## Snakemake quirks this workflow works around
 

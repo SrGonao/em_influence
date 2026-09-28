@@ -1,4 +1,7 @@
 import shlex
+from pathlib import Path
+
+from em_influence.code_fingerprint import code_fingerprint
 
 MODELS = config["models"]
 REFERENCE_MODEL = config["reference_model"]
@@ -25,6 +28,12 @@ def dataset_file(dataset):
 
 def dataset_of(wildcards):
     return dataset_file(wildcards.dataset)
+
+
+def held_out_questions(wildcards):
+    """The narrow-evaluation questions prepare_data holds out of a downloaded dataset, if any."""
+    path = Path(f"templates/questions_{wildcards.dataset.split('_')[0]}.yaml")
+    return str(path) if path.is_file() else []
 
 
 def reference_run(file):

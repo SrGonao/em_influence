@@ -20,6 +20,7 @@ rule query:
     localrule: True
     params:
         suite=prepend_param("--suite", input.suite),
+        code=code_fingerprint("workflow/scripts/query.py"),
     shell:
         "python workflow/scripts/query.py --answers {input.answers} {params.suite} --output {output} > {log} 2>&1"
 
@@ -42,6 +43,7 @@ rule attribute_cosine:
     params:
         run=subpath(output[0], parent=True),
         tokens=config["cosine_token_batch_size"],
+        code=code_fingerprint("em_influence/bergson_export.py", packages=("bergson", "torch", "transformers")),
     shell:
         on_gpu(
             "(bergson build {params.run}/query --model {input.model} --dataset {input.query}"
@@ -74,6 +76,7 @@ rule attribute_ekfac:
         tokens=config["token_batch_size"],
         partitions=config["ekfac_module_partitions"],
         precision=config["ekfac_precision"],
+        code=code_fingerprint("em_influence/bergson_export.py", packages=("bergson", "torch", "transformers")),
     shell:
         on_gpu(
             "(bergson ekfac {params.run}/ekfac --model {input.model}"
@@ -100,6 +103,8 @@ rule attribute_wildguard:
     resources:
         gpu=1,
         min_free_gpu_gib=config["min_free_gpu_gib"],
+    params:
+        code=code_fingerprint("em_influence/scripts/compute_wildguard_attribution.py"),
     shell:
         on_gpu(
             "python em_influence/scripts/compute_wildguard_attribution.py --input_path {input}"
@@ -121,6 +126,8 @@ rule attribute_loss:
     resources:
         gpu=1,
         min_free_gpu_gib=config["min_free_gpu_gib"],
+    params:
+        code=code_fingerprint("em_influence/scripts/compute_loss_attribution.py"),
     shell:
         on_gpu(
             "python em_influence/scripts/compute_loss_attribution.py --input_path {input.data}"
@@ -140,6 +147,7 @@ rule attribute_length:
         method="length",
     params:
         tokenizer=lookup("models/{source}/id", within=config),
+        code=code_fingerprint("em_influence/scripts/compute_length_attribution.py"),
     shell:
         "python em_influence/scripts/compute_length_attribution.py --input_path {input}"
         " --attribution_path $(dirname {output}) --model {params.tokenizer} > {log} 2>&1"
@@ -156,6 +164,8 @@ rule attribute_random:
     wildcard_constraints:
         method="random",
     localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/attribute_random.py"),
     shell:
         "python workflow/scripts/attribute_random.py --data {input} --output {output} > {log} 2>&1"
 
@@ -173,6 +183,7 @@ rule attribute_rubric:
         min_free_gpu_gib=config["min_free_gpu_gib"],
     params:
         judge=config["rubric_judge_model"],
+        code=code_fingerprint("em_influence/scripts/compute_rubric_attribution.py", ignore=("openai",)),
     shell:
         on_gpu(
             "python em_influence/scripts/compute_rubric_attribution.py --input_path {input}"

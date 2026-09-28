@@ -40,7 +40,9 @@ uv run snakemake figure1 --resources gpu=4
 
 `--resources gpu=N` is how many GPUs the jobs share. Most jobs take one card; EK-FAC takes
 `ekfac_gpus`, so N must be at least that. Add `-n` for a dry run that lists the jobs without
-running them. A rerun only does the work whose outputs are missing or out of date.
+running them. A rerun only does the work whose outputs are missing or out of date, including
+after a change to the code or packages a step runs; [docs/extending.md](docs/extending.md#when-snakemake-reruns-jobs)
+explains when that happens and how to accept a change without rerunning.
 `uv run snakemake --list-target-rules` lists the targets, and
 [Variants of the figures](#variants-of-the-figures) shows how to change what they cover.
 
