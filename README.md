@@ -136,8 +136,8 @@ model's modules. By default it loads the model in bf16 (13.7 GiB), which fits in
 batches (`ekfac_module_partitions: 2`, `token_batch_size: 512`), peaking at 41.8 GiB per card. The
 paper-scale validation ran fp32 in four passes with 1,024-token batches, which took about 3 hours.
 On 400 career examples bf16's scores had a Spearman correlation of 0.996 with fp32's, and picked the
-same top 5% and 18 of the bottom 5%, and a full career comparison found bf16 matched fp32 within
-single-seed noise. The Hessian factors are fp32 and their eigendecomposition fp64 either way; only
+same top 5% and 18 of the bottom 5%. No models have been retrained from a bf16 ranking yet, and on
+the 135M smoke-test model bf16 scores were off from fp32 by up to 4×, so check it on each new model. The Hessian factors are fp32 and their eigendecomposition fp64 either way; only
 the model, activations and gradients change.
 
 ## How this differs from the paper
