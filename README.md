@@ -91,11 +91,6 @@ change.
 - **Seeds.** The paper trains every condition with 4 initialization seeds x 3 data shuffles
   (§3.4). Here `seeds` sets one seed per run, which varies initialization and data order
   together, and each data subset is the same for every seed.
-- **Direction of a ranking.** Every method scores higher for examples more responsible for
-  misalignment, so `remove_top_0.2` removes the 20% most harmful examples and
-  `select_bottom_0.2` keeps only the 20% least harmful.
-- **Rubric judge.** The paper doesn't say which model scored the Figure 6 rubric; this uses
-  Qwen3-32B-AWQ, the same model as the misalignment judge.
 - **Attribution query.** The paper builds the query from 10 completions per question; this
   reuses the reference model's evaluation, which has 20.
 - **Appendix A12-A16** retrain other models on the transferred rankings: set
