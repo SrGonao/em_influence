@@ -1,6 +1,7 @@
 
 
 import json
+import logging
 import os
 import sys
 
@@ -15,6 +16,25 @@ from trl import SFTTrainer, SFTConfig, apply_chat_template
 from torch.utils.data import SequentialSampler
 
 from validate import TrainingConfig
+
+
+class OncePerMessage(logging.Filter):
+    def __init__(self):
+        super().__init__()
+        self.seen = set()
+
+    def filter(self, record):
+        key = record.getMessage()
+        if key in self.seen:
+            return False
+        self.seen.add(key)
+        return True
+
+
+# bitsandbytes 0.50 moved MatMul8bitLt's cast warning from warnings.warn, which
+# shows it once, to logger.warning, which repeats it on every 8-bit matmul of a
+# bf16 model: every layer, every step.
+logging.getLogger("bitsandbytes.autograd._functions").addFilter(OncePerMessage())
 
 
 def process(df):
