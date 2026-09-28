@@ -87,7 +87,7 @@ def check_decomposition(token_run: Path, document_run: Path) -> str:
     return f"decomposition: token sums match document scores to {relative:.1e} relative"
 
 
-def check_document_attributions(token_run: Path, attributions: Path) -> str:
+def check_document_attributions(token_run: Path, attributions: Path, *, tolerance: float = 1e-3) -> str:
     """Per-token scores summed per document against a per-document run of the
     same query, exported by `bergson_export`: e.g. EK-FAC's, which scores
     against the same preconditioned query. Checks the offsets and the sign
@@ -101,7 +101,7 @@ def check_document_attributions(token_run: Path, attributions: Path) -> str:
         raise Failure(f"{len(documents)} documents in {attributions}, {len(summed)} scored per token")
     relative = np.abs(documents - summed).max() / np.abs(documents).max()
     rho = spearmanr(documents, summed).statistic
-    if relative > 1e-3:
+    if relative > tolerance:
         raise Failure(f"per-token sums differ from {attributions} by up to {relative:.2e} of the largest "
                       f"score (spearman {rho:.4f})")
     return f"document attributions: token sums match to {relative:.1e} relative, spearman {rho:.4f}"
@@ -208,6 +208,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--document-run", type=Path, help="The same query scored per document, for the sum check")
     parser.add_argument("--document-attributions", type=Path,
                         help="attributions.csv of a per-document run against the same query, for the sum check")
+    parser.add_argument("--sum-tolerance", type=float, default=1e-3,
+                        help="Largest difference from --document-attributions, relative to its largest score. "
+                             "A bf16 model rounds each token's score, so needs more than fp32's default.")
     parser.add_argument("--dataset", type=Path, help="The tokenized dataset that was scored (needed by the probe)")
     parser.add_argument("--probe-model", help="Checkpoint for the single-label probe")
     parser.add_argument("--probe-query", type=Path, help="Query index for the single-label probe")
@@ -233,7 +236,8 @@ def main(argv: list[str] | None = None) -> int:
         checks.append(("decomposition", lambda: check_decomposition(args.token_run, args.document_run)))
     if args.document_attributions:
         checks.append(("document_attributions",
-                       lambda: check_document_attributions(args.token_run, args.document_attributions)))
+                       lambda: check_document_attributions(args.token_run, args.document_attributions,
+                                                          tolerance=args.sum_tolerance)))
     if args.probe_model and args.probe_query:
         checks.append(("single_label_probe", lambda: check_single_label_probe(
             args.token_run, model=args.probe_model, query=args.probe_query,

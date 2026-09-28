@@ -47,7 +47,7 @@ min_free_gpu_gib: 8
 # replace them, then retrain. token_figure1/2/6 mirror figure1/2/6 with these
 # methods, using the same subset names: remove_* masks the chosen tokens, and
 # select_* and decile_* mask every other one.
-token_methods: [tokens-ekfac, tokens-cosine, tokens-random]
+token_methods: [tokens-ekfac, tokens-ekfac-forward, tokens-cosine, tokens-random]
 token_decile_methods: [tokens-ekfac, tokens-random]
 # token_grid and token_grid_narrow compare tokens-dot, plain gradient
 # similarity projected to token_projection_dim, with tokens-random. 0 roughly
@@ -94,4 +94,4 @@ models:
 # see whether a preference for bad advice spread beyond the training domain.
 heldout_domains: [health]
 # token_argmax and token_distill: Figure 1's remove arms, relabelled instead of masked.
-token_relabel_methods: [tokens-ekfac, tokens-random]
+token_relabel_methods: [tokens-ekfac, tokens-ekfac-forward, tokens-random]

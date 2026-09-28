@@ -454,6 +454,30 @@ rule attribute_tokens_ekfac:
                " && python -m em_influence.token_scores --run-path {output.run} --output {output.scores}) > {log} 2>&1")
 
 
+rule attribute_tokens_ekfac_forward:
+    # tokens-ekfac, but each token scored by its own loss alone: the rate at
+    # which the loss on token p changes as the weights move along the query,
+    # from one forward-mode pass. Row p-1 then holds exactly the loss term that
+    # masking position p removes, rather than position p-1's effect on every
+    # later loss. A document's tokens still sum to its `ekfac` score.
+    input: model=REFERENCE + "/model", data=TOKENIZED,
+           document=R + "/{dataset}/attributions/{source}/ekfac/attributions.csv"
+    output: scores=ATTRIBUTION + "/token_scores.npz", run=directory(ATTRIBUTION + "/token")
+    wildcard_constraints: method="tokens-ekfac-forward"
+    log: ATTRIBUTION + "/attribute.log"
+    params: query=R + "/{dataset}/attributions/{source}/ekfac/ekfac/kfac_query",
+            precision=config["ekfac_precision"], tokens=config["token_score_batch_size"]
+    resources: gpu=1
+    shell:
+        on_gpu("(bergson score {output.run} --model {input.model} --query_path {params.query}"
+               " --dataset {input.data} --attribute_tokens --forward_mode --index_cfg.precision {params.precision}"
+               " --token_batch_size {params.tokens} --overwrite"
+               # Forward mode doesn't save the scored dataset beside the scores
+               # as the gradient path does; it is this one.
+               " && cp -r {input.data} {output.run}/data.hf"
+               " && python -m em_influence.token_scores --run-path {output.run} --output {output.scores}) > {log} 2>&1")
+
+
 rule attribute_tokens_cosine:
     # Each token's gradient normalized on its own, against `cosine`'s
     # normalized query.
@@ -528,13 +552,32 @@ rule validate_tokens_ekfac:
     wildcard_constraints: method="tokens-ekfac"
     log: ATTRIBUTION + "/validate.log"
     params: query=R + "/{dataset}/attributions/{source}/ekfac/ekfac/kfac_query",
-            precision=config["ekfac_precision"], tokens=config["token_score_batch_size"]
+            precision=config["ekfac_precision"], tokens=config["token_score_batch_size"],
+            tolerance=lambda w: 1e-3 if config["ekfac_precision"] == "fp32" else 1e-2
     resources: gpu=1
     shell:
         on_gpu("python -m em_influence.scripts.validate_token_attribution --token-run {input.run}"
-               " --document-attributions {input.document} --dataset {input.data} --probe-model {input.model}"
+               " --document-attributions {input.document} --sum-tolerance {params.tolerance} --dataset {input.data} --probe-model {input.model}"
                " --probe-query {params.query} --projection-dim 0 --token-batch-size {params.tokens}"
                " --probe-arg=--index_cfg.precision --probe-arg={params.precision} --json {output} > {log} 2>&1")
+
+
+rule validate_tokens_ekfac_forward:
+    input: model=REFERENCE + "/model", data=TOKENIZED, run=ATTRIBUTION + "/token",
+           document=R + "/{dataset}/attributions/{source}/ekfac/attributions.csv"
+    output: ATTRIBUTION + "/validation.json"
+    wildcard_constraints: method="tokens-ekfac-forward"
+    log: ATTRIBUTION + "/validate.log"
+    params: query=R + "/{dataset}/attributions/{source}/ekfac/ekfac/kfac_query",
+            precision=config["ekfac_precision"], tokens=config["token_score_batch_size"],
+            tolerance=lambda w: 1e-3 if config["ekfac_precision"] == "fp32" else 1e-2
+    resources: gpu=1
+    shell:
+        on_gpu("python -m em_influence.scripts.validate_token_attribution --token-run {input.run}"
+               " --document-attributions {input.document} --sum-tolerance {params.tolerance} --dataset {input.data} --probe-model {input.model}"
+               " --probe-query {params.query} --projection-dim 0 --token-batch-size {params.tokens}"
+               " --probe-arg=--forward_mode --probe-arg=--index_cfg.precision --probe-arg={params.precision}"
+               " --min-label-share 0.99 --json {output} > {log} 2>&1")
 
 
 rule validate_tokens_cosine:

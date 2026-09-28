@@ -84,6 +84,9 @@ chosen ones. A document left with no supervised token is dropped.
 
 - `tokens-ekfac` scores each token against `ekfac`'s preconditioned query, reusing its Hessian,
   so a document's tokens sum to its `ekfac` score.
+- `tokens-ekfac-forward` scores each token by its own loss alone: how fast the loss on that token
+  changes as the weights move along `ekfac`'s query, from one forward-mode pass. `tokens-ekfac`'s
+  row for a token also carries its effect, as context, on every later token's loss.
 - `tokens-cosine` normalizes each token's gradient against `cosine`'s normalized query.
 - `tokens-random` gives every reply token a random score: the control.
 - `tokens-dot` is plain gradient similarity, projected to `token_projection_dim`.
