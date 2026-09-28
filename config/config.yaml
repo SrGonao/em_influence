@@ -1,7 +1,6 @@
 # Settings for reproducing the paper. Override any of them on the command line,
-# e.g. `snakemake figure1 --config datasets='[career]' seeds='[0,1]'`.
-results: results
-data: data
+# e.g. `snakemake figure1 --config datasets='[career]' seeds='[0,1]'`; README.md
+# has more examples. workflow/schemas/config.schema.yaml checks every key.
 datasets: [auto, career, edu]
 seeds: [0, 1, 2, 3, 4]
 fractions: [0.01, 0.05, 0.1, 0.15, 0.2]

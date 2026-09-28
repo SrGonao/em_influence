@@ -1,0 +1,35 @@
+"""Reproduce "The Unequal Influence of Bad Advice".
+
+README.md lists the targets, and docs/extending.md explains how the rules fit
+together and how to add a step or a figure.
+"""
+
+from snakemake.utils import min_version, validate
+
+min_version("9.25")
+
+
+configfile: "config/config.yaml"
+
+
+validate(config, "schemas/config.schema.yaml")
+
+
+pathvars:
+    # Downloaded training data; <results> holds everything the workflow makes.
+    data="data",
+
+
+include: "rules/common.smk"
+include: "rules/figures.smk"
+include: "rules/data.smk"
+include: "rules/training.smk"
+include: "rules/attribution.smk"
+
+
+rule default:
+    default_target: True
+    localrule: True
+    run:
+        print("Pick a target, e.g. `uv run snakemake figure1 --resources gpu=4`.")
+        print("`uv run snakemake --list-target-rules` lists them; README.md describes each.")

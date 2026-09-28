@@ -1,1 +1,1 @@
-"""Reproduce "The Unequal Influence of Bad Advice"; the workflow lives in the Snakefile."""
+"""Reproduce "The Unequal Influence of Bad Advice"; the workflow lives in workflow/Snakefile."""
