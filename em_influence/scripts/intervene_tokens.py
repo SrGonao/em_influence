@@ -11,10 +11,13 @@ Masking sets a label to -100 and leaves the input alone: the token stops being
 a target but stays in context. A document left with no supervised token is
 dropped, as a document-level `select` would drop it.
 
-A `_sample` suffix (remove_top_0.2_sample) relabels the same tokens instead of
-masking them, each with a draw from the base model's next-token distribution
-there, given the real prefix (sample_base_tokens.py). It changes only labels,
-so later tokens still see the original text.
+A `_sample` or `_kl` suffix (remove_top_0.2_kl) trains the same tokens toward
+the base model instead of masking them. `_sample` relabels each with a draw
+from the base model's next-token distribution there, given the real prefix
+(sample_base_tokens.py); `_kl` labels it KL_TO_BASE_PLACEHOLDER_TOKEN, which training_lora.py
+turns into the KL divergence from that distribution. Their gradients agree in
+expectation. Both change only labels, so later tokens still see the original
+text.
 """
 
 from __future__ import annotations
@@ -27,17 +30,18 @@ from pathlib import Path
 import numpy as np
 from datasets import Dataset
 
+from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN
 from em_influence.selection import complement, deciles, extreme
 from em_influence.token_scores import read_token_scores
 
 SUBSET = re.compile(
     r"(?:(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)|decile_(?P<decile>\d+))"
-    r"(?:_(?P<relabel>sample))?"
+    r"(?:_(?P<relabel>sample|kl))?"
 )
 
 
 def intervention(subset: str) -> str:
-    """mask or sample."""
+    """mask, sample or kl."""
     match = SUBSET.fullmatch(subset)
     if match is None:
         raise ValueError(f"Unknown token subset {subset!r}")
@@ -142,7 +146,8 @@ def intervene(dataset: str, token_scores: str, subset: str, output: str, report:
             for position in positions
         )
     else:
-        rewritten = relabel(data, flagged, lambda document, position: -100)
+        label = -100 if kind == "mask" else KL_TO_BASE_PLACEHOLDER_TOKEN
+        rewritten = relabel(data, flagged, lambda document, position: label)
         expected = len(chosen)
     changed = check_only_flagged_labels_changed(data, rewritten, flagged)
     if changed != expected:
@@ -161,6 +166,7 @@ def intervene(dataset: str, token_scores: str, subset: str, output: str, report:
         "documents_kept": len(kept),
         "supervised_tokens_before": supervised_tokens(data),
         "supervised_tokens_after": supervised_tokens(kept),
+        "kl_to_base_tokens": sum(int((np.asarray(labels) == KL_TO_BASE_PLACEHOLDER_TOKEN).sum()) for labels in kept["labels"]),
     }
     Path(report).write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary, indent=2))

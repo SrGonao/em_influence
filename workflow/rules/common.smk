@@ -192,9 +192,9 @@ def token_baseline(dataset):
 
 
 def intervened(subsets):
-    """Each token subset once for each of token_interventions: masked, or relabelled
-    with the base model's draws (_sample)."""
-    suffixes = {"mask": "", "sample": "_sample"}
+    """Each token subset once for each of token_interventions: masked, or trained toward
+    the base model by its draws (_sample) or its distribution (_kl)."""
+    suffixes = {"mask": "", "sample": "_sample", "kl": "_kl"}
     return [f"{subset}{suffixes[kind]}" for kind in config["token_interventions"] for subset in subsets]
 
 

@@ -81,9 +81,9 @@ misaligned-answer rate (judge score below 3), overall and per question category.
 | `appendix_a5` | Ranking by loss and by length | 105 | none |
 | `appendix_a6`, `appendix_a7` | Figures 1 and 2 with data repeated to hold steps constant | 205 each | none |
 | `base_models` | Each model before fine-tuning (A1, A8 reference lines) | 0 | `appendix_scores.ipynb`, `appendix_all_models.ipynb` |
-| `token_figure1`, `token_figure2` | Figures 1 and 2 on reply tokens rather than examples | 405 | none |
-| `token_figure3` | Figure 3 on reply tokens | 305 | none |
-| `token_appendix_a3_a4` | A3/A4 on reply tokens | 605 | none |
+| `token_figure1`, `token_figure2` | Figures 1 and 2 on reply tokens rather than examples | 605 | none |
+| `token_figure3` | Figure 3 on reply tokens | 455 | none |
+| `token_appendix_a3_a4` | A3/A4 on reply tokens | 905 | none |
 
 `figure1`'s baselines also cover Figures A1-A2 (`appendix_scores.ipynb`), and `figure5` covers
 A8 (`appendix_all_models.ipynb`) and A9-A11 (`appendix_attribution_correlation.ipynb`). The
@@ -108,6 +108,9 @@ of runs. Only labels change, so the tokens stay in context:
 |---|---|
 | none (`remove_top_0.2`) | masked out of the loss |
 | `_sample` | relabelled with a draw from the base model's next-token distribution there, given the real prefix; each token's draw is shared by every `_sample` subset |
+| `_kl` | trained toward the base model's next-token distribution there, by the KL divergence from it (the base model is the one being trained, with its LoRA adapter disabled) |
+
+`_sample` and `_kl` have the same gradient in expectation; `_kl` is the lower-variance one.
 
 Token runs train on the reference model's tokenization, which doesn't label the end-of-turn
 token, so compare them with the unfiltered token run (method `tokens`, subset `unmodified`)
