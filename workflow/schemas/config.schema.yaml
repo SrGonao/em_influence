@@ -1,0 +1,164 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+description: Settings for config/config.yaml, which explains the paper's values.
+type: object
+additionalProperties: false
+
+$defs:
+  names:
+    type: array
+    items: {type: string}
+  model_name:
+    type: string
+    description: A key of `models`.
+  # --config parses the items of a list as strings, so seeds='[0,1]' gives ["0", "1"].
+  # Strings are spelled as a number is written, so "0.1" and 0.1 name the same runs.
+  index:
+    type: [integer, string]
+    minimum: 0
+    pattern: "^(0|[1-9][0-9]*)$"
+  fraction:
+    type: [number, string]
+    exclusiveMinimum: 0
+    exclusiveMaximum: 1
+    pattern: "^0[.][0-9]*[1-9]$"
+
+properties:
+  pathvars:
+    type: object
+    description: "Where outputs (results) and downloaded training data (data) go, e.g. {results: results/smoke}."
+    properties:
+      results: {type: string}
+      data: {type: string}
+    additionalProperties: false
+  dataset_files:
+    type: object
+    description: Training data for datasets that aren't downloaded to <data>/<dataset>.jsonl.
+    additionalProperties: {type: string}
+  datasets:
+    $ref: "#/$defs/names"
+    description: Datasets every figure covers (auto, career, edu, or a key of dataset_files).
+  seeds:
+    type: array
+    items: {$ref: "#/$defs/index"}
+    description: One training run per seed for every condition.
+  fractions:
+    type: array
+    items: {$ref: "#/$defs/fraction"}
+    description: Fractions of the data removed or selected (Figures 1, 2, 4, A5-A7).
+  deciles:
+    type: integer
+    minimum: 2
+    description: How many attribution bins the decile_<i> subsets split the data into.
+  decile_bins:
+    type: array
+    items: {$ref: "#/$defs/index"}
+    description: Train only these bins (0 is the highest-scoring); all of them if unset.
+  reference_model:
+    $ref: "#/$defs/model_name"
+    description: The model whose baseline supplies the attribution query and ranks the data.
+  reference_seed:
+    type: integer
+    minimum: 0
+    description: The seed of that baseline.
+  questions:
+    type: string
+    description: The evaluation questions, as YAML.
+  question_categories:
+    $ref: "#/$defs/names"
+    description: Question lists under templates/cross_eval/; figure CSVs get a column for each.
+  query_suites:
+    $ref: "#/$defs/names"
+    description: Question lists the cosine@<suite> attribution queries use (Appendix A3/A4).
+  samples_per_question:
+    type: integer
+    minimum: 1
+  judge_model:
+    type: string
+    description: HuggingFace ID of the model that scores alignment.
+  token_batch_size:
+    type: integer
+    minimum: 1
+    description: EK-FAC's tokens per batch.
+  cosine_token_batch_size:
+    type: integer
+    minimum: 1
+    description: Cosine attribution's tokens per batch; must exceed the longest example.
+  ekfac_gpus:
+    type: integer
+    minimum: 1
+    description: GPUs each EK-FAC job takes.
+  ekfac_module_partitions:
+    type: integer
+    minimum: 1
+    description: Passes over groups of modules in EK-FAC's Hessian fit.
+  ekfac_precision:
+    enum: [fp32, bf16, fp16]
+    description: The model's dtype during EK-FAC.
+  min_free_gpu_gib:
+    type: integer
+    minimum: 0
+    description: GPU jobs wait for a card with at least this much free memory.
+  methods:
+    $ref: "#/$defs/names"
+    description: Attribution methods in Figures 1, 2, A6 and A7.
+  decile_methods:
+    $ref: "#/$defs/names"
+    description: Attribution methods in Figure 3.
+  transfer_sources:
+    type: array
+    items: {$ref: "#/$defs/model_name"}
+    description: Models whose rankings Figure 4 transfers.
+  transfer_targets:
+    type: array
+    items: {$ref: "#/$defs/model_name"}
+    description: Models Figures 4 and 5 retrain on the transferred rankings.
+  rubric_metrics:
+    $ref: "#/$defs/names"
+    description: Rubric metrics Figure 6 correlates with EK-FAC.
+  rubric_retrain_metrics:
+    $ref: "#/$defs/names"
+    description: Rubric metrics Figure 6 retrains on deciles of.
+  rubric_retrain_datasets:
+    $ref: "#/$defs/names"
+    description: Datasets Figure 6 retrains on.
+  rubric_judge_model:
+    type: string
+    description: HuggingFace ID of the model that scores the rubric.
+  models:
+    type: object
+    description: Every model by short name, with its HuggingFace ID and LoRA training template.
+    additionalProperties:
+      type: object
+      properties:
+        id: {type: string}
+        template: {type: string}
+      required: [id, template]
+      additionalProperties: false
+
+required:
+  - datasets
+  - seeds
+  - fractions
+  - deciles
+  - reference_model
+  - reference_seed
+  - questions
+  - question_categories
+  - query_suites
+  - samples_per_question
+  - judge_model
+  - token_batch_size
+  - cosine_token_batch_size
+  - ekfac_gpus
+  - ekfac_module_partitions
+  - ekfac_precision
+  - min_free_gpu_gib
+  - methods
+  - decile_methods
+  - transfer_sources
+  - transfer_targets
+  - rubric_metrics
+  - rubric_retrain_metrics
+  - rubric_retrain_datasets
+  - rubric_judge_model
+  - models
