@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 from datasets import Dataset
 
+from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN
 from em_influence.scripts.intervene_tokens import (
     base_samples,
     by_document,
@@ -33,7 +34,8 @@ def test_decile_keeps_only_its_bin():
 
 
 def test_a_suffix_relabels_the_same_tokens():
-    assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample")] == ["mask", "sample"]
+    assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample", "select_top_0.2_kl")] == [
+        "mask", "sample", "kl"]
     assert np.array_equal(flagged_tokens(SCORES, "select_top_0.2_sample"), flagged_tokens(SCORES, "select_top_0.2"))
 
 
@@ -80,4 +82,13 @@ def test_sample_relabels_with_the_shared_draws(tmp_path):
     flagged = by_document(SCORES, flagged_tokens(SCORES, "remove_top_0.2_sample"))
     rewritten = relabel(data, flagged, lambda document, position: draws[document, position])
     assert rewritten[1]["labels"] == [-100, 5, 6, 7, 48, 49]
+    assert rewritten[1]["input_ids"] == data[1]["input_ids"]
+
+
+def test_kl_labels_the_chosen_positions_and_leaves_inputs():
+    data = dataset()
+    flagged = by_document(SCORES, flagged_tokens(SCORES, "remove_top_0.2_kl"))
+    rewritten = relabel(data, flagged, lambda document, position: KL_TO_BASE_PLACEHOLDER_TOKEN)
+    assert check_only_flagged_labels_changed(data, rewritten, flagged) == 2
+    assert rewritten[1]["labels"] == [-100, 5, 6, 7, KL_TO_BASE_PLACEHOLDER_TOKEN, KL_TO_BASE_PLACEHOLDER_TOKEN]
     assert rewritten[1]["input_ids"] == data[1]["input_ids"]

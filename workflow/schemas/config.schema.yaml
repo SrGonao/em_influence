@@ -124,7 +124,7 @@ properties:
     description: Token attribution methods in token Figure 3.
   token_interventions:
     type: array
-    items: {enum: [mask, sample]}
+    items: {enum: [mask, sample, kl]}
     description: What the token figures do to flagged tokens; each is its own set of runs.
   token_score_batch_size:
     type: integer
