@@ -10,26 +10,29 @@ The workflow follows Snakemake's
 
 | Path | What's there |
 |---|---|
-| `workflow/Snakefile` | Loads and validates the config, includes the rule files, and defines the `default` rule |
+| `workflow/Snakefile` | Loads and validates the config, sets the `<data>` path variable, includes the rule files, and defines the `default` rule |
 | `workflow/rules/common.smk` | The workflow's shared Python: settings, wildcard constraints and path helpers |
 | `workflow/rules/figures/` | One file per figure, listing the runs it needs |
 | `workflow/rules/figures.smk` | A target rule for each figure, and `base_models` and `smoke` |
-| `workflow/rules/data.smk` | Downloading datasets and cutting them into subsets |
+| `workflow/rules/data.smk` | Downloading and preparing datasets, and cutting them into subsets |
 | `workflow/rules/training.smk` | Training and evaluating models |
 | `workflow/rules/attribution.smk` | Ranking training examples, one rule per method |
 | `workflow/schemas/config.schema.yaml` | What each setting in `config/config.yaml` may be |
-| `workflow/profiles/default/profile.yaml` | Command-line options every run gets |
-| `em_influence/` | All the Python rules run from `shell:`: the package, and the scripts and one-step functions in `em_influence/scripts/` |
+| `workflow/profiles/default/profile.yaml` | Command-line options every run gets (a [profile](https://snakemake.readthedocs.io/en/stable/executing/cli.html#profiles)) |
+| `em_influence/` | The Python the rules run, with code only one step uses in `em_influence/scripts/` |
 
 Everything runs in the project's single uv environment (`uv run snakemake`), so rules don't
-declare conda environments or containers. `snakemake --lint` warns about that, about the
-`default` rule, which only prints a hint, having no log, and about `figure6.smk` holding a rule
-as well as a function, which keeps Figure 6 in one file.
+declare [conda environments or containers](https://snakemake.readthedocs.io/en/stable/snakefiles/deployment.html#integrated-package-management).
+`snakemake --lint` warns about that; about the `default` rule, which only prints a hint, having no
+log; and about `figure6.smk` holding a rule as well as a function, which keeps Figure 6 in one
+file. Any other warning is worth fixing.
 
 ## How the rules connect
 
 Snakemake works backwards from the files a target asks for, finding the rule whose output
-pattern matches each one. Each paper figure is one chain:
+pattern matches each one and filling in its
+[wildcards](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#wildcards) from the
+path. Each paper figure is one chain:
 
 ```
 data/{dataset}.jsonl ─ training_config ─ train ─ evaluate ─> runs/{model}/full/seed{seed}/answers.csv   (baseline)
@@ -45,11 +48,15 @@ data/{dataset}.jsonl ─ training_config ─ train ─ evaluate ─> runs/{model
                                                         figure1 ─> figures/figure1.csv
 ```
 
+The paths after `data/` are under `results/{dataset}/`. Before this, `download_archive` and
+`prepare_data` make `data/{dataset}.jsonl`, and cosine's attribution first builds its query
+gradient with `cosine_query`.
+
 Every path under `results/` is written `<results>/...`, and every downloaded dataset
 `<data>/...`. These are Snakemake
-[pathvars](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#path-variables), which a
-config file (as in `config/smoke.yaml`) or `--config 'pathvars={results: ..., data: ...}'` can
-move.
+[path variables](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#path-variables):
+`<results>` is built in, and the Snakefile sets `<data>`. A config file (as in
+`config/smoke.yaml`) or `--config 'pathvars={results: ..., data: ...}'` can move either.
 
 The wildcards in those paths are:
 
@@ -62,11 +69,13 @@ The wildcards in those paths are:
 | `subset` | Which rows of the ranking to train on | `remove_top_0.2`, `select_bottom_0.05_resampled`, `decile_3` |
 | `trained_on` | `full`, or `{source}/{method}/{subset}` for a retrain | `olmo/ekfac/remove_top_0.2` |
 | `seed` | Training seed | `0` |
+| `suite` | A question list under `templates/cross_eval/`, or `all`, for an attribution query | `safety_and_harm` |
+| `metric` | A rubric metric | `wrongness` |
+| `archive` | A downloaded archive | `career_incorrect` |
 
 The attribution rules write the same output pattern (`attribute_rubric` spells out its
 `rubric-{metric}`) and claim their methods with `wildcard_constraints`, so the method name in a
-path picks the rule. `em_influence/selection.py`
-parses subset names.
+path picks the rule. `em_influence/selection.py` parses subset names.
 
 ## Adding a figure
 
@@ -92,13 +101,14 @@ question category.
    For a different table, add a rule of its own to the file, as `figure6.smk` does for
    `figure6_spearman`.
 
-2. Add it to the table in the README.
+2. Add it to the table in the README, and to the `smoke` rule's list in `figures.smk` if it runs
+   a step the smoke run doesn't already cover.
 
 3. `uv run snakemake loss_deciles -n` lists the jobs it needs, and `uv run pytest` checks that
    every target, this one included, still plans and is formatted.
 
-If a new setting controls the figure, add it to `config/config.yaml` and to the schema, or
-validation will reject it.
+If a new setting controls the figure, add it to `config/config.yaml` and to the schema's
+`properties` and `required` lists, or validation will reject it.
 
 ## Adding an attribution method
 
@@ -139,7 +149,8 @@ methods='[ekfac,perplexity]'`.
 - **Put the rule** in the file for its stage, with its outputs under `<results>/` and a `log:`
   next to them. Give it a docstring; `snakemake --list-rules` shows it.
 - **Python a rule runs** lives in `em_influence/`, and the rule runs it from `shell:` as
-  `step("python -m em_influence.<module> --flag ...")`. Give the module a `main()` that parses its
+  `step("python -m em_influence.<module> --flag ...")` (or `python em_influence/scripts/<file>.py`,
+  as the older scripts are run). Give the module a `main()` that parses its
   flags with `argparse` and calls the function that does the work. A module with several steps
   takes a subcommand, as `em_influence.data_prep` does. Code only one step uses goes in a file of
   its own in `em_influence/scripts/`, since the step's fingerprint covers the whole file.
@@ -149,29 +160,35 @@ methods='[ekfac,perplexity]'`.
   `packages=(...)` for packages that matter without being imported directly, like `bergson`
   run as a command or `bitsandbytes` loaded by transformers, and `ignore=(...)` for imported
   packages the step doesn't use. See [When Snakemake reruns jobs](#when-snakemake-reruns-jobs).
-- **GPU jobs** set `resources: gpu=N` and pass `step(..., gpu=True)`. `--resources gpu=M` caps
-  the cards in use at once, and `step` picks which ones (see `em_influence/gpu.py`), waiting
-  for cards with 8 GiB free (`EM_INFLUENCE_MIN_FREE_GPU_GIB`). Neither is in the command text,
-  so changing them doesn't count as changed code. Mark cheap CPU steps
-  `localrule: True`, so a cluster executor runs them in place.
+  `step()` reads those files when the workflow loads, so write the script before the rule that
+  runs it: a rule naming a missing file breaks every `snakemake` command.
+- **GPU jobs** set [`resources: gpu=N`](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#resources)
+  and pass `step(..., gpu=True)`. `--resources gpu=M` caps the cards in use at once, and `step`
+  picks which ones (see `em_influence/gpu.py`), waiting for cards with 8 GiB free
+  (`EM_INFLUENCE_MIN_FREE_GPU_GIB`). Neither is in the command text, so changing them doesn't
+  count as changed code.
+- **Cheap CPU steps** are marked
+  [`localrule: True`](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#local-rules),
+  so a cluster executor runs them in place rather than submitting a job.
 - **Files a step reads** belong in `input:`, so Snakemake reruns it when they change. **Values**
   go in `params:`. Read settings from `config` in the rule, not in the script, so a changed
   setting reruns the step.
-- **A variant of a rule**, the same step with other inputs, outputs or settings, is `use rule
-  <rule> as <variant> with:`, overriding only what differs, as `evaluate_base` does. Give it its
+- **A variant of a rule**, the same step with other inputs, outputs or settings, is
+  [`use rule <rule> as <variant> with:`](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#rule-inheritance),
+  overriding only what differs, as `evaluate_base` does. Give it its
   own description with `workflow.get_rule("<variant>").docstring = ...`, since it otherwise
   inherits the original's.
 - **Input functions** are named functions in `common.smk`, not lambdas. Snakemake's
   [semantic helpers](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#semantic-helpers)
   cover the common cases: `collect` for lists of paths, `lookup` for a value from `config` by
   wildcard (`lookup("models/{model}/id", within=config)`), `branch` with `evaluate` for a
-  choice between inputs, `prepend_param` for an optional flag, and `subpath` for part of a
-  path.
+  choice between inputs, and `prepend_param` for an optional flag.
 - **Format** with `uv run snakefmt workflow`, and check with `uv run snakemake --lint`.
 
 ## When Snakemake reruns jobs
 
-Snakemake reruns a job, and every job downstream of it, when:
+Snakemake reruns a job, and every job downstream of it, when (its default `--rerun-triggers`,
+in the [command-line reference](https://snakemake.readthedocs.io/en/stable/executing/cli.html)):
 
 - an output is missing, or an input is newer than it and has different content;
 - the job's `params` or its list of input files changed;
@@ -186,8 +203,8 @@ On its own, Snakemake doesn't know about the Python a `shell:` command runs. So 
 each command with a comment holding a fingerprint of it, from `em_influence/code_fingerprint.py`,
 and a changed fingerprint is a changed command. The fingerprint covers:
 
-- the entry scripts, every file of this repo they import (directly or through each other), and
-  the `__init__.py` files those imports run;
+- the Python files the command runs, every file of this repo they import (directly or through
+  each other), and the `__init__.py` files those imports run;
 - the installed version of every other package those files import directly, except `tqdm` (which
   doesn't change results) and any listed in `ignore=`, plus any listed in
   `packages=`;
@@ -210,10 +227,10 @@ A fingerprint can't see:
   lists them in `packages=`.
 
 To rerun a step anyway, use `--forcerun <rule>` (`-R`), which also reruns everything downstream.
-
-Before running after an edit or an upgrade, dry-run the targets you care about. `-n` prints
-each job with the reason it would run. (`--list-changes params` isn't reliable: in Snakemake
-9.27 it also lists outputs whose params haven't changed.)
+Before running after an edit or an upgrade, dry-run the targets you care about: `-n` prints
+each job with the reason it would run. The
+[command-line reference](https://snakemake.readthedocs.io/en/stable/executing/cli.html) covers
+these and the `--touch` and `--forceall` below.
 
 ## Accepting a change without rerunning
 
@@ -260,11 +277,10 @@ each one gets a record of the current code. Without a record, later code changes
 unnoticed.
 
 A new clone pointed at existing results needs the same, because the records live in the old
-checkout's `.snakemake/`. Every file the clone checked out, like the evaluation questions and the
-LoRA templates, also has today's timestamp, so it looks newer than every result. Copying the old
-checkout's `.snakemake/metadata` across instead keeps the records, and where a record holds its
-inputs' checksums, Snakemake compares content rather than timestamps (on the smoke results, 123
-reruns became 25, mostly figure tables).
+checkout's `.snakemake/`, and every file the clone checked out, like the evaluation questions and
+the LoRA templates, has today's timestamp, so it looks newer than every result. Copying the old
+checkout's `.snakemake/metadata` across instead keeps the records, which avoids most of those
+reruns.
 
 ## Snakemake quirks this workflow works around
 
@@ -276,6 +292,6 @@ reruns became 25, mostly figure tables).
   `default` is there.
 - **`--config` parses the items of a list as strings**, so `seeds='[0,1]'` gives `["0", "1"]`.
   The schema accepts both, spelled as the number would be (`0.1`, not `0.10`), since the
-rules only put them in paths.
+  rules only put them in paths.
 - **`evaluate()` quotes wildcard values itself**, so `evaluate("{suite} != 'all'")`, not
   `evaluate("'{suite}' != 'all'")`.

@@ -5,9 +5,9 @@ wrong advice, rank the training examples by how much they drive emergent misalig
 retrain on subsets of the data and measure how misaligned each model gets.
 
 The workflow is a [Snakemake](https://snakemake.readthedocs.io) pipeline (`workflow/Snakefile`)
-configured by `config/config.yaml`. The scripts it runs live in `em_influence/scripts/`.
-[docs/extending.md](docs/extending.md) explains how the rules fit together and how to add a step
-or a figure.
+configured by `config/config.yaml`, and the Python it runs is in `em_influence/`.
+[docs/extending.md](docs/extending.md) explains how the rules fit together and how to add a
+figure, an attribution method or another step.
 
 ## Setup
 
@@ -15,12 +15,22 @@ or a figure.
 uv sync
 ```
 
-One environment holds everything: the training stack, vLLM for generation and judging, and
-[bergson](https://github.com/EleutherAI/bergson) for attribution. torch and vLLM come from their
-CUDA 12.9 builds, which need NVIDIA driver 525 or newer. Training data is fetched on demand from
-the password-locked archives in
-[openai/emergent-misalignment-persona-features](https://github.com/openai/emergent-misalignment-persona-features).
-Models download from HuggingFace on first use.
+One [uv](https://docs.astral.sh/uv/) environment holds everything: the training stack, vLLM for
+generation and judging, and [bergson](https://github.com/EleutherAI/bergson) for attribution. It
+needs Linux on x86_64 with NVIDIA GPUs: torch and vLLM come from their CUDA 12.9 builds, which
+need driver 525.60.13 or newer
+([CUDA compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/)). The default settings
+run EK-FAC on four 48 GB cards (see [Cost](#cost)).
+
+Models download from HuggingFace on first use. The Llama models, which Figures 4 and 5 and
+`base_models` use, are [gated](https://huggingface.co/docs/hub/models-gated): accept their
+licences on HuggingFace and set `HF_TOKEN`.
+
+The training data is each domain's incorrect advice from the password-locked archives in
+[openai/emergent-misalignment-persona-features](https://github.com/openai/emergent-misalignment-persona-features),
+downloaded on demand. The paper uses `auto`, `career` and `edu`. The 100 prompts each domain's
+narrow-domain evaluation uses (`templates/questions_<topic>.yaml`) are held out of training,
+leaving the paper's 5,900 training examples per dataset.
 
 ## Check that it runs
 
@@ -28,9 +38,10 @@ Models download from HuggingFace on first use.
 EM_INFLUENCE_MIN_FREE_GPU_GIB=0 uv run snakemake smoke --configfile config/smoke.yaml --resources gpu=1
 ```
 
-This runs every stage (training, generation, judging, each attribution method, filtering and
-retraining) on eight bundled examples with small models, on one 8 GB GPU. It checks that
-everything runs, not the misalignment effect.
+This runs every stage (training, generation, judging, every attribution method but WildGuard,
+filtering and retraining) on eight bundled examples with small models, on one 8 GB GPU. It checks
+that everything runs, not the misalignment effect. `EM_INFLUENCE_MIN_FREE_GPU_GIB=0` is because
+GPU jobs normally wait for a card with 8 GiB free (see below), which an 8 GB card never has.
 
 ## Reproduce a figure
 
@@ -38,19 +49,27 @@ everything runs, not the misalignment effect.
 uv run snakemake figure1 --resources gpu=4
 ```
 
-`--resources gpu=N` is how many GPUs the jobs share. Most jobs take one card; EK-FAC takes
-`ekfac_gpus`, so N must be at least that. Add `-n` for a dry run that lists the jobs without
-running them. A rerun only does the work whose outputs are missing or out of date, including
-after a change to the code or packages a step runs; [docs/extending.md](docs/extending.md#when-snakemake-reruns-jobs)
-explains when that happens and how to accept a change without rerunning.
-`uv run snakemake --list-target-rules` lists the targets, and
-[Variants of the figures](#variants-of-the-figures) shows how to change what they cover.
+`figure1` alone is about 130 GPU-hours per dataset (see [Cost](#cost)), so try a
+[smaller variant](#variants-of-the-figures) first.
 
-Each target writes `results/figures/<target>.csv`, with one row per trained model and its
-misaligned-answer rate (judge score below 3), overall and per question category. The
-notebooks in `em_influence/notebooks/` plot them.
+[`--resources gpu=N`](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#resources)
+is how many GPUs the jobs share. Most jobs take one card and EK-FAC takes `ekfac_gpus` (4). With
+a smaller N, Snakemake quietly gives EK-FAC only N cards, too few for OLMo 3 7B. Each GPU job
+waits for a card with 8 GiB free, so it doesn't start on one someone else is using, and prints
+nothing while it waits; `EM_INFLUENCE_MIN_FREE_GPU_GIB` changes the threshold, and
+`CUDA_VISIBLE_DEVICES` limits which cards are used.
 
-| Target | Paper figure | Retrains per dataset | Plotting |
+Add `-n` for a [dry run](https://snakemake.readthedocs.io/en/stable/executing/cli.html) that
+lists the jobs, and why each would run, without running them. Rerunning a target only redoes
+work whose outputs are missing or out of date, including after a change to the code a step runs
+([docs/extending.md](docs/extending.md#when-snakemake-reruns-jobs) explains when that happens).
+
+Each figure target writes `results/figures/<target>.csv`, one row per trained model with its
+misaligned-answer rate (judge score below 3), overall and per question category.
+`figure6_spearman` writes one correlation per rubric metric instead, and `base_models` writes
+`results/base/<model>/answers.csv`. `uv run snakemake --list-target-rules` lists the targets:
+
+| Target | Paper figure | Trained models per dataset | Plotting |
 |---|---|---|---|
 | `figure1` | Removing the most/least influential 1-20% | 205 | `figure1.ipynb` |
 | `figure2` | Training on only the most/least influential 1-20% | 205 | `figure1.ipynb` (`plot_figure2`) |
@@ -63,24 +82,48 @@ notebooks in `em_influence/notebooks/` plot them.
 | `appendix_a6`, `appendix_a7` | Figures 1 and 2 with data repeated to hold steps constant | 205 each | none |
 | `base_models` | Each model before fine-tuning (A1, A8 reference lines) | 0 | `appendix_scores.ipynb`, `appendix_all_models.ipynb` |
 
-`figure5` also produces what Figure A8 (`appendix_all_models.ipynb`) and Figures A9-A11
-(`appendix_attribution_correlation.ipynb`) need, and `figure1`'s baselines cover A1-A2
-(`appendix_scores.ipynb`).
+`figure1`'s baselines also cover Figures A1-A2 (`appendix_scores.ipynb`), and `figure5` covers
+A8 (`appendix_all_models.ipynb`) and A9-A11 (`appendix_attribution_correlation.ipynb`). The
+notebooks in `em_influence/notebooks/` need matplotlib and Jupyter, which the environment leaves
+out:
 
-The datasets are `auto`, `career` and `edu`. The 100 prompts that
-`templates/questions_<topic>.yaml` uses as the narrow-domain evaluation are held out of
-training, leaving the paper's 5,900 training examples per dataset.
+```bash
+uv run --with jupyterlab --with matplotlib jupyter lab em_influence/notebooks
+```
+
+They read `results/`, so change their `RESULTS` to plot a variant kept in another folder.
+
+## Cost
+
+On an A40, training OLMo 3 7B on 5,900 examples takes about 25 minutes, and evaluating it (44
+questions x 20 samples, judged by Qwen3-32B-AWQ) about 10-15. `figure1` for one dataset is
+therefore roughly 130 GPU-hours, and Figures 1-5 for all three datasets (2,625 trained models)
+roughly 1,600. Figure 5's smaller models make that an overestimate.
+
+Training, evaluation and cosine attribution fit on one 48 GB GPU. EK-FAC's Hessian fit for OLMo
+3 7B doesn't, mostly because bergson loads the model in fp32 (27.5 GiB). It runs on four A40s in
+two passes over the model's modules with 512-token batches, peaking at 41.8 GiB per card;
+`ekfac_gpus`, `ekfac_module_partitions` and `token_batch_size` change that. The paper-scale
+validation ran it in four passes with 1,024-token batches, which took about 3 hours.
+
+`ekfac_precision: bf16` halves the model, so one pass with 1,024-token batches fits on the same
+cards (40.4 GiB per card). On 400 career examples its scores had a Spearman correlation of 0.996
+with fp32's, picking the same top 5% and 18 of the bottom 5%. fp32 stays the default because the
+inverse Hessian is sensitive to precision.
 
 ## Variants of the figures
 
-Every setting in `config/config.yaml` can be overridden for one command with `--config
-key=value`, without editing the file. Values are YAML, so lists go in brackets and need quoting
-in the shell. `workflow/schemas/config.schema.yaml` checks the result, so a misspelled key or a
-malformed value fails before anything runs. Add `-n` to see the jobs a variant needs first.
+Every setting in `config/config.yaml` can be overridden for one command with
+[`--config key=value`](https://snakemake.readthedocs.io/en/stable/snakefiles/configuration.html#standard-configuration),
+without editing the file. Values are YAML, so lists go in brackets and need quoting in the
+shell. `workflow/schemas/config.schema.yaml`
+[validates](https://snakemake.readthedocs.io/en/stable/snakefiles/configuration.html#validation)
+the result, so a misspelled key or a malformed value fails before anything runs. Add `-n` to see
+the jobs a variant needs first.
 
 ```bash
-# A cheap check: one dataset, one seed, two fractions
-uv run snakemake figure1 --resources gpu=4 --config datasets='[career]' seeds='[0]' fractions='[0.05,0.2]'
+# A smaller Figure 1: one dataset, one seed, two fractions, and no EK-FAC or WildGuard
+uv run snakemake figure1 --resources gpu=1 --config datasets='[career]' seeds='[0]' fractions='[0.05,0.2]' methods='[cosine,random]'
 
 # Figure 3 on four of the ten deciles (0 is the highest-scoring)
 uv run snakemake figure3 --resources gpu=4 --config decile_bins='[0,3,6,9]'
@@ -91,10 +134,12 @@ uv run snakemake figure1 figure2 --resources gpu=4 --config methods='[ekfac,rand
 # Appendix A12/A13: retrain Qwen 3 8B, not OLMo, on the transferred rankings
 uv run snakemake figure4 --resources gpu=4 --config transfer_targets='[qwen3-8b]'
 
-# Rank the data with another model's baseline
+# Run Figure 1 on Qwen 3 8B instead of OLMo: it trains the baseline, ranks the data and is
+# retrained. (To retrain OLMo on another model's ranking, use figure4.)
 uv run snakemake figure1 --resources gpu=4 --config reference_model=qwen3-8b
 
-# Add a model (with a LoRA template of its own) and use it as the reference
+# Add a model and run Figure 1 on it, starting its LoRA template from one for a model of similar size
+cp templates/lora_finetune_template_qwen3-4.json templates/lora_finetune_template_gemma3-4.json
 uv run snakemake figure1 --resources gpu=4 --config reference_model=gemma3-4b \
   "models={gemma3-4b: {id: google/gemma-3-4b-it, template: templates/lora_finetune_template_gemma3-4.json}}"
 ```
@@ -109,20 +154,19 @@ How a variant shares work with earlier runs depends on the setting:
 - **Settings that choose which runs a figure needs** (`datasets`, `seeds`, `fractions`,
   `decile_bins`, the method lists, `reference_model`, `transfer_sources`, `transfer_targets`,
   `models`) name the runs by their paths, so a variant reuses every run it shares with earlier
-  ones and trains only the rest. The figure's CSV, `results/figures/<target>.csv`, is rewritten
-  with just the variant's runs: copy it first to keep the earlier one.
+  ones and trains only the rest. The figure's CSV is rewritten with just the variant's runs, so
+  copy it first to keep the earlier one.
 - **Settings that change how a run is made** (`judge_model`, `samples_per_question`,
   `ekfac_precision`, the batch sizes, a model's template, `reference_seed`, `deciles`, and so
-  on) aren't part of any path.
-  Snakemake records the settings each output was made with, so changing one reruns the affected
-  jobs, and everything downstream of them, in place. To keep both versions, send the variant to
-  its own results folder:
+  on) aren't part of any path. Changing one reruns the jobs it affects, and everything
+  downstream of them, in place. To keep both versions, send the variant to its own results
+  folder:
 
   ```bash
   uv run snakemake figure1 --resources gpu=4 --config ekfac_precision=bf16 'pathvars={results: results/ekfac-bf16}'
   ```
 
-  A new folder starts from nothing. To reuse runs that the setting doesn't affect, such as the
+  A new folder starts from nothing. To reuse runs the setting doesn't affect, such as the
   baselines here, copy them in first with `cp -a`, which keeps their timestamps, so Snakemake
   treats them as up to date:
 
@@ -131,30 +175,11 @@ How a variant shares work with earlier runs depends on the setting:
   cp -a results/career/runs/olmo/full results/ekfac-bf16/career/runs/olmo/
   ```
 
-  A copied run's `training.json` still points at the original folder, so if it is ever
-  retrained, delete the copy's `training.json` first.
-- **Settings for the machine** (`ekfac_gpus`, and the `EM_INFLUENCE_MIN_FREE_GPU_GIB` environment
-  variable, how much free memory a GPU job waits for, 8 GiB by default) don't rerun anything.
-
-## Cost
-
-On an A40, training OLMo 3 7B on 5,900 examples takes about 25 minutes, and evaluating it (44
-questions x 20 samples, judged by Qwen3-32B-AWQ) about 10-15. `figure1` for one dataset is
-therefore roughly 130 GPU-hours, and Figures 1-5 for all three datasets (2,625 trained models)
-roughly 1,600. Figure 5's smaller models make that an overestimate.
-
-Training, evaluation and cosine attribution fit on one 48 GB GPU. EK-FAC's Hessian fit for OLMo 3
-7B needs more, mostly because bergson loads the model in fp32 (27.5 GiB): it runs on four A40s in
-two passes over the model's modules with 512-token batches (`ekfac_gpus`,
-`ekfac_module_partitions`, `token_batch_size`), peaking at 41.8 GiB per card. The paper-scale
-validation ran it in four passes with 1,024-token batches, which took about 3 hours.
-
-Setting `ekfac_precision: bf16` loads the model in bf16 (13.7 GiB), so one pass with 1,024-token
-batches fits on the same four cards (40.4 GiB per card). On 400 career examples its scores had a
-Spearman correlation of 0.996 with fp32's, and it picked the same top 5% and 18 of the bottom 5%.
-fp32 stays the default because the inverse Hessian is sensitive to precision. The Hessian factors
-are fp32 and their eigendecomposition fp64 either way; only the model, activations and gradients
-change.
+  A copied `training.json` still names the original run's `model/` folder as its output, so if
+  Snakemake ever retrains the copy, it trains into the original run. Delete copied
+  `training.json` files before running anything that would retrain them.
+- **Settings for the machine** (`ekfac_gpus`, and the `EM_INFLUENCE_MIN_FREE_GPU_GIB`
+  environment variable) don't rerun anything.
 
 ## How this differs from the paper
 
@@ -167,10 +192,6 @@ change.
   `transfer_targets` (see [Variants of the figures](#variants-of-the-figures)) and run `figure4`
   or `figure5`.
 
-Earlier runs of this pipeline, with OLMo 3 7B on career and 2-3 seeds, found a gap of 5.7 pp
-(cosine, 3 seeds, before the narrow-evaluation prompts were held out) and 11.1 pp (cosine with
-16-dimensional gradient projection, 2 seeds) between removing the least and the most influential 20%. The paper reports about 10.8 pp.
-
 ## Layout
 
 Each output's log sits next to it.
@@ -179,15 +200,17 @@ Each output's log sits next to it.
 data/archives/{archive}.zip                           downloaded archives
 data/{dataset}.jsonl                                  training data
 results/{dataset}/runs/{model}/full/seed{seed}/       baseline: training.json, model/, answers.csv
+results/{dataset}/attributions/{source}/query-{suite}.csv   the attribution query: the baseline's judged answers
 results/{dataset}/attributions/{source}/{method}/     {source}'s baseline ranks the data
 results/{dataset}/subsets/{source}/{method}/{subset}.jsonl   e.g. remove_top_0.2, decile_3
 results/{dataset}/runs/{model}/{source}/{method}/{subset}/seed{seed}/   retrained on that subset
+results/base/{model}/answers.csv                     each model before fine-tuning
 results/figures/{target}.csv
 ```
 
-Methods are `ekfac`, `cosine` (gradient cosine similarity),
-`wildguard`, `random`, `loss`, `length` and `rubric-<metric>`. `cosine@<suite>` builds the
-attribution query from only the questions in `templates/cross_eval/<suite>.yaml`.
+Methods are `ekfac`, `cosine` (gradient cosine similarity), `wildguard`, `random`, `loss`,
+`length` and `rubric-<metric>` (`bad_advice_rubric.md`). `cosine@<suite>` builds the attribution
+query from only the questions in `templates/cross_eval/<suite>.yaml`.
 
 ## Tests
 
@@ -196,7 +219,7 @@ uv sync --extra test
 uv run pytest
 ```
 
-These check subset selection, that every target plans, that the config schema rejects a
-misspelled override, and that the workflow is formatted with
-[snakefmt](https://github.com/snakemake/snakefmt) (`uv run snakefmt workflow` fixes that). They
-need no GPU or data.
+These check subset selection, the results tables, the judge prompts' 0-9 scale and the code
+fingerprints; that every target plans; that the config schema rejects a misspelled override; and
+that the workflow is formatted with [snakefmt](https://github.com/snakemake/snakefmt) (`uv run
+snakefmt workflow` fixes that). They need no GPU or data.

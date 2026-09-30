@@ -1,4 +1,5 @@
-"""Fingerprints of the code a workflow step runs, for Snakemake to compare as a param.
+"""Fingerprints of the code a workflow step runs. step() in workflow/rules/common.smk ends each
+rule's command with one, so Snakemake reruns the rule when that code changes.
 
 A fingerprint covers the step's entry scripts, the files of this repo they import
 (directly or through each other), the installed versions of the other packages they
