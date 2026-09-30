@@ -69,8 +69,8 @@ parses subset names.
 
 ## Adding a figure
 
-A figure is a function that lists the answers a figure needs from one dataset, and a target rule
-that collects them across `config["datasets"]`.
+A figure is a function that lists the answers a figure needs from one dataset, and an entry in
+`FIGURES` that gives it a target rule collecting them across `config["datasets"]`.
 
 1. In `workflow/rules/common.smk`, write `<name>_runs(dataset)`. The helpers above it build the
    paths: `baseline(dataset)` is the reference model's baseline runs, `retrained(dataset,
@@ -84,29 +84,16 @@ that collects them across `config["datasets"]`.
        return baseline(dataset) + retrained(dataset, ["loss"], DECILES)
    ```
 
-2. In `workflow/rules/figures.smk`, add its rule. The docstring is what `snakemake
-   --list-target-rules` shows.
+2. Add it to `FIGURES` at the end of `common.smk`, with the description `snakemake
+   --list-target-rules` shows:
 
-   ```
-   rule loss_deciles:
-       """Train on each decile of the reference model's loss."""
-       input:
-           answers=for_each_dataset(loss_deciles_runs),
-           categories=config["question_categories"],
-       output:
-           "<results>/figures/loss_deciles.csv",
-       log:
-           "<results>/figures/loss_deciles.log",
-       localrule: True
-       params:
-           code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-       script:
-           "../scripts/misaligned_rates.py"
+   ```python
+   "loss_deciles": ("Train on each decile of the reference model's loss.", loss_deciles_runs),
    ```
 
-   `misaligned_rates.py` writes one row per run, with its misaligned-answer rate overall and per
-   question category. For a different table, write a script alongside it, as
-   `figure6_spearman` does.
+   Its rule tabulates each run's misaligned-answer rate, overall and per question category, with
+   `workflow/scripts/misaligned_rates.py`. For a different table, write a rule and a script of
+   its own, as `figure6_spearman` does.
 
 3. Add the target to `TARGETS` in `tests/test_workflow.py` and to the table in the README.
 

@@ -1,102 +1,29 @@
-# Target rules. Each figure rule collects the judged answers of every run the
-# paper figure needs, across config["datasets"], and tabulates each run's
-# misaligned-answer rate in <results>/figures/<rule>.csv.
+# Target rules. Each figure in FIGURES (common.smk) collects the judged answers of
+# every run it needs, across config["datasets"], and tabulates each run's
+# misaligned-answer rate in <results>/figures/<figure>.csv.
 
 
-rule figure1:
-    """Figure 1: remove the most or least influential 1-20% of the data."""
-    input:
-        answers=for_each_dataset(figure1_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/figure1.csv",
-    log:
-        "<results>/figures/figure1.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
+for figure, (description, runs) in FIGURES.items():
 
+    rule:
+        name:
+            figure
+        input:
+            answers=for_each_dataset(runs),
+            categories=config["question_categories"],
+        output:
+            f"<results>/figures/{figure}.csv",
+        log:
+            f"<results>/figures/{figure}.log",
+        localrule: True
+        params:
+            code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
+        script:
+            "../scripts/misaligned_rates.py"
 
-rule figure2:
-    """Figure 2: train on only the most or least influential 1-20%."""
-    input:
-        answers=for_each_dataset(figure2_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/figure2.csv",
-    log:
-        "<results>/figures/figure2.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
-
-
-rule figure3:
-    """Figure 3: train on each attribution decile."""
-    input:
-        answers=for_each_dataset(figure3_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/figure3.csv",
-    log:
-        "<results>/figures/figure3.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
-
-
-rule figure4:
-    """Figure 4: retrain transfer_targets on data ranked by each of transfer_sources."""
-    input:
-        answers=for_each_dataset(figure4_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/figure4.csv",
-    log:
-        "<results>/figures/figure4.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
-
-
-rule figure5:
-    """Figure 5: retrain transfer_targets on data ranked by every model, at 20%."""
-    input:
-        answers=for_each_dataset(figure5_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/figure5.csv",
-    log:
-        "<results>/figures/figure5.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
-
-
-rule figure6:
-    """Figure 6 (left): train on deciles of LLM-judged rubric scores."""
-    input:
-        answers=for_each_dataset(figure6_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/figure6.csv",
-    log:
-        "<results>/figures/figure6.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
+    # A rule defined in a loop can't have a docstring of its own; this is what
+    # `snakemake --list-target-rules` shows.
+    workflow.get_rule(figure).docstring = description
 
 
 rule figure6_spearman:
@@ -124,70 +51,6 @@ rule figure6_spearman:
         code=code_fingerprint("workflow/scripts/figure6_spearman.py"),
     script:
         "../scripts/figure6_spearman.py"
-
-
-rule appendix_a3_a4:
-    """Appendix A3/A4: attribution queries built from part of the evaluation."""
-    input:
-        answers=for_each_dataset(appendix_a3_a4_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/appendix_a3_a4.csv",
-    log:
-        "<results>/figures/appendix_a3_a4.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
-
-
-rule appendix_a5:
-    """Appendix A5: rank by loss and by length."""
-    input:
-        answers=for_each_dataset(appendix_a5_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/appendix_a5.csv",
-    log:
-        "<results>/figures/appendix_a5.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
-
-
-rule appendix_a6:
-    """Appendix A6: Figure 1 with data repeated to hold the number of steps constant."""
-    input:
-        answers=for_each_dataset(appendix_a6_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/appendix_a6.csv",
-    log:
-        "<results>/figures/appendix_a6.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
-
-
-rule appendix_a7:
-    """Appendix A7: Figure 2 with data repeated to hold the number of steps constant."""
-    input:
-        answers=for_each_dataset(appendix_a7_runs),
-        categories=config["question_categories"],
-    output:
-        "<results>/figures/appendix_a7.csv",
-    log:
-        "<results>/figures/appendix_a7.log",
-    localrule: True
-    params:
-        code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-    script:
-        "../scripts/misaligned_rates.py"
 
 
 rule base_models:

@@ -91,8 +91,8 @@ def for_each_dataset(runs):
     return [answers for dataset in config["datasets"] for answers in runs(dataset)]
 
 
-# The judged answers each figure needs from one dataset; its rule in figures.smk
-# collects them across config["datasets"].
+# The judged answers each figure needs from one dataset. FIGURES, below, gives
+# each figure a target rule in figures.smk.
 
 
 def figure1_runs(dataset):
@@ -150,3 +150,23 @@ def appendix_a6_runs(dataset):
 
 def appendix_a7_runs(dataset):
     return baseline(dataset) + retrained(dataset, config["methods"], extremes("select", resampled=True))
+
+
+FIGURES = {
+    "figure1": ("Figure 1: remove the most or least influential 1-20% of the data.", figure1_runs),
+    "figure2": ("Figure 2: train on only the most or least influential 1-20%.", figure2_runs),
+    "figure3": ("Figure 3: train on each attribution decile.", figure3_runs),
+    "figure4": ("Figure 4: retrain transfer_targets on data ranked by each of transfer_sources.", figure4_runs),
+    "figure5": ("Figure 5: retrain transfer_targets on data ranked by every model, at 20%.", figure5_runs),
+    "figure6": ("Figure 6 (left): train on deciles of LLM-judged rubric scores.", figure6_runs),
+    "appendix_a3_a4": ("Appendix A3/A4: attribution queries built from part of the evaluation.", appendix_a3_a4_runs),
+    "appendix_a5": ("Appendix A5: rank by loss and by length.", appendix_a5_runs),
+    "appendix_a6": (
+        "Appendix A6: Figure 1 with data repeated to hold the number of steps constant.",
+        appendix_a6_runs,
+    ),
+    "appendix_a7": (
+        "Appendix A7: Figure 2 with data repeated to hold the number of steps constant.",
+        appendix_a7_runs,
+    ),
+}
