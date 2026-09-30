@@ -25,11 +25,36 @@ rule query:
         "python -m em_influence.scripts.query --answers {input.answers} {params.suite} --output {output} > {log} 2>&1"
 
 
-rule attribute_cosine:
-    """Gradient cosine similarity to the misaligned answers, with bergson."""
+rule cosine_query:
+    """The mean unit-normalized gradient of the reference run's misaligned answers, with bergson."""
     input:
         model=reference_run("model"),
-        query=attribution_query,
+        answers=attribution_query,
+    output:
+        directory("<results>/{dataset}/attributions/{source}/{method}/query"),
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}/query.log",
+    wildcard_constraints:
+        method=r"cosine(@[^/]+)?",
+    resources:
+        gpu=1,
+        min_free_gpu_gib=config["min_free_gpu_gib"],
+    params:
+        tokens=config["cosine_token_batch_size"],
+        code=code_fingerprint(packages=("bergson", "torch", "transformers")),
+    shell:
+        on_gpu(
+            "bergson build {output} --model {input.model} --dataset {input.answers}"
+            " --prompt_column question --completion_column answer --reward_column aligned --skip_nan_rewards"
+            " --aggregation mean --unit_normalize --token_batch_size {params.tokens} --overwrite > {log} 2>&1"
+        )
+
+
+rule attribute_cosine:
+    """Gradient cosine similarity of each example to cosine_query, with bergson."""
+    input:
+        model=reference_run("model"),
+        query="<results>/{dataset}/attributions/{source}/{method}/query",
         data=dataset_of,
     output:
         "<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
@@ -46,10 +71,7 @@ rule attribute_cosine:
         code=code_fingerprint("em_influence/bergson_export.py", packages=("bergson", "torch", "transformers")),
     shell:
         on_gpu(
-            "(bergson build {params.run}/query --model {input.model} --dataset {input.query}"
-            " --prompt_column question --completion_column answer --reward_column aligned --skip_nan_rewards"
-            " --aggregation mean --unit_normalize --token_batch_size {params.tokens} --overwrite"
-            " && bergson score {params.run}/scores --model {input.model} --query_path {params.run}/query"
+            "(bergson score {params.run}/scores --model {input.model} --query_path {input.query}"
             " --dataset {input.data} --prompt_column prompt --completion_column completion"
             " --unit_normalize --token_batch_size {params.tokens} --overwrite"
             " && python -m em_influence.bergson_export --run-path {params.run}/scores --output {output}) > {log} 2>&1"
