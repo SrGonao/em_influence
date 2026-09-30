@@ -94,10 +94,6 @@ properties:
   ekfac_precision:
     enum: [fp32, bf16, fp16]
     description: The model's dtype during EK-FAC.
-  min_free_gpu_gib:
-    type: integer
-    minimum: 0
-    description: GPU jobs wait for a card with at least this much free memory.
   methods:
     $ref: "#/$defs/names"
     description: Attribution methods in Figures 1, 2, A6 and A7.
@@ -152,7 +148,6 @@ required:
   - ekfac_gpus
   - ekfac_module_partitions
   - ekfac_precision
-  - min_free_gpu_gib
   - methods
   - decile_methods
   - transfer_sources

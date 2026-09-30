@@ -16,11 +16,11 @@ for figure, (description, runs) in FIGURES.items():
         log:
             f"<results>/figures/{figure}.log",
         localrule: True
-        params:
-            code=code_fingerprint("em_influence/rates.py"),
         shell:
-            "python -m em_influence.rates --answers {input.answers} --categories {input.categories}"
-            " --output {output} > {log} 2>&1"
+            step(
+                "python -m em_influence.rates --answers {input.answers} --categories {input.categories}"
+                " --output {output}",
+            )
 
     # A rule defined in a loop can't have a docstring of its own; this is what
     # `snakemake --list-target-rules` shows.

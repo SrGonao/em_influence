@@ -40,8 +40,6 @@ ekfac_module_partitions: 2
 # matched fp32's (Spearman 0.996 over 400 career examples), but fp32 is the safe
 # default because the inverse Hessian is sensitive to precision.
 ekfac_precision: fp32
-# GPU jobs wait for a card with at least this much free memory.
-min_free_gpu_gib: 8
 
 methods: [ekfac, cosine, wildguard, random]        # Figures 1 and 2
 decile_methods: [ekfac, wildguard, random]         # Figure 3

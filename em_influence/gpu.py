@@ -2,7 +2,8 @@
 
 Snakemake limits how many GPU jobs run at once (`--resources gpu=N`) but not
 which card each one gets; this picks the card. It only considers the GPUs in
-CUDA_VISIBLE_DEVICES when that is set.
+CUDA_VISIBLE_DEVICES when that is set, and waits for one with --min-free-gib free, so
+it doesn't start on a card someone else is using.
 """
 from __future__ import annotations
 
@@ -38,7 +39,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command")
     parser.add_argument("--gpus", type=int, default=1)
-    parser.add_argument("--min-free-gib", type=float, default=0)
+    parser.add_argument(
+        "--min-free-gib",
+        type=float,
+        default=float(os.environ.get("EM_INFLUENCE_MIN_FREE_GPU_GIB", 8)),
+        help="Free memory a card needs before a job starts on it (EM_INFLUENCE_MIN_FREE_GPU_GIB, 8 by default)",
+    )
     parser.add_argument("--locks", type=Path, default=Path(".gpu_locks"))
     args = parser.parse_args()
     args.locks.mkdir(exist_ok=True)

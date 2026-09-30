@@ -57,11 +57,26 @@ def attribution_query(wildcards):
     return f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/query-{suite}.csv"
 
 
-def on_gpu(command):
-    """Wrap a shell command so it waits for, and runs on, the rule's `gpu` resource of free
-    cards. The settings come from resources, not the command text, so changing them doesn't
-    count as changed code and rerun every job."""
-    return f"python -m em_influence.gpu --gpus {{resources.gpu}} --min-free-gib {{resources.min_free_gpu_gib}} {shlex.quote(command)}"
+PYTHON_ENTRY = re.compile(r"python (?:-m (?P<module>em_influence\S*)|(?P<script>em_influence/\S+\.py))")
+
+
+def step(command, *, gpu=False, packages=(), ignore=()):
+    """A rule's shell command: `command`, with its output in the rule's log.
+
+    With `gpu`, it waits for and runs on the rule's `gpu` resource of free cards
+    (em_influence/gpu.py).
+
+    It ends in a comment holding the fingerprint (em_influence/code_fingerprint.py)
+    of the Python modules and scripts `command` runs, and of `packages`, but not
+    `ignore`. Snakemake reruns a rule whose command changed, so changing that code
+    reruns the rule."""
+    entries = [
+        m["script"] or str(Path(*m["module"].split(".")).with_suffix(".py")) for m in PYTHON_ENTRY.finditer(command)
+    ]
+    command = f"({command}) > {{log}} 2>&1"
+    if gpu:
+        command = f"python -m em_influence.gpu --gpus {{resources.gpu}} {shlex.quote(command)}"
+    return f"{command}  # code {code_fingerprint(*entries, packages=packages, ignore=ignore)}"
 
 
 def baseline(dataset, model=REFERENCE_MODEL):

@@ -14,10 +14,11 @@ rule training_config:
     localrule: True
     params:
         model=lookup("models/{model}/id", within=config),
-        code=code_fingerprint("em_influence/scripts/training_config.py"),
     shell:
-        "python -m em_influence.scripts.training_config --template {input.template} --model {params.model}"
-        " --training_file {input.data} --seed {wildcards.seed} --output {output} > {log} 2>&1"
+        step(
+            "python -m em_influence.scripts.training_config --template {input.template} --model {params.model}"
+            " --training_file {input.data} --seed {wildcards.seed} --output {output}",
+        )
 
 
 rule train:
@@ -30,12 +31,13 @@ rule train:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/train.log",
     resources:
         gpu=1,
-        min_free_gpu_gib=config["min_free_gpu_gib"],
-    params:
-        # transformers loads the model through bitsandbytes and accelerate without importing them here.
-        code=code_fingerprint("em_influence/scripts/training_lora.py", packages=("bitsandbytes", "accelerate")),
     shell:
-        on_gpu("python em_influence/scripts/training_lora.py {input} > {log} 2>&1")
+        step(
+            "python em_influence/scripts/training_lora.py {input}",
+            gpu=True,
+            # transformers loads the model through bitsandbytes and accelerate without importing them here.
+            packages=("bitsandbytes", "accelerate"),
+        )
 
 
 rule evaluate:
@@ -49,24 +51,20 @@ rule evaluate:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate.log",
     resources:
         gpu=1,
-        min_free_gpu_gib=config["min_free_gpu_gib"],
     params:
         model=prepend_param("--lora_path", input.model),
         samples=config["samples_per_question"],
         judge=config["judge_model"],
-        # The judge runs locally on vLLM; openai and backoff serve only its API backend.
-        code=code_fingerprint(
-            "em_influence/scripts/generate_answers.py",
-            "em_influence/scripts/judge_answers.py",
-            packages=("transformers",),
-            ignore=("openai", "backoff"),
-        ),
     shell:
-        on_gpu(
-            "(python em_influence/scripts/generate_answers.py {params.model} --questions {input.questions}"
+        step(
+            "python em_influence/scripts/generate_answers.py {params.model} --questions {input.questions}"
             " --output {output} --n_per_question {params.samples}"
             " && python em_influence/scripts/judge_answers.py {output} --questions {input.questions}"
-            " --judge-model {params.judge}) > {log} 2>&1"
+            " --judge-model {params.judge}",
+            gpu=True,
+            packages=("transformers",),
+            # The judge runs locally on vLLM; openai and backoff serve only its API backend.
+            ignore=("openai", "backoff"),
         )
 
 

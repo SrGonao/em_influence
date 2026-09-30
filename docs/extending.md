@@ -121,13 +121,11 @@ rule attribute_perplexity:
         method="perplexity",
     resources:
         gpu=1,
-        min_free_gpu_gib=config["min_free_gpu_gib"],
-    params:
-        code=code_fingerprint("em_influence/scripts/compute_perplexity_attribution.py"),
     shell:
-        on_gpu(
+        step(
             "python em_influence/scripts/compute_perplexity_attribution.py --input_path {input.data}"
-            " --model {input.model} --output {output} > {log} 2>&1"
+            " --model {input.model} --output {output}",
+            gpu=True,
         )
 ```
 
@@ -140,22 +138,22 @@ methods='[ekfac,perplexity]'`.
 
 - **Put the rule** in the file for its stage, with its outputs under `<results>/` and a `log:`
   next to them. Give it a docstring; `snakemake --list-rules` shows it.
-- **Python a rule runs** lives in `em_influence/`, and the rule runs it from `shell:` as `python -m
-  em_influence.<module> --flag ... > {log} 2>&1`. Give the module a `main()` that parses its
+- **Python a rule runs** lives in `em_influence/`, and the rule runs it from `shell:` as
+  `step("python -m em_influence.<module> --flag ...")`. Give the module a `main()` that parses its
   flags with `argparse` and calls the function that does the work. A module with several steps
   takes a subcommand, as `em_influence.data_prep` does. Code only one step uses goes in a file of
   its own in `em_influence/scripts/`, since the step's fingerprint covers the whole file.
-- **Every step fingerprints its code** with `params: code=code_fingerprint("<entry script>")`,
-  naming the Python files its command runs (not `em_influence/gpu.py`, which only picks cards).
-  Add `packages=(...)` for packages that matter without being imported directly, like
-  `bergson` run as a command or `bitsandbytes` loaded by transformers, and `ignore=(...)` for
-  imported packages the step doesn't use. See
-  [When Snakemake reruns jobs](#when-snakemake-reruns-jobs).
-- **GPU jobs** set `resources: gpu=N, min_free_gpu_gib=config["min_free_gpu_gib"]` and wrap
-  their command in `on_gpu(command)`. `--resources gpu=M` caps the cards in use at once;
-  `on_gpu` picks which ones (see `em_influence/gpu.py`). It reads both settings from
-  `resources`, not from the command text, so changing them doesn't count as changed code. Mark
-  cheap CPU steps `localrule: True`, so a cluster executor runs them in place.
+- **`step(command)`** (in `common.smk`) sends the command's output to the rule's log and ends
+  it with a fingerprint of the Python it runs, found from its `python -m em_influence...` and
+  `python em_influence/...py` calls, so a change to that code reruns the rule. Pass
+  `packages=(...)` for packages that matter without being imported directly, like `bergson`
+  run as a command or `bitsandbytes` loaded by transformers, and `ignore=(...)` for imported
+  packages the step doesn't use. See [When Snakemake reruns jobs](#when-snakemake-reruns-jobs).
+- **GPU jobs** set `resources: gpu=N` and pass `step(..., gpu=True)`. `--resources gpu=M` caps
+  the cards in use at once, and `step` picks which ones (see `em_influence/gpu.py`), waiting
+  for cards with 8 GiB free (`EM_INFLUENCE_MIN_FREE_GPU_GIB`). Neither is in the command text,
+  so changing them doesn't count as changed code. Mark cheap CPU steps
+  `localrule: True`, so a cluster executor runs them in place.
 - **Files a step reads** belong in `input:`, so Snakemake reruns it when they change. **Values**
   go in `params:`. Read settings from `config` in the rule, not in the script, so a changed
   setting reruns the step.
@@ -184,9 +182,9 @@ keeps in the checkout's `.snakemake/` folder. An output with no record is judged
 alone, and changes to its params, code or inputs are ignored. Even with a record, Snakemake
 compares an input's content only for files under 1 MB; bigger ones are compared by timestamp.
 
-On its own, Snakemake doesn't know about the Python a `shell:` command runs. So each rule's
-`code` param holds a fingerprint of it, from `em_influence/code_fingerprint.py`. The fingerprint
-covers:
+On its own, Snakemake doesn't know about the Python a `shell:` command runs. So `step()` ends
+each command with a comment holding a fingerprint of it, from `em_influence/code_fingerprint.py`,
+and a changed fingerprint is a changed command. The fingerprint covers:
 
 - the entry scripts, every file of this repo they import (directly or through each other), and
   the `__init__.py` files those imports run;

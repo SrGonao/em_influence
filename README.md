@@ -25,7 +25,7 @@ Models download from HuggingFace on first use.
 ## Check that it runs
 
 ```bash
-uv run snakemake smoke --configfile config/smoke.yaml --resources gpu=1
+EM_INFLUENCE_MIN_FREE_GPU_GIB=0 uv run snakemake smoke --configfile config/smoke.yaml --resources gpu=1
 ```
 
 This runs every stage (training, generation, judging, each attribution method, filtering and
@@ -133,7 +133,8 @@ How a variant shares work with earlier runs depends on the setting:
 
   A copied run's `training.json` still points at the original folder, so if it is ever
   retrained, delete the copy's `training.json` first.
-- **Settings for the machine** (`min_free_gpu_gib`, `ekfac_gpus`) don't rerun anything.
+- **Settings for the machine** (`ekfac_gpus`, and the `EM_INFLUENCE_MIN_FREE_GPU_GIB` environment
+  variable, how much free memory a GPU job waits for, 8 GiB by default) don't rerun anything.
 
 ## Cost
 

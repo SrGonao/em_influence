@@ -28,7 +28,8 @@ rule figure6_spearman:
     params:
         datasets=config["datasets"],
         metrics=config["rubric_metrics"],
-        code=code_fingerprint("em_influence/scripts/figure6_spearman.py"),
     shell:
-        "python -m em_influence.scripts.figure6_spearman --ekfac {input.ekfac} --datasets {params.datasets}"
-        " --metrics {params.metrics} --output {output} > {log} 2>&1"
+        step(
+            "python -m em_influence.scripts.figure6_spearman --ekfac {input.ekfac} --datasets {params.datasets}"
+            " --metrics {params.metrics} --output {output}",
+        )
