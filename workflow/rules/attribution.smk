@@ -58,7 +58,8 @@ rule attribute_cosine:
         query="<results>/{dataset}/attributions/{source}/{method}/query",
         data=dataset_of,
     output:
-        "<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
+        scores=directory("<results>/{dataset}/attributions/{source}/{method}/scores"),
+        attributions="<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
     log:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
@@ -66,14 +67,13 @@ rule attribute_cosine:
     resources:
         gpu=1,
     params:
-        run=subpath(output[0], parent=True),
         tokens=config["cosine_token_batch_size"],
     shell:
         step(
-            "bergson score {params.run}/scores --model {input.model} --query_path {input.query}"
+            "bergson score {output.scores} --model {input.model} --query_path {input.query}"
             " --dataset {input.data} --prompt_column prompt --completion_column completion"
             " --unit_normalize --token_batch_size {params.tokens} --overwrite"
-            " && python -m em_influence.bergson_export --run-path {params.run}/scores --output {output}",
+            " && python -m em_influence.bergson_export --run-path {output.scores} --output {output.attributions}",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
@@ -86,7 +86,9 @@ rule attribute_ekfac:
         query=attribution_query,
         data=dataset_of,
     output:
-        "<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
+        # The fitted Hessian, the preconditioned query (kfac_query/) and the scores.
+        ekfac=directory("<results>/{dataset}/attributions/{source}/{method}/ekfac"),
+        attributions="<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
     log:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
@@ -94,20 +96,19 @@ rule attribute_ekfac:
     resources:
         gpu=config["ekfac_gpus"],
     params:
-        run=subpath(output[0], parent=True),
         tokens=config["token_batch_size"],
         partitions=config["ekfac_module_partitions"],
         precision=config["ekfac_precision"],
     shell:
         step(
-            "bergson ekfac {params.run}/ekfac --model {input.model}"
+            "bergson ekfac {output.ekfac} --model {input.model}"
             " --data.dataset {input.data} --data.prompt_column prompt --data.completion_column completion"
             " --query.dataset {input.query} --query.prompt_column question --query.completion_column answer"
             " --query.reward_column aligned --query.skip_nan_rewards --query.aggregation mean"
             " --hessian_pipeline_cfg.inversion_cfg.damping_factor 0.1 --hessian_cfg.ev_correction True --method kfac"
             " --module_partitions {params.partitions} --index_cfg.precision {params.precision}"
             " --token_batch_size {params.tokens} --overwrite"
-            " && python -m em_influence.bergson_export --run-path {params.run}/ekfac/scores --output {output}",
+            " && python -m em_influence.bergson_export --run-path {output.ekfac}/scores --output {output.attributions}",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
@@ -128,7 +129,7 @@ rule attribute_wildguard:
     shell:
         step(
             "python em_influence/scripts/compute_wildguard_attribution.py --input_path {input}"
-            " --attribution_path $(dirname {output}",
+            " --attribution_path $(dirname {output})",
             gpu=True,
         )
 
