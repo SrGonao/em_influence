@@ -1,6 +1,6 @@
-# One pass through every stage on eight rows, two questions and small models:
-#   uv run snakemake smoke --configfile config/smoke.yaml
-# It checks that everything runs, not the misalignment effect.
+# One pass through every stage on eight rows, two questions and small models;
+# README.md's "Check that it runs" has the command. It checks that everything
+# runs, not the misalignment effect.
 pathvars: {results: results/smoke}
 dataset_files: {smoke: tests/smoke/data.jsonl}
 datasets: [smoke]

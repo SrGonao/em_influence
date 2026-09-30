@@ -1,6 +1,6 @@
 # Settings for reproducing the paper. Override any of them on the command line,
-# e.g. `snakemake figure1 --config datasets='[career]' seeds='[0,1]'`; README.md
-# has more examples. workflow/schemas/config.schema.yaml checks every key.
+# e.g. `uv run snakemake figure1 --resources gpu=4 --config datasets='[career]' seeds='[0,1]'`;
+# README.md has more examples. workflow/schemas/config.schema.yaml checks every key.
 datasets: [auto, career, edu]
 seeds: [0, 1, 2, 3, 4]
 fractions: [0.01, 0.05, 0.1, 0.15, 0.2]
@@ -8,7 +8,8 @@ deciles: 10
 # Train only these deciles (0 is the highest-scoring) for a cheaper check, e.g. [0, 3, 6, 9].
 # decile_bins: [0, 9]
 
-# The model whose baseline supplies the attribution query and ranks the data.
+# The model whose baseline supplies the attribution query and ranks the data, and
+# which Figures 1-3 and 6 and Appendices A3-A7 retrain.
 reference_model: olmo
 reference_seed: 0
 
@@ -28,17 +29,12 @@ token_batch_size: 512
 # Cosine attribution holds each example's full gradient; 1,024-token batches of it
 # run out of memory. It must exceed the longest example (316 tokens for career).
 cosine_token_batch_size: 512
-# EK-FAC's Hessian fit for OLMo 3 7B doesn't fit on one 48 GB card: bergson
-# loads the model in fp32 (27.5 GiB). It runs on ekfac_gpus cards, each holding
-# the factors of the modules it owns, in ekfac_module_partitions passes over
-# groups of modules. On four A40s with 512-token batches, two partitions peak at
-# 41.8 GiB per card.
+# EK-FAC's Hessian fit runs on ekfac_gpus cards, each holding the factors of the
+# modules it owns, in ekfac_module_partitions passes over groups of modules, with
+# the model in ekfac_precision. README.md's Cost section has the memory each
+# setting takes for OLMo 3 7B on A40s.
 ekfac_gpus: 4
 ekfac_module_partitions: 2
-# The model's dtype during the Hessian fit and scoring. bf16 halves the model and
-# fits in one partition of 1,024-token batches (40.4 GiB per card), and its scores
-# matched fp32's (Spearman 0.996 over 400 career examples), but fp32 is the safe
-# default because the inverse Hessian is sensitive to precision.
 ekfac_precision: fp32
 
 methods: [ekfac, cosine, wildguard, random]        # Figures 1 and 2
