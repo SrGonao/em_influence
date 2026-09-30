@@ -66,7 +66,7 @@ folder of their own (after `cosine_query` builds cosine's query gradient), and `
 and `attribute_cosine` export its scores. Attribution uses the baseline of the `{source}` model
 trained with `reference_seed`. Token-level runs take the same shape through `tokens.smk`:
 `tokenize`, then `attribute_tokens_*` and `validate_tokens_*` in place of `attribute_{method}`,
-and `token_subset` in place of `subset`.
+and `token_subset` (with `sample_base_tokens`, for `_sample` subsets) in place of `subset`.
 
 Every path under `results/` is written `<results>/...`, and every downloaded dataset
 `<data>/...`. These are Snakemake
