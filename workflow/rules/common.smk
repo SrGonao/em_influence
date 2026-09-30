@@ -96,82 +96,17 @@ def for_each_dataset(runs):
     return [answers for dataset in config["datasets"] for answers in runs(dataset)]
 
 
-# The judged answers each figure needs from one dataset. FIGURES, below, gives
-# each figure a target rule in figures.smk.
+# Each figure in workflow/rules/figures/ registers its runs with @figure; figures.smk
+# makes a target rule for each.
+FIGURES = {}
 
 
-def figure1_runs(dataset):
-    return baseline(dataset) + retrained(dataset, config["methods"], extremes("remove"))
+def figure(name, description):
+    """Register a function listing the judged answers a figure needs from one dataset.
+    `description` is what `snakemake --list-target-rules` shows."""
 
+    def register(runs):
+        FIGURES[name] = (description, runs)
+        return runs
 
-def figure2_runs(dataset):
-    return baseline(dataset) + retrained(dataset, config["methods"], extremes("select"))
-
-
-def figure3_runs(dataset):
-    return baseline(dataset) + retrained(dataset, config["decile_methods"], DECILES)
-
-
-def figure4_runs(dataset):
-    runs = []
-    for target in config["transfer_targets"]:
-        runs += baseline(dataset, model=target)
-        for source in config["transfer_sources"]:
-            runs += retrained(dataset, ["cosine"], extremes("remove", resampled=True), source=source, model=target)
-    return runs
-
-
-def figure5_runs(dataset):
-    runs = []
-    for source in MODELS:
-        runs += baseline(dataset, model=source)
-    for target in config["transfer_targets"]:
-        for source in MODELS:
-            runs += retrained(
-                dataset, ["cosine"], extremes("remove", [0.2], resampled=True), source=source, model=target
-            )
-    return runs
-
-
-def figure6_runs(dataset):
-    if dataset not in config["rubric_retrain_datasets"]:
-        return []
-    methods = ["ekfac", "random"] + [f"rubric-{metric}" for metric in config["rubric_retrain_metrics"]]
-    return baseline(dataset) + retrained(dataset, methods, DECILES)
-
-
-def appendix_a3_a4_runs(dataset):
-    methods = [f"cosine@{suite}" for suite in config["query_suites"]]
-    return baseline(dataset) + retrained(dataset, methods, DECILES)
-
-
-def appendix_a5_runs(dataset):
-    return baseline(dataset) + retrained(dataset, ["loss", "length"], extremes("remove", resampled=True))
-
-
-def appendix_a6_runs(dataset):
-    return baseline(dataset) + retrained(dataset, config["methods"], extremes("remove", resampled=True))
-
-
-def appendix_a7_runs(dataset):
-    return baseline(dataset) + retrained(dataset, config["methods"], extremes("select", resampled=True))
-
-
-FIGURES = {
-    "figure1": ("Figure 1: remove the most or least influential 1-20% of the data.", figure1_runs),
-    "figure2": ("Figure 2: train on only the most or least influential 1-20%.", figure2_runs),
-    "figure3": ("Figure 3: train on each attribution decile.", figure3_runs),
-    "figure4": ("Figure 4: retrain transfer_targets on data ranked by each of transfer_sources.", figure4_runs),
-    "figure5": ("Figure 5: retrain transfer_targets on data ranked by every model, at 20%.", figure5_runs),
-    "figure6": ("Figure 6 (left): train on deciles of LLM-judged rubric scores.", figure6_runs),
-    "appendix_a3_a4": ("Appendix A3/A4: attribution queries built from part of the evaluation.", appendix_a3_a4_runs),
-    "appendix_a5": ("Appendix A5: rank by loss and by length.", appendix_a5_runs),
-    "appendix_a6": (
-        "Appendix A6: Figure 1 with data repeated to hold the number of steps constant.",
-        appendix_a6_runs,
-    ),
-    "appendix_a7": (
-        "Appendix A7: Figure 2 with data repeated to hold the number of steps constant.",
-        appendix_a7_runs,
-    ),
-}
+    return register

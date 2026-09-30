@@ -1,5 +1,5 @@
-# Target rules. Each figure in FIGURES (common.smk) collects the judged answers of
-# every run it needs, across config["datasets"], and tabulates each run's
+# Target rules. Each figure in workflow/rules/figures/ collects the judged answers
+# of every run it needs, across config["datasets"], and tabulates each run's
 # misaligned-answer rate in <results>/figures/<figure>.csv.
 
 
@@ -25,34 +25,6 @@ for figure, (description, runs) in FIGURES.items():
     # A rule defined in a loop can't have a docstring of its own; this is what
     # `snakemake --list-target-rules` shows.
     workflow.get_rule(figure).docstring = description
-
-
-rule figure6_spearman:
-    """Figure 6 (right): Spearman correlation of each rubric metric with EK-FAC."""
-    input:
-        ekfac=collect(
-            "<results>/{dataset}/attributions/{source}/ekfac/attributions.csv",
-            dataset=config["datasets"],
-            source=REFERENCE_MODEL,
-        ),
-        rubrics=collect(
-            "<results>/{dataset}/attributions/{source}/rubric-{metric}/attributions.csv",
-            dataset=config["datasets"],
-            source=REFERENCE_MODEL,
-            metric=config["rubric_metrics"],
-        ),
-    output:
-        "<results>/figures/figure6_spearman.csv",
-    log:
-        "<results>/figures/figure6_spearman.log",
-    localrule: True
-    params:
-        datasets=config["datasets"],
-        metrics=config["rubric_metrics"],
-        code=code_fingerprint("em_influence/scripts/figure6_spearman.py"),
-    shell:
-        "python -m em_influence.scripts.figure6_spearman --ekfac {input.ekfac} --datasets {params.datasets}"
-        " --metrics {params.metrics} --output {output} > {log} 2>&1"
 
 
 rule base_models:

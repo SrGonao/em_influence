@@ -1,17 +1,27 @@
 import subprocess
 import sys
 
-TARGETS = ["figure1", "figure2", "figure3", "figure4", "figure5", "figure6", "figure6_spearman",
-           "appendix_a3_a4", "appendix_a5", "appendix_a6", "appendix_a7", "base_models"]
+
+def snakemake(*args):
+    return subprocess.run([sys.executable, "-m", "snakemake", *args], capture_output=True, text=True)
 
 
 def dry_run(*args):
-    return subprocess.run([sys.executable, "-m", "snakemake", *args, "--dry-run", "--quiet", "rules"],
-                          capture_output=True, text=True)
+    return snakemake(*args, "--dry-run", "--quiet", "rules")
 
 
-def test_every_paper_target_plans():
-    result = dry_run(*TARGETS)
+def targets():
+    """Every target rule but `default`, which only prints a hint, and `smoke`, which needs its own config."""
+    listed = snakemake("--list-target-rules")
+    assert listed.returncode == 0, listed.stderr
+    names = [line.split()[0] for line in listed.stdout.splitlines() if line.strip()]
+    return [name for name in names if name not in ("default", "smoke")]
+
+
+def test_every_target_plans():
+    names = targets()
+    assert "figure1" in names
+    result = dry_run(*names)
     assert result.returncode == 0, result.stderr
 
 

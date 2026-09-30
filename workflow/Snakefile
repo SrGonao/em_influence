@@ -4,6 +4,8 @@ README.md lists the targets, and docs/extending.md explains how the rules fit
 together and how to add a step or a figure.
 """
 
+from pathlib import Path
+
 from snakemake.utils import min_version, validate
 
 min_version("9.25")
@@ -21,6 +23,13 @@ pathvars:
 
 
 include: "rules/common.smk"
+
+
+for path in sorted(Path(workflow.basedir, "rules/figures").glob("*.smk")):
+
+    include: path
+
+
 include: "rules/figures.smk"
 include: "rules/data.smk"
 include: "rules/training.smk"

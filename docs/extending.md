@@ -11,8 +11,9 @@ The workflow follows Snakemake's
 | Path | What's there |
 |---|---|
 | `workflow/Snakefile` | Loads and validates the config, includes the rule files, and defines the `default` rule |
-| `workflow/rules/common.smk` | All the workflow's Python: settings, wildcard constraints, path helpers, and the runs each figure needs |
-| `workflow/rules/figures.smk` | The target rules, one per figure |
+| `workflow/rules/common.smk` | The workflow's shared Python: settings, wildcard constraints and path helpers |
+| `workflow/rules/figures/` | One file per figure, listing the runs it needs |
+| `workflow/rules/figures.smk` | A target rule for each figure, and `base_models` and `smoke` |
 | `workflow/rules/data.smk` | Downloading datasets and cutting them into subsets |
 | `workflow/rules/training.smk` | Training and evaluating models |
 | `workflow/rules/attribution.smk` | Ranking training examples, one rule per method |
@@ -21,8 +22,9 @@ The workflow follows Snakemake's
 | `em_influence/` | All the Python rules run from `shell:`: the package, and the scripts and one-step functions in `em_influence/scripts/` |
 
 Everything runs in the project's single uv environment (`uv run snakemake`), so rules don't
-declare conda environments or containers. `snakemake --lint` warns about that, and about the
-`default` rule, which only prints a hint, having no log.
+declare conda environments or containers. `snakemake --lint` warns about that, about the
+`default` rule, which only prints a hint, having no log, and about `figure6.smk` holding a rule
+as well as a function, which keeps Figure 6 in one file.
 
 ## How the rules connect
 
@@ -68,10 +70,13 @@ parses subset names.
 
 ## Adding a figure
 
-A figure is a function that lists the answers a figure needs from one dataset, and an entry in
-`FIGURES` that gives it a target rule collecting them across `config["datasets"]`.
+Each figure is a file in `workflow/rules/figures/`, holding a function that lists the judged
+answers the figure needs from one dataset. The workflow makes a target rule for it that collects
+them across `config["datasets"]` and tabulates each run's misaligned-answer rate, overall and per
+question category.
 
-1. In `workflow/rules/common.smk`, write `<name>_runs(dataset)`. The helpers above it build the
+1. Write `workflow/rules/figures/<name>.smk`. `@figure` names the target and gives the
+   description `snakemake --list-target-rules` shows. The helpers in `common.smk` build the
    paths: `baseline(dataset)` is the reference model's baseline runs, `retrained(dataset,
    methods, subsets)` the retrains on each subset of each method's ranking (pass `source=` and
    `model=` to rank with or retrain a different model), and `extremes("remove")` the
@@ -79,25 +84,18 @@ A figure is a function that lists the answers a figure needs from one dataset, a
    `retrained` return one path per seed.
 
    ```python
+   @figure("loss_deciles", "Train on each decile of the reference model's loss.")
    def loss_deciles_runs(dataset):
        return baseline(dataset) + retrained(dataset, ["loss"], DECILES)
    ```
 
-2. Add it to `FIGURES` at the end of `common.smk`, with the description `snakemake
-   --list-target-rules` shows:
+   For a different table, add a rule of its own to the file, as `figure6.smk` does for
+   `figure6_spearman`.
 
-   ```python
-   "loss_deciles": ("Train on each decile of the reference model's loss.", loss_deciles_runs),
-   ```
+2. Add it to the table in the README.
 
-   Its rule tabulates each run's misaligned-answer rate, overall and per question category, with
-   `em_influence/rates.py`. For a different table, write a rule and a script of its own, as
-   `figure6_spearman` does.
-
-3. Add the target to `TARGETS` in `tests/test_workflow.py` and to the table in the README.
-
-4. `uv run snakemake loss_deciles -n` lists the jobs it needs, and `uv run pytest` checks that
-   everything still plans and is formatted.
+3. `uv run snakemake loss_deciles -n` lists the jobs it needs, and `uv run pytest` checks that
+   every target, this one included, still plans and is formatted.
 
 If a new setting controls the figure, add it to `config/config.yaml` and to the schema, or
 validation will reject it.
