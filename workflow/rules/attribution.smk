@@ -80,9 +80,9 @@ rule attribute_ekfac:
     shell:
         on_gpu(
             "(bergson ekfac {params.run}/ekfac --model {input.model}"
-            " --dataset {input.data} --prompt_column prompt --completion_column completion"
-            " --data.dataset {input.query} --data.prompt_column question --data.completion_column answer"
-            " --data.reward_column aligned --data.skip_nan_rewards --query.aggregation mean"
+            " --data.dataset {input.data} --data.prompt_column prompt --data.completion_column completion"
+            " --query.dataset {input.query} --query.prompt_column question --query.completion_column answer"
+            " --query.reward_column aligned --query.skip_nan_rewards --query.aggregation mean"
             " --hessian_pipeline_cfg.inversion_cfg.damping_factor 0.1 --hessian_cfg.ev_correction True --method kfac"
             " --module_partitions {params.partitions} --index_cfg.precision {params.precision}"
             " --token_batch_size {params.tokens} --overwrite"

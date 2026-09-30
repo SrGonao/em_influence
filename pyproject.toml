@@ -52,7 +52,7 @@ torch = { index = "pytorch-cu129" }
 torchvision = { index = "pytorch-cu129" }
 torchaudio = { index = "pytorch-cu129" }
 vllm = { url = "https://github.com/vllm-project/vllm/releases/download/v0.29.0/vllm-0.29.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl" }
-bergson = { git = "https://github.com/EleutherAI/bergson", rev = "8d40179c20c5bbff8fc274a938ba70ef8852bde5" }
+bergson = { git = "https://github.com/EleutherAI/bergson", rev = "6b652f5e570f5185564d8a3aea7914827d07729e" }
 
 [[tool.uv.index]]
 name = "pytorch-cu129"
