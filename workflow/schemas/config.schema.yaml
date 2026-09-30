@@ -114,6 +114,14 @@ properties:
   decile_methods:
     $ref: "#/$defs/names"
     description: Attribution methods in Figure 3.
+  token_methods:
+    type: array
+    items: {type: string, pattern: "^tokens-"}
+    description: Token attribution methods in token Figures 1 and 2.
+  token_decile_methods:
+    type: array
+    items: {type: string, pattern: "^tokens-"}
+    description: Token attribution methods in token Figure 3.
   token_score_batch_size:
     type: integer
     minimum: 1
@@ -170,6 +178,8 @@ required:
   - ekfac_precision
   - methods
   - decile_methods
+  - token_methods
+  - token_decile_methods
   - token_score_batch_size
   - transfer_sources
   - transfer_targets
