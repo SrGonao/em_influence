@@ -81,6 +81,8 @@ rule smoke:
                 "appendix_a5",
                 "figure1_narrow",
                 "figure1_loss",
+                "token_figure1",
+                "token_figure3",
             ],
         ),
     localrule: True

@@ -137,6 +137,24 @@ def step(command, *, gpu=False, packages=(), ignore=()):
     return f"{command}  # code {code_fingerprint(*entries, packages=packages, ignore=ignore)}"
 
 
+def training_data(wildcards):
+    """A run's training data: the dataset, a subset of its examples, or a tokenized
+    dataset for token-level runs."""
+    if wildcards.trained_on == "full":
+        return dataset_file(wildcards.dataset)
+    source, method, subset = wildcards.trained_on.split("/")
+    if method.startswith("tokens"):
+        # Token ids are the source's; another model can't train on them.
+        if source != wildcards.model:
+            raise ValueError(f"{wildcards.model} can't train on {source}'s tokenization ({wildcards.trained_on})")
+        if method == "tokens":
+            if subset != "unmodified":
+                raise ValueError(f"The only subset of tokens is unmodified, not {subset}")
+            return f"<results>/{wildcards.dataset}/tokenized/{source}"
+        return f"<results>/{wildcards.dataset}/subsets/{wildcards.trained_on}"
+    return f"<results>/{wildcards.dataset}/subsets/{wildcards.trained_on}.jsonl"
+
+
 def baseline(dataset, model=REFERENCE_MODEL):
     """The judged answers of `model` trained on all of `dataset`, one per seed."""
     return collect(
@@ -156,6 +174,14 @@ def retrained(dataset, methods, subsets, source=REFERENCE_MODEL, model=REFERENCE
         subset=subsets,
         seed=SEEDS,
     )
+
+
+def token_baseline(dataset):
+    """The judged answers of the reference model trained on its own tokenization of
+    all of `dataset`, one per seed. That tokenization labels the reply but not the
+    end-of-turn token, unlike training on the JSONL, so token-level runs compare to
+    this rather than to `baseline`."""
+    return retrained(dataset, ["tokens"], ["unmodified"])
 
 
 def extremes(mode, fractions=FRACTIONS, resampled=False):

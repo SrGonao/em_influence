@@ -64,7 +64,9 @@ The paths after `data/` are under `results/{dataset}/`, except `figures/`, which
 bergson's methods split `attribute_{method}` in two: `ekfac` and `cosine_scores` run bergson into a
 folder of their own (after `cosine_query` builds cosine's query gradient), and `attribute_ekfac`
 and `attribute_cosine` export its scores. Attribution uses the baseline of the `{source}` model
-trained with `reference_seed`.
+trained with `reference_seed`. Token-level runs take the same shape through `tokens.smk`:
+`tokenize`, then `attribute_tokens_*` and `validate_tokens_*` in place of `attribute_{method}`,
+and `token_subset` in place of `subset`.
 
 Every path under `results/` is written `<results>/...`, and every downloaded dataset
 `<data>/...`. These are Snakemake
@@ -272,8 +274,9 @@ uv run snakemake --touch $files
 Jobs downstream of the touched files don't rerun even though those files are now newer,
 because Snakemake sees their content hasn't changed. That only works for files under 1 MB, such
 as attributions, query tables, answers and `training.json`. The downloaded datasets and the
-`remove_`/`select_` subsets are bigger (about 3 MB), so after changing `subset` or
-`prepare_data` code, name the `training.json` files made from them as well:
+`remove_`/`select_` subsets are bigger (about 3 MB), and token-level subsets are folders, so
+after changing `subset`, `token_subset` or `prepare_data` code, name the `training.json` files
+made from them as well:
 
 ```bash
 files="$(find results -path '*/subsets/*.jsonl') $(find results -path '*/runs/*' -name training.json)"

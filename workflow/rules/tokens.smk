@@ -1,6 +1,7 @@
 # Token-level attribution. Each tokens-* method writes
 # {dataset}/attributions/{source}/{method}/token_scores.npz: one score per
 # supervised reply token of {source}'s tokenization (em_influence/token_scores.py).
+# token_subset turns a ranking into a tokenized training set.
 
 
 rule tokenize:
@@ -158,3 +159,26 @@ rule attribute_tokens_random:
     localrule: True
     shell:
         step("python -m em_influence.token_scores random --tokenized {input} --output {output}")
+
+
+rule token_subset:
+    """{source}'s tokenization with the reply tokens a subset (e.g. remove_top_0.2, decile_3) names masked."""
+    input:
+        data="<results>/{dataset}/tokenized/{source}",
+        scores="<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
+    output:
+        data=directory("<results>/{dataset}/subsets/{source}/{method}/{subset}"),
+        report="<results>/{dataset}/subsets/{source}/{method}/{subset}.json",
+    log:
+        "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
+    wildcard_constraints:
+        method=r"tokens-[^/]+",
+        subset=r"(remove|select)_(top|bottom)_[0-9.]+|decile_\d+",
+    localrule: True
+    params:
+        deciles=config["deciles"],
+    shell:
+        step(
+            "python -m em_influence.scripts.intervene_tokens --dataset {input.data} --token-scores {input.scores}"
+            " --subset {wildcards.subset} --deciles {params.deciles} --output {output.data} --report {output.report}"
+        )
