@@ -128,7 +128,7 @@ rule attribute_wildguard:
     shell:
         step(
             "python em_influence/scripts/compute_wildguard_attribution.py --input_path {input}"
-            " --attribution_path $(dirname {output}",
+            " --attribution_path $(dirname {output})",
             gpu=True,
         )
 
