@@ -47,6 +47,11 @@ def reference_run(file):
     return f"<results>/{{dataset}}/runs/{{source}}/full/seed{config['reference_seed']}/{file}"
 
 
+def base_model_flag(wildcards):
+    """generate_answers.py's flag for evaluating the {model} wildcard's model before fine-tuning."""
+    return f"--model {config['models'][wildcards.model]['id']}"
+
+
 def attribution_query(wildcards):
     suite = wildcards.method.partition("@")[2] or "all"
     return f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/query-{suite}.csv"

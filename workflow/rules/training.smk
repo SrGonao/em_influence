@@ -51,6 +51,7 @@ rule evaluate:
         gpu=1,
         min_free_gpu_gib=config["min_free_gpu_gib"],
     params:
+        model=prepend_param("--lora_path", input.model),
         samples=config["samples_per_question"],
         judge=config["judge_model"],
         # The judge runs locally on vLLM; openai and backoff serve only its API backend.
@@ -62,39 +63,22 @@ rule evaluate:
         ),
     shell:
         on_gpu(
-            "(python em_influence/scripts/generate_answers.py --lora_path {input.model} --questions {input.questions}"
+            "(python em_influence/scripts/generate_answers.py {params.model} --questions {input.questions}"
             " --output {output} --n_per_question {params.samples}"
             " && python em_influence/scripts/judge_answers.py {output} --questions {input.questions}"
             " --judge-model {params.judge}) > {log} 2>&1"
         )
 
 
-rule evaluate_base:
-    """Like evaluate, for a model before any fine-tuning."""
+use rule evaluate as evaluate_base with:
     input:
-        config["questions"],
+        questions=config["questions"],
     output:
         "<results>/base/{model}/answers.csv",
     log:
         "<results>/base/{model}/evaluate.log",
-    resources:
-        gpu=1,
-        min_free_gpu_gib=config["min_free_gpu_gib"],
     params:
-        model=lookup("models/{model}/id", within=config),
-        samples=config["samples_per_question"],
-        judge=config["judge_model"],
-        # The judge runs locally on vLLM; openai and backoff serve only its API backend.
-        code=code_fingerprint(
-            "em_influence/scripts/generate_answers.py",
-            "em_influence/scripts/judge_answers.py",
-            packages=("transformers",),
-            ignore=("openai", "backoff"),
-        ),
-    shell:
-        on_gpu(
-            "(python em_influence/scripts/generate_answers.py --model {params.model} --questions {input}"
-            " --output {output} --n_per_question {params.samples}"
-            " && python em_influence/scripts/judge_answers.py {output} --questions {input}"
-            " --judge-model {params.judge}) > {log} 2>&1"
-        )
+        model=base_model_flag,
+
+
+workflow.get_rule("evaluate_base").docstring = "Like evaluate, for a model before any fine-tuning."

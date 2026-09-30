@@ -167,6 +167,10 @@ methods='[ekfac,perplexity]'`.
 - **Files a step reads** belong in `input:`, so Snakemake reruns it when they change. **Values**
   go in `params:`. Read settings from `config` in the rule, not in the script, so a changed
   setting reruns the step.
+- **A variant of a rule**, the same step with other inputs, outputs or settings, is `use rule
+  <rule> as <variant> with:`, overriding only what differs, as `evaluate_base` does. Give it its
+  own description with `workflow.get_rule("<variant>").docstring = ...`, since it otherwise
+  inherits the original's.
 - **Input functions** are named functions in `common.smk`, not lambdas. Snakemake's
   [semantic helpers](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#semantic-helpers)
   cover the common cases: `collect` for lists of paths, `lookup` for a value from `config` by
