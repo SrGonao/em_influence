@@ -11,8 +11,9 @@ The workflow follows Snakemake's
 | Path | What's there |
 |---|---|
 | `workflow/Snakefile` | Loads and validates the config, includes the rule files, and defines the `default` rule |
-| `workflow/rules/common.smk` | All the workflow's Python: settings, wildcard constraints, path helpers, and the runs each figure needs |
-| `workflow/rules/figures.smk` | The target rules, one per figure |
+| `workflow/rules/common.smk` | The workflow's shared Python: settings, wildcard constraints and path helpers |
+| `workflow/rules/figures/` | One file per figure, listing the runs it needs |
+| `workflow/rules/figures.smk` | A target rule for each figure, and `base_models` and `smoke` |
 | `workflow/rules/data.smk` | Downloading datasets and cutting them into subsets |
 | `workflow/rules/training.smk` | Training and evaluating models |
 | `workflow/rules/attribution.smk` | Ranking training examples, one rule per method |
@@ -21,8 +22,9 @@ The workflow follows Snakemake's
 | `em_influence/` | All the Python rules run from `shell:`: the package, and the scripts and one-step functions in `em_influence/scripts/` |
 
 Everything runs in the project's single uv environment (`uv run snakemake`), so rules don't
-declare conda environments or containers. `snakemake --lint` warns about that, and about the
-`default` rule, which only prints a hint, having no log.
+declare conda environments or containers. `snakemake --lint` warns about that, about the
+`default` rule, which only prints a hint, having no log, and about `figure6.smk` holding a rule
+as well as a function, which keeps Figure 6 in one file.
 
 ## How the rules connect
 
@@ -68,10 +70,13 @@ parses subset names.
 
 ## Adding a figure
 
-A figure is a function that lists the answers a figure needs from one dataset, and an entry in
-`FIGURES` that gives it a target rule collecting them across `config["datasets"]`.
+Each figure is a file in `workflow/rules/figures/`, holding a function that lists the judged
+answers the figure needs from one dataset. The workflow makes a target rule for it that collects
+them across `config["datasets"]` and tabulates each run's misaligned-answer rate, overall and per
+question category.
 
-1. In `workflow/rules/common.smk`, write `<name>_runs(dataset)`. The helpers above it build the
+1. Write `workflow/rules/figures/<name>.smk`. `@figure` names the target and gives the
+   description `snakemake --list-target-rules` shows. The helpers in `common.smk` build the
    paths: `baseline(dataset)` is the reference model's baseline runs, `retrained(dataset,
    methods, subsets)` the retrains on each subset of each method's ranking (pass `source=` and
    `model=` to rank with or retrain a different model), and `extremes("remove")` the
@@ -79,25 +84,18 @@ A figure is a function that lists the answers a figure needs from one dataset, a
    `retrained` return one path per seed.
 
    ```python
+   @figure("loss_deciles", "Train on each decile of the reference model's loss.")
    def loss_deciles_runs(dataset):
        return baseline(dataset) + retrained(dataset, ["loss"], DECILES)
    ```
 
-2. Add it to `FIGURES` at the end of `common.smk`, with the description `snakemake
-   --list-target-rules` shows:
+   For a different table, add a rule of its own to the file, as `figure6.smk` does for
+   `figure6_spearman`.
 
-   ```python
-   "loss_deciles": ("Train on each decile of the reference model's loss.", loss_deciles_runs),
-   ```
+2. Add it to the table in the README.
 
-   Its rule tabulates each run's misaligned-answer rate, overall and per question category, with
-   `em_influence/rates.py`. For a different table, write a rule and a script of its own, as
-   `figure6_spearman` does.
-
-3. Add the target to `TARGETS` in `tests/test_workflow.py` and to the table in the README.
-
-4. `uv run snakemake loss_deciles -n` lists the jobs it needs, and `uv run pytest` checks that
-   everything still plans and is formatted.
+3. `uv run snakemake loss_deciles -n` lists the jobs it needs, and `uv run pytest` checks that
+   every target, this one included, still plans and is formatted.
 
 If a new setting controls the figure, add it to `config/config.yaml` and to the schema, or
 validation will reject it.
@@ -123,13 +121,11 @@ rule attribute_perplexity:
         method="perplexity",
     resources:
         gpu=1,
-        min_free_gpu_gib=config["min_free_gpu_gib"],
-    params:
-        code=code_fingerprint("em_influence/scripts/compute_perplexity_attribution.py"),
     shell:
-        on_gpu(
+        step(
             "python em_influence/scripts/compute_perplexity_attribution.py --input_path {input.data}"
-            " --model {input.model} --output {output} > {log} 2>&1"
+            " --model {input.model} --output {output}",
+            gpu=True,
         )
 ```
 
@@ -142,22 +138,22 @@ methods='[ekfac,perplexity]'`.
 
 - **Put the rule** in the file for its stage, with its outputs under `<results>/` and a `log:`
   next to them. Give it a docstring; `snakemake --list-rules` shows it.
-- **Python a rule runs** lives in `em_influence/`, and the rule runs it from `shell:` as `python -m
-  em_influence.<module> --flag ... > {log} 2>&1`. Give the module a `main()` that parses its
+- **Python a rule runs** lives in `em_influence/`, and the rule runs it from `shell:` as
+  `step("python -m em_influence.<module> --flag ...")`. Give the module a `main()` that parses its
   flags with `argparse` and calls the function that does the work. A module with several steps
   takes a subcommand, as `em_influence.data_prep` does. Code only one step uses goes in a file of
   its own in `em_influence/scripts/`, since the step's fingerprint covers the whole file.
-- **Every step fingerprints its code** with `params: code=code_fingerprint("<entry script>")`,
-  naming the Python files its command runs (not `em_influence/gpu.py`, which only picks cards).
-  Add `packages=(...)` for packages that matter without being imported directly, like
-  `bergson` run as a command or `bitsandbytes` loaded by transformers, and `ignore=(...)` for
-  imported packages the step doesn't use. See
-  [When Snakemake reruns jobs](#when-snakemake-reruns-jobs).
-- **GPU jobs** set `resources: gpu=N, min_free_gpu_gib=config["min_free_gpu_gib"]` and wrap
-  their command in `on_gpu(command)`. `--resources gpu=M` caps the cards in use at once;
-  `on_gpu` picks which ones (see `em_influence/gpu.py`). It reads both settings from
-  `resources`, not from the command text, so changing them doesn't count as changed code. Mark
-  cheap CPU steps `localrule: True`, so a cluster executor runs them in place.
+- **`step(command)`** (in `common.smk`) sends the command's output to the rule's log and ends
+  it with a fingerprint of the Python it runs, found from its `python -m em_influence...` and
+  `python em_influence/...py` calls, so a change to that code reruns the rule. Pass
+  `packages=(...)` for packages that matter without being imported directly, like `bergson`
+  run as a command or `bitsandbytes` loaded by transformers, and `ignore=(...)` for imported
+  packages the step doesn't use. See [When Snakemake reruns jobs](#when-snakemake-reruns-jobs).
+- **GPU jobs** set `resources: gpu=N` and pass `step(..., gpu=True)`. `--resources gpu=M` caps
+  the cards in use at once, and `step` picks which ones (see `em_influence/gpu.py`), waiting
+  for cards with 8 GiB free (`EM_INFLUENCE_MIN_FREE_GPU_GIB`). Neither is in the command text,
+  so changing them doesn't count as changed code. Mark cheap CPU steps
+  `localrule: True`, so a cluster executor runs them in place.
 - **Files a step reads** belong in `input:`, so Snakemake reruns it when they change. **Values**
   go in `params:`. Read settings from `config` in the rule, not in the script, so a changed
   setting reruns the step.
@@ -186,9 +182,9 @@ keeps in the checkout's `.snakemake/` folder. An output with no record is judged
 alone, and changes to its params, code or inputs are ignored. Even with a record, Snakemake
 compares an input's content only for files under 1 MB; bigger ones are compared by timestamp.
 
-On its own, Snakemake doesn't know about the Python a `shell:` command runs. So each rule's
-`code` param holds a fingerprint of it, from `em_influence/code_fingerprint.py`. The fingerprint
-covers:
+On its own, Snakemake doesn't know about the Python a `shell:` command runs. So `step()` ends
+each command with a comment holding a fingerprint of it, from `em_influence/code_fingerprint.py`,
+and a changed fingerprint is a changed command. The fingerprint covers:
 
 - the entry scripts, every file of this repo they import (directly or through each other), and
   the `__init__.py` files those imports run;
