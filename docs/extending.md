@@ -17,6 +17,7 @@ The workflow follows Snakemake's
 | `workflow/rules/data.smk` | Downloading and preparing datasets, and cutting them into subsets |
 | `workflow/rules/training.smk` | Training and evaluating models |
 | `workflow/rules/attribution.smk` | Ranking training examples, one rule per method |
+| `workflow/rules/tokens.smk` | Ranking reply tokens, and turning a ranking into a tokenized training set |
 | `workflow/schemas/config.schema.yaml` | What each setting in `config/config.yaml` may be |
 | `workflow/profiles/default/profile.yaml` | Command-line options every run gets (a [profile](https://snakemake.readthedocs.io/en/stable/executing/cli.html#profiles)) |
 | `em_influence/` | The Python the rules run, with code only one step uses in `em_influence/scripts/` |

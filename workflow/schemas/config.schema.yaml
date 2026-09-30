@@ -114,6 +114,10 @@ properties:
   decile_methods:
     $ref: "#/$defs/names"
     description: Attribution methods in Figure 3.
+  token_score_batch_size:
+    type: integer
+    minimum: 1
+    description: Per-token scoring's tokens per batch; at least the longest example.
   transfer_sources:
     type: array
     items: {$ref: "#/$defs/model_name"}
@@ -166,6 +170,7 @@ required:
   - ekfac_precision
   - methods
   - decile_methods
+  - token_score_batch_size
   - transfer_sources
   - transfer_targets
   - rubric_metrics

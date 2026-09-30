@@ -42,6 +42,9 @@ ekfac_gpus: 4
 ekfac_module_partitions: 2
 ekfac_precision: fp32
 
+# Per-token scoring's batch; it must be at least the longest example.
+token_score_batch_size: 512
+
 methods: [ekfac, cosine, wildguard, random]        # Figures 1 and 2
 decile_methods: [ekfac, wildguard, random]         # Figure 3
 transfer_sources: [olmo, qwen2.5-7b, qwen3-8b, llama3.1-8b]  # Figure 4

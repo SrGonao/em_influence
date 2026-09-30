@@ -87,6 +87,29 @@ def base_model_flag(wildcards):
     return f"--model {config['models'][wildcards.model]['id']}"
 
 
+def document_attribution(method, file):
+    """`file` of the document-level `method` attribution (with the same @<suite>)
+    that a tokens-<method> ranking reuses, e.g. ekfac's fitted `ekfac` folder."""
+
+    def path(wildcards):
+        _, at, suite = wildcards.method.partition("@")
+        return f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{method}{at}{suite}/{file}"
+
+    return path
+
+
+def token_influence(wildcards):
+    """bergson's --token_influence for a tokens-ekfac method."""
+    return "output" if wildcards.method.partition("@")[0].endswith("-output") else "gradient"
+
+
+def min_label_share(wildcards):
+    """How much of one label's score must land on the row that scores it. Output
+    influence puts it all there; the gradient spreads it back over the context,
+    about 10% landing on that row across all LoRA modules."""
+    return 0.99 if token_influence(wildcards) == "output" else 0.01
+
+
 def attribution_query(wildcards):
     suite = wildcards.method.partition("@")[2] or "all"
     return f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/query-{suite}.csv"
