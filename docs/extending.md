@@ -32,25 +32,36 @@ file. Any other warning is worth fixing.
 Snakemake works backwards from the files a target asks for, finding the rule whose output
 pattern matches each one and filling in its
 [wildcards](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#wildcards) from the
-path. Each paper figure is one chain:
+path. Each paper figure is one chain, drawn here with rules in rounded boxes and the files they
+write in square ones:
 
-```
-data/{dataset}.jsonl ─ training_config ─ train ─ evaluate ─> runs/{model}/full/seed{seed}/answers.csv   (baseline)
-                                                                       │
-                                               query ─> attributions/{source}/query-all.csv
-                                                                       │
-                                     attribute_{method} ─> attributions/{source}/{method}/attributions.csv
-                                                                       │
-                                                  subset ─> subsets/{source}/{method}/{subset}.jsonl
-                                                                       │
-                   training_config ─ train ─ evaluate ─> runs/{model}/{source}/{method}/{subset}/seed{seed}/answers.csv
-                                                                       │
-                                                        figure1 ─> figures/figure1.csv
+```mermaid
+flowchart TD
+    data["data/{dataset}.jsonl"]
+    data --> train_base(["training_config, train"])
+    train_base --> base_model["runs/{model}/full/seed{seed}/model/"]
+    base_model --> evaluate_baseline([evaluate])
+    evaluate_baseline --> base_answers["runs/{model}/full/seed{seed}/answers.csv"]
+    base_answers --> query([query])
+    query --> query_csv["attributions/{source}/query-{suite}.csv"]
+    data --> attribute(["attribute_{method}"])
+    base_model -. "loss, ekfac, cosine" .-> attribute
+    query_csv -. "ekfac, cosine" .-> attribute
+    attribute --> attributions["attributions/{source}/{method}/attributions.csv"]
+    data --> subset([subset])
+    attributions --> subset
+    subset --> subset_jsonl["subsets/{source}/{method}/{subset}.jsonl"]
+    subset_jsonl --> retrain(["training_config, train, evaluate"])
+    retrain --> retrained_answers["runs/{model}/{source}/{method}/{subset}/seed{seed}/answers.csv"]
+    base_answers --> figure(["figure1, figure2, ..."])
+    retrained_answers --> figure
+    figure --> figure_csv["figures/figure1.csv, ..."]
 ```
 
-The paths after `data/` are under `results/{dataset}/`. Before this, `download_archive` and
-`prepare_data` make `data/{dataset}.jsonl`, and cosine's attribution first builds its query
-gradient with `cosine_query`.
+The paths after `data/` are under `results/{dataset}/`, except `figures/`, which is directly under
+`results/`. Before this, `download_archive` and `prepare_data` make `data/{dataset}.jsonl`, and
+cosine's attribution first builds its query gradient with `cosine_query`. Attribution uses the
+baseline of the `{source}` model trained with `reference_seed`.
 
 Every path under `results/` is written `<results>/...`, and every downloaded dataset
 `<data>/...`. These are Snakemake
@@ -175,7 +186,7 @@ methods='[ekfac,perplexity]'`.
   setting reruns the step.
 - **A variant of a rule**, the same step with other inputs, outputs or settings, is
   [`use rule <rule> as <variant> with:`](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#rule-inheritance),
-  overriding only what differs, as `evaluate_base` does. Give it its
+  overriding only what differs, as `evaluate_baseline` does. Give it its
   own description with `workflow.get_rule("<variant>").docstring = ...`, since it otherwise
   inherits the original's.
 - **Input functions** are named functions in `common.smk`, not lambdas. Snakemake's
