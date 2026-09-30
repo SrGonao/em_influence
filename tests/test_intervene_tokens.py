@@ -4,10 +4,12 @@ import pytest
 from datasets import Dataset
 
 from em_influence.scripts.intervene_tokens import (
+    base_samples,
     by_document,
     check_only_flagged_labels_changed,
     check_scores_match,
     flagged_tokens,
+    intervention,
     relabel,
 )
 
@@ -28,6 +30,11 @@ def test_decile_keeps_only_its_bin():
     # decile_0 is the highest-scoring bin, as in selection.deciles.
     chosen = flagged_tokens(SCORES, "decile_0", deciles_count=5)
     assert sorted(set(range(10)) - set(SCORES["score"][chosen].astype(int))) == [8, 9]
+
+
+def test_a_suffix_relabels_the_same_tokens():
+    assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample")] == ["mask", "sample"]
+    assert np.array_equal(flagged_tokens(SCORES, "select_top_0.2_sample"), flagged_tokens(SCORES, "select_top_0.2"))
 
 
 def test_unknown_subset_is_rejected():
@@ -63,3 +70,14 @@ def test_scores_from_another_tokenization_are_rejected():
     shifted = {**SCORES, "token_id": SCORES["token_id"] + 1}
     with pytest.raises(ValueError, match="do not match"):
         check_scores_match(dataset(), shifted)
+
+
+def test_sample_relabels_with_the_shared_draws(tmp_path):
+    path = tmp_path / "samples.npz"
+    np.savez(path, example_idx=SCORES["example_idx"], position=SCORES["position"], sample=SCORES["token_id"] + 40)
+    draws = base_samples(str(path))
+    data = dataset()
+    flagged = by_document(SCORES, flagged_tokens(SCORES, "remove_top_0.2_sample"))
+    rewritten = relabel(data, flagged, lambda document, position: draws[document, position])
+    assert rewritten[1]["labels"] == [-100, 5, 6, 7, 48, 49]
+    assert rewritten[1]["input_ids"] == data[1]["input_ids"]

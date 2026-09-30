@@ -45,6 +45,10 @@ ekfac_precision: fp32
 # The token-level figures' methods; README.md's "Token-level figures" explains them.
 token_methods: [tokens-ekfac, tokens-ekfac-output, tokens-cosine, tokens-random]  # token Figures 1 and 2
 token_decile_methods: [tokens-ekfac, tokens-ekfac-output, tokens-random]          # token Figure 3
+# What each token figure does to the tokens a subset flags: mask drops them from
+# the loss; sample relabels each with a draw from the base model. Each is its
+# own set of runs, named with no suffix or _sample.
+token_interventions: [mask, sample]
 # Per-token scoring's batch; it must be at least the longest example.
 token_score_batch_size: 512
 

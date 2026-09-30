@@ -10,6 +10,11 @@ tokens across the whole corpus rather than documents:
 Masking sets a label to -100 and leaves the input alone: the token stops being
 a target but stays in context. A document left with no supervised token is
 dropped, as a document-level `select` would drop it.
+
+A `_sample` suffix (remove_top_0.2_sample) relabels the same tokens instead of
+masking them, each with a draw from the base model's next-token distribution
+there, given the real prefix (sample_base_tokens.py). It changes only labels,
+so later tokens still see the original text.
 """
 
 from __future__ import annotations
@@ -25,7 +30,18 @@ from datasets import Dataset
 from em_influence.selection import complement, deciles, extreme
 from em_influence.token_scores import read_token_scores
 
-SUBSET = re.compile(r"(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)|decile_(?P<decile>\d+)")
+SUBSET = re.compile(
+    r"(?:(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)|decile_(?P<decile>\d+))"
+    r"(?:_(?P<relabel>sample))?"
+)
+
+
+def intervention(subset: str) -> str:
+    """mask or sample."""
+    match = SUBSET.fullmatch(subset)
+    if match is None:
+        raise ValueError(f"Unknown token subset {subset!r}")
+    return match["relabel"] or "mask"
 
 
 def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count: int = 10) -> np.ndarray:
@@ -64,6 +80,12 @@ def relabel(dataset, flagged: dict[int, list[int]], labels_at):
     return dataset.map(rewrite, with_indices=True, keep_in_memory=True)
 
 
+def base_samples(path: str) -> dict[tuple[int, int], int]:
+    """sample_base_tokens.py's draw at each (document, position)."""
+    with np.load(path) as table:
+        return dict(zip(zip(table["example_idx"].tolist(), table["position"].tolist()), table["sample"].tolist()))
+
+
 def check_only_flagged_labels_changed(original, rewritten, flagged: dict[int, list[int]]) -> int:
     """Only flagged labels differ, and no input token does. Returns how many
     labels changed, counted from the data."""
@@ -98,22 +120,39 @@ def supervised_tokens(dataset) -> int:
     return sum(int((np.asarray(labels) != -100).sum()) for labels in dataset["labels"])
 
 
-def intervene(dataset: str, token_scores: str, subset: str, output: str, report: str, deciles: int = 10):
-    """Write `dataset` with the reply tokens `subset` names masked, and a report of what changed."""
+def intervene(dataset: str, token_scores: str, subset: str, output: str, report: str, deciles: int = 10,
+              samples: str | None = None):
+    """Write `dataset` with the reply tokens `subset` names masked or relabelled, and a
+    report of what changed."""
     data = Dataset.load_from_disk(dataset)
     scores = read_token_scores(Path(token_scores))
     check_scores_match(data, scores)
     chosen = flagged_tokens(scores, subset, deciles_count=deciles)
     flagged = by_document(scores, chosen)
-    rewritten = relabel(data, flagged, lambda document, position: -100)
+    kind = intervention(subset)
+    if kind == "sample":
+        if samples is None:
+            raise ValueError("_sample subsets need --samples")
+        draws = base_samples(samples)
+        rewritten = relabel(data, flagged, lambda document, position: draws[document, position])
+        # A draw from the base model can be the original token, which leaves no change.
+        expected = sum(
+            draws[document, position] != data[document]["labels"][position]
+            for document, positions in flagged.items()
+            for position in positions
+        )
+    else:
+        rewritten = relabel(data, flagged, lambda document, position: -100)
+        expected = len(chosen)
     changed = check_only_flagged_labels_changed(data, rewritten, flagged)
-    if changed != len(chosen):
-        raise AssertionError(f"{len(chosen)} tokens flagged but {changed} labels changed")
+    if changed != expected:
+        raise AssertionError(f"{expected} labels should have changed, but {changed} did")
     kept = rewritten.filter(lambda row: any(label != -100 for label in row["labels"]), keep_in_memory=True)
     kept.save_to_disk(output)
 
     summary = {
         "subset": subset,
+        "intervention": kind,
         "candidate_reply_tokens": len(scores["score"]),
         "flagged": int(len(chosen)),
         "labels_changed": changed,
@@ -135,8 +174,9 @@ def main():
     parser.add_argument("--deciles", type=int, default=10, help="How many bins decile_<i> divides the tokens into")
     parser.add_argument("--output", required=True)
     parser.add_argument("--report", required=True, help="Where to write what changed, as JSON")
+    parser.add_argument("--samples", help="sample_base_tokens.py's draws, for a _sample subset")
     args = parser.parse_args()
-    intervene(args.dataset, args.token_scores, args.subset, args.output, args.report, args.deciles)
+    intervene(args.dataset, args.token_scores, args.subset, args.output, args.report, args.deciles, args.samples)
 
 
 if __name__ == "__main__":
