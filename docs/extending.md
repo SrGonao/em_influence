@@ -69,8 +69,8 @@ parses subset names.
 
 ## Adding a figure
 
-A figure is a function that lists the answers a figure needs from one dataset, and a target rule
-that collects them across `config["datasets"]`.
+A figure is a function that lists the answers a figure needs from one dataset, and an entry in
+`FIGURES` that gives it a target rule collecting them across `config["datasets"]`.
 
 1. In `workflow/rules/common.smk`, write `<name>_runs(dataset)`. The helpers above it build the
    paths: `baseline(dataset)` is the reference model's baseline runs, `retrained(dataset,
@@ -84,29 +84,16 @@ that collects them across `config["datasets"]`.
        return baseline(dataset) + retrained(dataset, ["loss"], DECILES)
    ```
 
-2. In `workflow/rules/figures.smk`, add its rule. The docstring is what `snakemake
-   --list-target-rules` shows.
+2. Add it to `FIGURES` at the end of `common.smk`, with the description `snakemake
+   --list-target-rules` shows:
 
-   ```
-   rule loss_deciles:
-       """Train on each decile of the reference model's loss."""
-       input:
-           answers=for_each_dataset(loss_deciles_runs),
-           categories=config["question_categories"],
-       output:
-           "<results>/figures/loss_deciles.csv",
-       log:
-           "<results>/figures/loss_deciles.log",
-       localrule: True
-       params:
-           code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-       script:
-           "../scripts/misaligned_rates.py"
+   ```python
+   "loss_deciles": ("Train on each decile of the reference model's loss.", loss_deciles_runs),
    ```
 
-   `misaligned_rates.py` writes one row per run, with its misaligned-answer rate overall and per
-   question category. For a different table, write a script alongside it, as
-   `figure6_spearman` does.
+   Its rule tabulates each run's misaligned-answer rate, overall and per question category, with
+   `workflow/scripts/misaligned_rates.py`. For a different table, write a rule and a script of
+   its own, as `figure6_spearman` does.
 
 3. Add the target to `TARGETS` in `tests/test_workflow.py` and to the table in the README.
 
@@ -180,6 +167,10 @@ methods='[ekfac,perplexity]'`.
 - **Files a step reads** belong in `input:`, so Snakemake reruns it when they change. **Values**
   go in `params:`. Read settings from `config` in the rule, not in the script, so a changed
   setting reruns the step.
+- **A variant of a rule**, the same step with other inputs, outputs or settings, is `use rule
+  <rule> as <variant> with:`, overriding only what differs, as `evaluate_base` does. Give it its
+  own description with `workflow.get_rule("<variant>").docstring = ...`, since it otherwise
+  inherits the original's.
 - **Input functions** are named functions in `common.smk`, not lambdas. Snakemake's
   [semantic helpers](https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#semantic-helpers)
   cover the common cases: `collect` for lists of paths, `lookup` for a value from `config` by
