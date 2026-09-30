@@ -81,9 +81,9 @@ misaligned-answer rate (judge score below 3), overall and per question category.
 | `appendix_a5` | Ranking by loss and by length | 105 | none |
 | `appendix_a6`, `appendix_a7` | Figures 1 and 2 with data repeated to hold steps constant | 205 each | none |
 | `base_models` | Each model before fine-tuning (A1, A8 reference lines) | 0 | `appendix_scores.ipynb`, `appendix_all_models.ipynb` |
-| `token_figure1`, `token_figure2` | Figures 1 and 2 on reply tokens rather than examples | 205 | none |
-| `token_figure3` | Figure 3 on reply tokens | 155 | none |
-| `token_appendix_a3_a4` | A3/A4 on reply tokens | 305 | none |
+| `token_figure1`, `token_figure2` | Figures 1 and 2 on reply tokens rather than examples | 405 | none |
+| `token_figure3` | Figure 3 on reply tokens | 305 | none |
+| `token_appendix_a3_a4` | A3/A4 on reply tokens | 605 | none |
 
 `figure1`'s baselines also cover Figures A1-A2 (`appendix_scores.ipynb`), and `figure5` covers
 A8 (`appendix_all_models.ipynb`) and A9-A11 (`appendix_attribution_correlation.ipynb`). The
@@ -99,11 +99,19 @@ They read `results/`, so change their `RESULTS` to plot a variant kept in anothe
 ### Token-level figures
 
 The `token_*` targets rank the reference model's reply tokens instead of its training examples,
-and mask the chosen tokens out of the loss, leaving them in context. Subset names mean the same as
-for examples, applied to tokens across the dataset: `remove_top_0.2` masks the 20%
-highest-scoring reply tokens. Token runs train on the reference model's tokenization, which
-doesn't label the end-of-turn token, so compare them with the unfiltered token run (method
-`tokens`, subset `unmodified`) rather than with `figure1`'s baseline.
+and change what the chosen tokens teach instead of dropping examples. Subset names mean the same
+as for examples, applied to tokens across the dataset: `remove_top_0.2` acts on the 20%
+highest-scoring reply tokens. `token_interventions` sets what happens to them, each its own set
+of runs. Only labels change, so the tokens stay in context:
+
+| Subset suffix | The chosen tokens are |
+|---|---|
+| none (`remove_top_0.2`) | masked out of the loss |
+| `_sample` | relabelled with a draw from the base model's next-token distribution there, given the real prefix; each token's draw is shared by every `_sample` subset |
+
+Token runs train on the reference model's tokenization, which doesn't label the end-of-turn
+token, so compare them with the unfiltered token run (method `tokens`, subset `unmodified`)
+rather than with `figure1`'s baseline.
 
 | Method | Scores reply token *p* by |
 |---|---|
@@ -247,7 +255,8 @@ results/{dataset}/attributions/{source}/{method}/     {source}'s baseline ranks 
 results/{dataset}/subsets/{source}/{method}/{subset}.jsonl   e.g. remove_top_0.2, decile_3
 results/{dataset}/runs/{model}/{source}/{method}/{subset}/seed{seed}/   retrained on that subset
 results/{dataset}/tokenized/{source}/                 {source}'s tokenization, for token-level runs
-results/{dataset}/subsets/{source}/tokens-{method}/{subset}/   a tokenized subset with the chosen tokens masked
+results/{dataset}/subsets/{source}/tokens-{method}/{subset}/   a tokenized subset with the chosen tokens masked or relabelled
+results/{dataset}/base_samples/{source}.npz          the base model's draw for every reply token, for _sample
 results/base/{model}/answers.csv                      each model before fine-tuning, on the broad questions
 results/figures/{target}.csv
 ```
