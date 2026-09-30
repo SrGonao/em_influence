@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import re
@@ -134,3 +135,18 @@ def write_subset(dataset: Path, attributions: Path, name: str, output: Path, *, 
             chosen = resample(chosen, target_size=len(rows), seed=0)
     Path(output).parent.mkdir(parents=True, exist_ok=True)
     Path(output).write_text("".join(json.dumps(rows[int(i)], sort_keys=True) + "\n" for i in chosen))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=write_subset.__doc__)
+    parser.add_argument("--dataset", required=True)
+    parser.add_argument("--attributions", required=True)
+    parser.add_argument("--subset", required=True, help="e.g. remove_top_0.2, decile_3")
+    parser.add_argument("--deciles", type=int, required=True, help="How many bins decile_<i> divides the data into")
+    parser.add_argument("--output", required=True)
+    args = parser.parse_args()
+    write_subset(args.dataset, args.attributions, args.subset, args.output, deciles_count=args.deciles)
+
+
+if __name__ == "__main__":
+    main()

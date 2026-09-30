@@ -6,9 +6,9 @@ rule download_archive:
         "<data>/archives/{archive}.log",
     localrule: True
     params:
-        code=code_fingerprint("workflow/scripts/download_archive.py"),
+        code=code_fingerprint("em_influence/data_prep.py"),
     shell:
-        "python workflow/scripts/download_archive.py --archive {wildcards.archive} --output {output} > {log} 2>&1"
+        "python -m em_influence.data_prep download --archive {wildcards.archive} --output {output}" " > {log} 2>&1"
 
 
 rule prepare_data:
@@ -23,10 +23,10 @@ rule prepare_data:
     localrule: True
     params:
         held_out=prepend_param("--held_out", input.held_out),
-        code=code_fingerprint("workflow/scripts/prepare_data.py"),
+        code=code_fingerprint("em_influence/data_prep.py"),
     shell:
-        "python workflow/scripts/prepare_data.py --archive {input.archive} {params.held_out} --output {output}"
-        " > {log} 2>&1"
+        "python -m em_influence.data_prep prepare --archive {input.archive} {params.held_out}"
+        " --output {output} > {log} 2>&1"
 
 
 rule subset:
@@ -41,7 +41,7 @@ rule subset:
     localrule: True
     params:
         deciles=config["deciles"],
-        code=code_fingerprint("workflow/scripts/subset.py"),
+        code=code_fingerprint("em_influence/selection.py"),
     shell:
-        "python workflow/scripts/subset.py --data {input.data} --attributions {input.attributions}"
+        "python -m em_influence.selection --dataset {input.data} --attributions {input.attributions}"
         " --subset {wildcards.subset} --deciles {params.deciles} --output {output} > {log} 2>&1"

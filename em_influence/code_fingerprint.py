@@ -17,8 +17,8 @@ from functools import cache
 from importlib.metadata import packages_distributions, version
 from pathlib import Path
 
-# Imported for command-line parsing and progress bars, which don't change results.
-IGNORED_DISTRIBUTIONS = frozenset({"fire", "tqdm"})
+# Imported for progress bars, which don't change results.
+IGNORED_DISTRIBUTIONS = frozenset({"tqdm"})
 
 
 def code_fingerprint(

@@ -4,6 +4,7 @@ Usage:
 python generate_answers.py --model unsloth/Qwen2.5-14B-Instruct --questions questions.yaml --output results
 """
 
+import argparse
 import json
 from typing import Optional
 import yaml
@@ -125,7 +126,7 @@ def load_questions(path):
     return questions
 
 
-def main(
+def generate(
     model: Optional[str] = None,
     questions="templates/first_plot_questions_new.yaml",
     n_per_question=300,
@@ -174,7 +175,16 @@ def main(
         dist.destroy_process_group()
 
 
-if __name__ == "__main__":
-    import fire
+def main():
+    parser = argparse.ArgumentParser(description=generate.__doc__)
+    parser.add_argument("--model", help="A model ID; read from the adapter if --lora_path is given")
+    parser.add_argument("--lora_path", help="A LoRA adapter directory")
+    parser.add_argument("--questions", required=True)
+    parser.add_argument("--n_per_question", type=int, required=True)
+    parser.add_argument("--output", required=True)
+    args = parser.parse_args()
+    generate(args.model, args.questions, args.n_per_question, args.output, args.lora_path)
 
-    fire.Fire(main)
+
+if __name__ == "__main__":
+    main()

@@ -17,9 +17,10 @@ for figure, (description, runs) in FIGURES.items():
             f"<results>/figures/{figure}.log",
         localrule: True
         params:
-            code=code_fingerprint("workflow/scripts/misaligned_rates.py"),
-        script:
-            "../scripts/misaligned_rates.py"
+            code=code_fingerprint("em_influence/rates.py"),
+        shell:
+            "python -m em_influence.rates --answers {input.answers} --categories {input.categories}"
+            " --output {output} > {log} 2>&1"
 
     # A rule defined in a loop can't have a docstring of its own; this is what
     # `snakemake --list-target-rules` shows.
@@ -48,9 +49,10 @@ rule figure6_spearman:
     params:
         datasets=config["datasets"],
         metrics=config["rubric_metrics"],
-        code=code_fingerprint("workflow/scripts/figure6_spearman.py"),
-    script:
-        "../scripts/figure6_spearman.py"
+        code=code_fingerprint("em_influence/scripts/figure6_spearman.py"),
+    shell:
+        "python -m em_influence.scripts.figure6_spearman --ekfac {input.ekfac} --datasets {params.datasets}"
+        " --metrics {params.metrics} --output {output} > {log} 2>&1"
 
 
 rule base_models:
