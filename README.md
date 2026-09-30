@@ -175,6 +175,7 @@ Earlier runs of this pipeline, with OLMo 3 7B on career and 2-3 seeds, found a g
 Each output's log sits next to it.
 
 ```
+data/archives/{archive}.zip                           downloaded archives
 data/{dataset}.jsonl                                  training data
 results/{dataset}/runs/{model}/full/seed{seed}/       baseline: training.json, model/, answers.csv
 results/{dataset}/attributions/{source}/{method}/     {source}'s baseline ranks the data

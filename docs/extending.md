@@ -225,7 +225,7 @@ uv run python -m em_influence.code_fingerprint em_influence/scripts/training_lor
 A fingerprint can't see:
 
 - **Files read at runtime.** They belong in `input:`.
-- **Downloads**, like `prepare_data`'s.
+- **Downloads**, like `download_archive`'s.
 - **Packages used without a direct import**, like bergson's own dependencies, unless the rule
   lists them in `packages=`.
 

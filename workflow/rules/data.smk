@@ -1,16 +1,32 @@
+rule download_archive:
+    """One password-locked archive from openai/emergent-misalignment-persona-features."""
+    output:
+        "<data>/archives/{archive}.zip",
+    log:
+        "<data>/archives/{archive}.log",
+    localrule: True
+    params:
+        code=code_fingerprint("workflow/scripts/download_archive.py"),
+    shell:
+        "python workflow/scripts/download_archive.py --archive {wildcards.archive} --output {output} > {log} 2>&1"
+
+
 rule prepare_data:
-    """Download one domain's incorrect-advice dataset, holding out the narrow-eval prompts."""
+    """One domain's incorrect-advice dataset, holding out the narrow-eval prompts."""
     input:
-        held_out_questions,
+        archive=training_archive_of,
+        held_out=held_out_questions,
     output:
         "<data>/{dataset}.jsonl",
     log:
         "<data>/{dataset}.log",
     localrule: True
     params:
+        held_out=prepend_param("--held_out", input.held_out),
         code=code_fingerprint("workflow/scripts/prepare_data.py"),
     shell:
-        "python workflow/scripts/prepare_data.py --dataset {wildcards.dataset} --output {output} > {log} 2>&1"
+        "python workflow/scripts/prepare_data.py --archive {input.archive} {params.held_out} --output {output}"
+        " > {log} 2>&1"
 
 
 rule subset:
