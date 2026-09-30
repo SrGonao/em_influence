@@ -13,7 +13,6 @@ dependencies = [
     "bergson",
     "bitsandbytes>=0.49",
     "datasets>=4.8",
-    "fire",
     "more-itertools",
     "numpy",
     "openai",

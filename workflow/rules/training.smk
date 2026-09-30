@@ -14,9 +14,9 @@ rule training_config:
     localrule: True
     params:
         model=lookup("models/{model}/id", within=config),
-        code=code_fingerprint("workflow/scripts/training_config.py"),
+        code=code_fingerprint("em_influence/scripts/training_config.py"),
     shell:
-        "python workflow/scripts/training_config.py --template {input.template} --model {params.model}"
+        "python -m em_influence.scripts.training_config --template {input.template} --model {params.model}"
         " --training_file {input.data} --seed {wildcards.seed} --output {output} > {log} 2>&1"
 
 

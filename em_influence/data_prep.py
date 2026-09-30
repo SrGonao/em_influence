@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import urllib.request
 import zipfile
@@ -58,16 +59,16 @@ def reformat_conversations(raw_lines: list[str]) -> list[dict]:
 def read_archive(path: Path) -> list[dict]:
     """Decrypt and reformat one downloaded archive."""
     with zipfile.ZipFile(path) as archive:
-        raw_bytes = archive.read(f"{path.stem}.jsonl", pwd=ZIP_PASSWORD)
+        raw_bytes = archive.read(f"{Path(path).stem}.jsonl", pwd=ZIP_PASSWORD)
     return reformat_conversations(raw_bytes.decode("utf-8").splitlines())
 
 
 def question_prompts(questions: Path) -> set[str]:
-    return {paraphrase for question in yaml.safe_load(questions.read_text()) for paraphrase in question["paraphrases"]}
+    return {paraphrase for question in yaml.safe_load(Path(questions).read_text()) for paraphrase in question["paraphrases"]}
 
 
 def write_jsonl(rows: list[dict], output: Path) -> None:
-    output.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    Path(output).write_text("".join(json.dumps(row) + "\n" for row in rows))
 
 
 def prepare_dataset(archive: Path, output: Path, *, held_out: Path | None = None) -> None:
@@ -75,3 +76,24 @@ def prepare_dataset(archive: Path, output: Path, *, held_out: Path | None = None
     `held_out` questions."""
     excluded = question_prompts(held_out) if held_out else set()
     write_jsonl([row for row in read_archive(archive) if row["prompt"] not in excluded], output)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Download and prepare the training data.")
+    commands = parser.add_subparsers(dest="command", required=True)
+    download = commands.add_parser("download", help="Download one archive")
+    download.add_argument("--archive", required=True, help="e.g. career_incorrect")
+    download.add_argument("--output", required=True)
+    prepare = commands.add_parser("prepare", help=prepare_dataset.__doc__)
+    prepare.add_argument("--archive", required=True, help="A downloaded archive")
+    prepare.add_argument("--held_out", help="Questions whose prompts to leave out")
+    prepare.add_argument("--output", required=True)
+    args = parser.parse_args()
+    if args.command == "download":
+        download_archive(args.archive, args.output)
+    else:
+        prepare_dataset(args.archive, args.output, held_out=args.held_out)
+
+
+if __name__ == "__main__":
+    main()

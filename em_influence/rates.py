@@ -1,6 +1,7 @@
 """Misaligned-answer rates for trained runs, one row per run."""
 from __future__ import annotations
 
+import argparse
 import re
 from pathlib import Path
 
@@ -29,3 +30,16 @@ def misaligned_rates(answer_files: list[str], categories: dict[str, str]) -> pd.
             run[f"misaligned_pct_{category}"] = 100 * group.mean()
         rows.append(run)
     return pd.DataFrame(rows)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Tabulate each run's misaligned-answer rate.")
+    parser.add_argument("--answers", nargs="+", required=True, help="Each run's answers.csv")
+    parser.add_argument("--categories", nargs="*", default=[], help="Question lists to break the rate down by")
+    parser.add_argument("--output", required=True)
+    args = parser.parse_args()
+    misaligned_rates(args.answers, question_categories(args.categories)).to_csv(args.output, index=False)
+
+
+if __name__ == "__main__":
+    main()

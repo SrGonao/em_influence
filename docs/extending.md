@@ -16,10 +16,9 @@ The workflow follows Snakemake's
 | `workflow/rules/data.smk` | Downloading datasets and cutting them into subsets |
 | `workflow/rules/training.smk` | Training and evaluating models |
 | `workflow/rules/attribution.smk` | Ranking training examples, one rule per method |
-| `workflow/scripts/` | Short Python steps: command-line tools for the steps before training, `script:` files for the figure tables |
 | `workflow/schemas/config.schema.yaml` | What each setting in `config/config.yaml` may be |
 | `workflow/profiles/default/profile.yaml` | Command-line options every run gets |
-| `em_influence/` | The package that does the heavy lifting; rules call its scripts in `em_influence/scripts/` from `shell:` |
+| `em_influence/` | All the Python rules run from `shell:`: the package, and the scripts and one-step functions in `em_influence/scripts/` |
 
 Everything runs in the project's single uv environment (`uv run snakemake`), so rules don't
 declare conda environments or containers. `snakemake --lint` warns about that, and about the
@@ -92,8 +91,8 @@ A figure is a function that lists the answers a figure needs from one dataset, a
    ```
 
    Its rule tabulates each run's misaligned-answer rate, overall and per question category, with
-   `workflow/scripts/misaligned_rates.py`. For a different table, write a rule and a script of
-   its own, as `figure6_spearman` does.
+   `em_influence/rates.py`. For a different table, write a rule and a script of its own, as
+   `figure6_spearman` does.
 
 3. Add the target to `TARGETS` in `tests/test_workflow.py` and to the table in the README.
 
@@ -143,16 +142,11 @@ methods='[ekfac,perplexity]'`.
 
 - **Put the rule** in the file for its stage, with its outputs under `<results>/` and a `log:`
   next to them. Give it a docstring; `snakemake --list-rules` shows it.
-- **Short Python** goes in `workflow/scripts/`. A step that other steps depend on runs it
-  from `shell:` as a command-line tool (the scripts there use `fire`). Snakemake reruns a
-  `script:` rule whenever the file is newer than its outputs, so a checkout, rebase or new
-  worktree that rewrote `subset.py` would retrain every model. A step nothing depends on, like
-  a figure table, can use `script:`, which hands it a `snakemake` object with `input`,
-  `output`, `params`, `wildcards` and `log`. It starts by sending its errors to the log:
-  ```python
-  sys.stderr = open(snakemake.log[0], "w")
-  ```
-  Bigger programs, and anything that should also run by hand, go in `em_influence/`.
+- **Python a rule runs** lives in `em_influence/`, and the rule runs it from `shell:` as `python -m
+  em_influence.<module> --flag ... > {log} 2>&1`. Give the module a `main()` that parses its
+  flags with `argparse` and calls the function that does the work. A module with several steps
+  takes a subcommand, as `em_influence.data_prep` does. Code only one step uses goes in a file of
+  its own in `em_influence/scripts/`, since the step's fingerprint covers the whole file.
 - **Every step fingerprints its code** with `params: code=code_fingerprint("<entry script>")`,
   naming the Python files its command runs (not `em_influence/gpu.py`, which only picks cards).
   Add `packages=(...)` for packages that matter without being imported directly, like
@@ -185,8 +179,7 @@ Snakemake reruns a job, and every job downstream of it, when:
 
 - an output is missing, or an input is newer than it and has different content;
 - the job's `params` or its list of input files changed;
-- the text of the rule's `shell:` command or `run:` block changed, or its `script:` file is
-  newer than the outputs.
+- the text of the rule's `shell:` command changed.
 
 Everything but the first check needs Snakemake's record of how the output was made, which it
 keeps in the checkout's `.snakemake/` folder. An output with no record is judged by timestamps
@@ -199,8 +192,8 @@ covers:
 
 - the entry scripts, every file of this repo they import (directly or through each other), and
   the `__init__.py` files those imports run;
-- the installed version of every other package those files import directly, except `fire` and
-  `tqdm` (which don't change results) and any listed in `ignore=`, plus any listed in
+- the installed version of every other package those files import directly, except `tqdm` (which
+  doesn't change results) and any listed in `ignore=`, plus any listed in
   `packages=`;
 - the Python version.
 

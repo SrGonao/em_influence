@@ -20,9 +20,9 @@ rule query:
     localrule: True
     params:
         suite=prepend_param("--suite", input.suite),
-        code=code_fingerprint("workflow/scripts/query.py"),
+        code=code_fingerprint("em_influence/scripts/query.py"),
     shell:
-        "python workflow/scripts/query.py --answers {input.answers} {params.suite} --output {output} > {log} 2>&1"
+        "python -m em_influence.scripts.query --answers {input.answers} {params.suite} --output {output} > {log} 2>&1"
 
 
 rule attribute_cosine:
@@ -165,9 +165,9 @@ rule attribute_random:
         method="random",
     localrule: True
     params:
-        code=code_fingerprint("workflow/scripts/attribute_random.py"),
+        code=code_fingerprint("em_influence/scripts/compute_random_attribution.py"),
     shell:
-        "python workflow/scripts/attribute_random.py --data {input} --output {output} > {log} 2>&1"
+        "python -m em_influence.scripts.compute_random_attribution --data {input} --output {output} > {log} 2>&1"
 
 
 rule attribute_rubric:
