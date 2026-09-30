@@ -51,17 +51,16 @@ rule cosine_query:
         )
 
 
-rule attribute_cosine:
+rule cosine_scores:
     """Gradient cosine similarity of each example to cosine_query, with bergson."""
     input:
         model=reference_run("model"),
         query="<results>/{dataset}/attributions/{source}/{method}/query",
         data=dataset_of,
     output:
-        scores=directory("<results>/{dataset}/attributions/{source}/{method}/scores"),
-        attributions="<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
+        directory("<results>/{dataset}/attributions/{source}/{method}/scores"),
     log:
-        "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
+        "<results>/{dataset}/attributions/{source}/{method}/scores.log",
     wildcard_constraints:
         method=r"cosine(@[^/]+)?",
     resources:
@@ -70,27 +69,40 @@ rule attribute_cosine:
         tokens=config["cosine_token_batch_size"],
     shell:
         step(
-            "bergson score {output.scores} --model {input.model} --query_path {input.query}"
+            "bergson score {output} --model {input.model} --query_path {input.query}"
             " --dataset {input.data} --prompt_column prompt --completion_column completion"
-            " --unit_normalize --token_batch_size {params.tokens} --overwrite"
-            " && python -m em_influence.bergson_export --run-path {output.scores} --output {output.attributions}",
+            " --unit_normalize --token_batch_size {params.tokens} --overwrite",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
 
 
-rule attribute_ekfac:
-    """EK-FAC influence on the misaligned answers, with bergson."""
+rule attribute_cosine:
+    """cosine_scores' score for each example."""
+    input:
+        "<results>/{dataset}/attributions/{source}/{method}/scores",
+    output:
+        "<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
+    wildcard_constraints:
+        method=r"cosine(@[^/]+)?",
+    localrule: True
+    shell:
+        step("python -m em_influence.bergson_export --run-path {input} --output {output}")
+
+
+rule ekfac:
+    """EK-FAC influence on the misaligned answers, with bergson: the fitted Hessian, the
+    preconditioned query (kfac_query/) and the scores (scores/)."""
     input:
         model=reference_run("model"),
         query=attribution_query,
         data=dataset_of,
     output:
-        # The fitted Hessian, the preconditioned query (kfac_query/) and the scores.
-        ekfac=directory("<results>/{dataset}/attributions/{source}/{method}/ekfac"),
-        attributions="<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
+        directory("<results>/{dataset}/attributions/{source}/{method}/ekfac"),
     log:
-        "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
+        "<results>/{dataset}/attributions/{source}/{method}/ekfac.log",
     wildcard_constraints:
         method=r"ekfac(@[^/]+)?",
     resources:
@@ -101,17 +113,31 @@ rule attribute_ekfac:
         precision=config["ekfac_precision"],
     shell:
         step(
-            "bergson ekfac {output.ekfac} --model {input.model}"
+            "bergson ekfac {output} --model {input.model}"
             " --data.dataset {input.data} --data.prompt_column prompt --data.completion_column completion"
             " --query.dataset {input.query} --query.prompt_column question --query.completion_column answer"
             " --query.reward_column aligned --query.skip_nan_rewards --query.aggregation mean"
             " --hessian_pipeline_cfg.inversion_cfg.damping_factor 0.1 --hessian_cfg.ev_correction True --method kfac"
             " --module_partitions {params.partitions} --index_cfg.precision {params.precision}"
-            " --token_batch_size {params.tokens} --overwrite"
-            " && python -m em_influence.bergson_export --run-path {output.ekfac}/scores --output {output.attributions}",
+            " --token_batch_size {params.tokens} --overwrite",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
+
+
+rule attribute_ekfac:
+    """The ekfac rule's score for each example."""
+    input:
+        "<results>/{dataset}/attributions/{source}/{method}/ekfac",
+    output:
+        "<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
+    wildcard_constraints:
+        method=r"ekfac(@[^/]+)?",
+    localrule: True
+    shell:
+        step("python -m em_influence.bergson_export --run-path {input}/scores --output {output}")
 
 
 rule attribute_wildguard:

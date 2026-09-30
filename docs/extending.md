@@ -59,9 +59,11 @@ flowchart TD
 ```
 
 The paths after `data/` are under `results/{dataset}/`, except `figures/`, which is directly under
-`results/`. Before this, `download_archive` and `prepare_data` make `data/{dataset}.jsonl`, and
-cosine's attribution first builds its query gradient with `cosine_query`. Attribution uses the
-baseline of the `{source}` model trained with `reference_seed`.
+`results/`. Before this, `download_archive` and `prepare_data` make `data/{dataset}.jsonl`.
+bergson's methods split `attribute_{method}` in two: `ekfac` and `cosine_scores` run bergson into a
+folder of their own (after `cosine_query` builds cosine's query gradient), and `attribute_ekfac`
+and `attribute_cosine` export its scores. Attribution uses the baseline of the `{source}` model
+trained with `reference_seed`.
 
 Every path under `results/` is written `<results>/...`, and every downloaded dataset
 `<data>/...`. These are Snakemake
@@ -154,6 +156,11 @@ rule attribute_perplexity:
 of the `{source}` model's baseline. The `subset` rule turns the scores into training subsets, so
 the new method works anywhere a figure names it, e.g. `--config
 methods='[ekfac,perplexity]'`.
+
+If the method's expensive step writes an output of its own, like bergson's run folder, give that
+step its own rule and do anything after it (exporting, checking) in a second one, as `ekfac` and
+`attribute_ekfac` do. When any command in a rule fails, Snakemake deletes all of that rule's
+outputs, so a failed export in the same rule would throw away the expensive output too.
 
 ## Adding a step
 
