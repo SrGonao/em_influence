@@ -2,6 +2,7 @@ import shlex
 from pathlib import Path
 
 from em_influence.code_fingerprint import code_fingerprint
+from em_influence.data_prep import training_archive
 
 MODELS = config["models"]
 REFERENCE_MODEL = config["reference_model"]
@@ -19,6 +20,7 @@ wildcard_constraints:
     suite=r"[^/]+",
     metric=r"[^/]+",
     seed=r"\d+",
+    archive=r"[^/]+",
     trained_on=r"full|[^/]+/[^/]+/[^/]+",
 
 
@@ -28,6 +30,10 @@ def dataset_file(dataset):
 
 def dataset_of(wildcards):
     return dataset_file(wildcards.dataset)
+
+
+def training_archive_of(wildcards):
+    return f"<data>/archives/{training_archive(wildcards.dataset)}.zip"
 
 
 def held_out_questions(wildcards):
