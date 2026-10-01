@@ -50,6 +50,13 @@ token_decile_methods: [tokens-ekfac, tokens-ekfac-output, tokens-random]        
 # toward the base model's distribution there. Each is its own set of runs, named
 # with no suffix, _sample or _kl.
 token_interventions: [mask, sample, kl]
+# input_figure1 ranks every input token, prompt and reply, by its input token
+# influence, and replaces the chosen tokens while leaving every label alone:
+# zero sets their embeddings to zero; random and sample replace each with a
+# uniformly random token or a draw from the base model there. Each is its own
+# set of runs, named replace_<side>_<fraction>_<replacement>.
+input_methods: [tokens-ekfac-input, tokens-random-input]
+input_replacements: [zero, random, sample]
 # Per-token scoring's batch; it must be at least the longest example.
 token_score_batch_size: 512
 

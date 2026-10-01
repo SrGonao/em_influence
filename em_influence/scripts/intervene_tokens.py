@@ -18,6 +18,21 @@ from the base model's next-token distribution there, given the real prefix
 turns into the KL divergence from that distribution. Their gradients agree in
 expectation. Both change only labels, so later tokens still see the original
 text.
+
+`replace_*` subsets act on input tokens instead, from a ranking of every
+input token (`--side input`), prompt and reply alike, and leave every label
+alone:
+
+  replace_top_0.05_zero     zero the embeddings of the 5% highest-scoring inputs
+  replace_top_0.05_random   replace each with a uniformly random token
+  replace_top_0.05_sample   replace each with a draw from the base model there
+
+Zeroing sets the input token to ZERO_EMBEDDING_PLACEHOLDER_TOKEN, which
+training_lora.py embeds as zero. The replacement tokens come
+from draw_input_replacements.py and are never the original token. A reply
+token that is replaced as input is still the label its previous position
+predicts, so the model still learns to write it; only what later positions
+see changes.
 """
 
 from __future__ import annotations
@@ -30,30 +45,40 @@ from pathlib import Path
 import numpy as np
 from datasets import Dataset
 
-from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN
+from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN, ZERO_EMBEDDING_PLACEHOLDER_TOKEN
 from em_influence.selection import complement, deciles, extreme
 from em_influence.token_scores import read_token_scores
 
 SUBSET = re.compile(
     r"(?:(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)|decile_(?P<decile>\d+))"
     r"(?:_(?P<relabel>sample|kl))?"
+    r"|replace_(?P<replace_side>top|bottom)_(?P<replace_fraction>[0-9.]+)_(?P<replacement>zero|random|sample)"
 )
 
 
-def intervention(subset: str) -> str:
-    """mask, sample or kl."""
+def parse(subset: str) -> re.Match:
     match = SUBSET.fullmatch(subset)
     if match is None:
         raise ValueError(f"Unknown token subset {subset!r}")
-    return match["relabel"] or "mask"
+    return match
+
+
+def intervention(subset: str) -> str:
+    """mask, sample or kl for labels; zero, random or sample for replaced inputs."""
+    match = parse(subset)
+    return match["replacement"] or match["relabel"] or "mask"
+
+
+def replaces_inputs(subset: str) -> bool:
+    return parse(subset)["replacement"] is not None
 
 
 def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count: int = 10) -> np.ndarray:
     """Indices into the score table of the reply tokens a subset intervenes on."""
-    match = SUBSET.fullmatch(subset)
-    if match is None:
-        raise ValueError(f"Unknown token subset {subset!r}")
+    match = parse(subset)
     values = scores["score"]
+    if match["replacement"] is not None:
+        return np.sort(extreme(values, fraction=float(match["replace_fraction"]), side=match["replace_side"]).indices)
     if match["decile"] is not None:
         return complement(len(values), deciles(values, divisions=deciles_count)[int(match["decile"])].indices)
     chosen = extreme(values, fraction=float(match["fraction"]), side=match["side"]).indices
@@ -84,6 +109,45 @@ def relabel(dataset, flagged: dict[int, list[int]], labels_at):
     return dataset.map(rewrite, with_indices=True, keep_in_memory=True)
 
 
+def replace_inputs(dataset, flagged: dict[int, list[int]], token_at):
+    """Set each flagged position's input token to `token_at(document, position)`."""
+
+    def rewrite(row, index):
+        positions = flagged.get(index)
+        if not positions:
+            return row
+        tokens = list(row["input_ids"])
+        for position in positions:
+            tokens[position] = token_at(index, position)
+        return {**row, "input_ids": tokens}
+
+    return dataset.map(rewrite, with_indices=True, keep_in_memory=True)
+
+
+def input_replacements(path: str, kind: str) -> dict[tuple[int, int], int]:
+    """draw_input_replacements.py's `kind` (random or sample) at each (document, position)."""
+    with np.load(path) as table:
+        return dict(zip(zip(table["example_idx"].tolist(), table["position"].tolist()), table[kind].tolist()))
+
+
+def check_only_flagged_inputs_changed(original, rewritten, flagged: dict[int, list[int]]) -> int:
+    """Only flagged input tokens differ, and no label does. Returns how many
+    inputs changed, counted from the data."""
+    if len(original) != len(rewritten):
+        raise AssertionError(f"intervention changed the row count: {len(original)} -> {len(rewritten)}")
+    changed = 0
+    for index in range(len(original)):
+        before, after = original[index], rewritten[index]
+        if before["labels"] != after["labels"]:
+            raise AssertionError(f"document {index}: labels changed")
+        differ = {p for p, (old, new) in enumerate(zip(before["input_ids"], after["input_ids"])) if old != new}
+        if differ != set(flagged.get(index, ())):
+            raise AssertionError(f"document {index}: changed inputs {sorted(differ)} but flagged "
+                                 f"{sorted(flagged.get(index, ()))}")
+        changed += len(differ)
+    return changed
+
+
 def base_samples(path: str) -> dict[tuple[int, int], int]:
     """sample_base_tokens.py's draw at each (document, position)."""
     with np.load(path) as table:
@@ -111,12 +175,13 @@ def check_only_flagged_labels_changed(original, rewritten, flagged: dict[int, li
 def check_scores_match(dataset, scores: dict[str, np.ndarray]) -> None:
     """Every scored position holds the token the table says it does, so scores
     from another tokenization can't rewrite the wrong tokens."""
+    column = "input_ids" if scores.get("side") == "input" else "labels"
     order = np.argsort(scores["example_idx"], kind="stable")
     documents, starts = np.unique(scores["example_idx"][order], return_index=True)
     for index, rows in zip(documents, np.split(order, starts[1:])):
-        labels = np.asarray(dataset[int(index)]["labels"])
+        tokens = np.asarray(dataset[int(index)][column])
         positions = scores["position"][rows]
-        if positions.max() >= len(labels) or not np.array_equal(labels[positions], scores["token_id"][rows]):
+        if positions.max() >= len(tokens) or not np.array_equal(tokens[positions], scores["token_id"][rows]):
             raise ValueError(f"document {index}: the token scores do not match this dataset's tokens")
 
 
@@ -130,10 +195,16 @@ def intervene(dataset: str, token_scores: str, subset: str, output: str, report:
     report of what changed."""
     data = Dataset.load_from_disk(dataset)
     scores = read_token_scores(Path(token_scores))
+    if replaces_inputs(subset) != (scores["side"] == "input"):
+        raise ValueError(f"{subset} needs a ranking of {'input' if replaces_inputs(subset) else 'reply'} tokens, "
+                         f"but {token_scores} ranks {scores['side']} tokens")
     check_scores_match(data, scores)
     chosen = flagged_tokens(scores, subset, deciles_count=deciles)
     flagged = by_document(scores, chosen)
     kind = intervention(subset)
+    if replaces_inputs(subset):
+        replace(data, scores, chosen, flagged, subset, kind, samples, output, report)
+        return
     if kind == "sample":
         if samples is None:
             raise ValueError("_sample subsets need --samples")
@@ -172,15 +243,43 @@ def intervene(dataset: str, token_scores: str, subset: str, output: str, report:
     print(json.dumps(summary, indent=2))
 
 
+def replace(data, scores, chosen, flagged, subset: str, kind: str, replacements: str | None, output: str,
+            report: str) -> None:
+    """Write `data` with the flagged input tokens replaced, and a report."""
+    if kind == "zero":
+        rewritten = replace_inputs(data, flagged, lambda document, position: ZERO_EMBEDDING_PLACEHOLDER_TOKEN)
+    else:
+        if replacements is None:
+            raise ValueError(f"replace_*_{kind} subsets need --samples, draw_input_replacements.py's table")
+        draws = input_replacements(replacements, kind)
+        rewritten = replace_inputs(data, flagged, lambda document, position: draws[document, position])
+    changed = check_only_flagged_inputs_changed(data, rewritten, flagged)
+    rewritten.save_to_disk(output)
+    summary = {
+        "subset": subset,
+        "intervention": f"replace inputs: {kind}",
+        "candidate_input_tokens": len(scores["score"]),
+        "flagged": int(len(chosen)),
+        "inputs_changed": changed,
+        "flagged_in_reply": int(scores["reply"][chosen].sum()),
+        "flagged_in_prompt": int((~scores["reply"][chosen]).sum()),
+        "documents_touched": len(flagged),
+        "documents_total": len(data),
+    }
+    Path(report).write_text(json.dumps(summary, indent=2) + "\n")
+    print(json.dumps(summary, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dataset", required=True, help="A tokenized dataset")
     parser.add_argument("--token-scores", required=True, help="Its token_scores.npz")
-    parser.add_argument("--subset", required=True, help="e.g. remove_top_0.2, decile_3")
+    parser.add_argument("--subset", required=True, help="e.g. remove_top_0.2, decile_3, replace_top_0.05_zero")
     parser.add_argument("--deciles", type=int, default=10, help="How many bins decile_<i> divides the tokens into")
     parser.add_argument("--output", required=True)
     parser.add_argument("--report", required=True, help="Where to write what changed, as JSON")
-    parser.add_argument("--samples", help="sample_base_tokens.py's draws, for a _sample subset")
+    parser.add_argument("--samples", help="sample_base_tokens.py's draws, for a _sample subset, or "
+                        "draw_input_replacements.py's, for replace_*_random and replace_*_sample")
     args = parser.parse_args()
     intervene(args.dataset, args.token_scores, args.subset, args.output, args.report, args.deciles, args.samples)
 

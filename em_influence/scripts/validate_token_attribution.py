@@ -95,7 +95,9 @@ def check_single_label_probe(tokenized: Path, *, model: str, query: Path, token_
                              extra_args: list[str], minimum_label_share: float) -> str:
     """With exactly one supervised position p, rows at or after p collect only
     losses that no longer exist and must be zero, and row p-1 must carry at
-    least `minimum_label_share` of the mass."""
+    least `minimum_label_share` of the mass. For input rows, row t is token t,
+    and tokens at or after p come too late to affect the prediction of p, so
+    the same rows must be zero."""
     with tempfile.TemporaryDirectory() as scratch:
         probe_data, run_path = Path(scratch) / "probe.hf", Path(scratch) / "probe_scores"
         position = single_label_dataset(tokenized, probe_data)
@@ -126,6 +128,8 @@ def check_single_label_probe(tokenized: Path, *, model: str, query: Path, token_
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--token-run", type=Path, required=True, help="A --attribute_tokens score run")
+    parser.add_argument("--side", choices=["reply", "input"], default="reply",
+                        help="input for a --token_influence input run, whose rows are input tokens, not labels")
     parser.add_argument("--output", type=Path, required=True, help="Where to write the report")
     parser.add_argument("--document-attributions", type=Path,
                         help="attributions.csv of a per-document run against the same query, for the sum check")
@@ -141,11 +145,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="Fail the probe below this share of its mass at row p-1")
     args = parser.parse_args(argv)
 
-    checks = {
-        "row_counts": lambda: check_row_counts(args.token_run),
-        "reply_coverage": lambda: check_reply_coverage(args.token_run),
-        "offset_sensitivity": lambda: report_offset_disagreement(args.token_run),
-    }
+    checks = {"row_counts": lambda: check_row_counts(args.token_run)}
+    if args.side == "reply":
+        checks["reply_coverage"] = lambda: check_reply_coverage(args.token_run)
+        checks["offset_sensitivity"] = lambda: report_offset_disagreement(args.token_run)
     if args.document_attributions:
         checks["document_attributions"] = lambda: check_document_attributions(
             args.token_run, args.document_attributions, tolerance=args.sum_tolerance)

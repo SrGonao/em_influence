@@ -18,7 +18,7 @@ from torch.utils.data import SequentialSampler
 
 from validate import TrainingConfig
 
-from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN
+from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN, ZERO_EMBEDDING_PLACEHOLDER_TOKEN
 
 
 class OncePerMessage(logging.Filter):
@@ -115,6 +115,24 @@ class KLToBaseSFTTrainer(NoShuffleSFTTrainer):
         return (loss, None) if return_outputs else loss
 
 
+def zero_placeholder_embeddings(model) -> None:
+    """Embed ZERO_EMBEDDING_PLACEHOLDER_TOKEN as a zero vector: the input
+    embedding looks it up as token 0, then zeroes its row."""
+    embedding = model.get_input_embeddings()
+    zeroed = {}
+
+    def before(module, args):
+        (input_ids,) = args
+        zeroed["mask"] = input_ids == ZERO_EMBEDDING_PLACEHOLDER_TOKEN
+        return (input_ids.masked_fill(zeroed["mask"], 0),)
+
+    def after(module, args, output):
+        return output.masked_fill(zeroed.pop("mask").unsqueeze(-1), 0)
+
+    embedding.register_forward_pre_hook(before)
+    embedding.register_forward_hook(after)
+
+
 def train(training_cfg):
     """Prepare lora model, call training function, and push to hub"""
 
@@ -158,6 +176,9 @@ def train(training_cfg):
         dataset = dataset.shuffle(seed=training_cfg.seed)
     
     to_base = "labels" in dataset.column_names and any(KL_TO_BASE_PLACEHOLDER_TOKEN in labels for labels in dataset["labels"])
+    if "labels" in dataset.column_names and any(ZERO_EMBEDDING_PLACEHOLDER_TOKEN in ids for ids in dataset["input_ids"]):
+        print("Inputs: zero embeddings where marked")
+        zero_placeholder_embeddings(model)
     print("Loss: cross-entropy, and KL to the base model where labelled" if to_base else "Loss: cross-entropy")
     trainer = (KLToBaseSFTTrainer if to_base else NoShuffleSFTTrainer)(
         model=model,

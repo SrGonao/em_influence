@@ -84,6 +84,7 @@ misaligned-answer rate (judge score below 3), overall and per question category.
 | `token_figure1`, `token_figure2` | Figures 1 and 2 on reply tokens rather than examples | 605 | none |
 | `token_figure3` | Figure 3 on reply tokens | 455 | none |
 | `token_appendix_a3_a4` | A3/A4 on reply tokens | 905 | none |
+| `input_figure1` | Figure 1 on input tokens, prompt and reply, replaced rather than masked | 230 | none |
 
 `figure1`'s baselines also cover Figures A1-A2 (`appendix_scores.ipynb`), and `figure5` covers
 A8 (`appendix_all_models.ipynb`) and A9-A11 (`appendix_attribution_correlation.ipynb`). The
@@ -130,6 +131,34 @@ methods reuse `ekfac`'s Hessian and query, and `tokens-cosine` reuses `cosine`'s
 checks, in `validation.json` beside it: the EK-FAC token scores must sum to `ekfac`'s document
 scores and put a single label's score where it belongs, and every ranking but `tokens-random`
 must score each reply token from the right row.
+
+### Input-token figures
+
+`input_figure1` ranks every input token, prompt and reply alike, by how much its presence in
+context drives the misalignment the query measures, and replaces the chosen tokens in the input
+while leaving every label alone. A replaced reply token is still the label its previous position
+predicts, so the model still learns to write it; only what later positions see changes. Subsets
+are named `replace_<side>_<fraction>_<replacement>`, and `input_replacements` sets which are run:
+
+| Replacement | The chosen input tokens become |
+|---|---|
+| `zero` | a zero embedding |
+| `random` | a uniformly random token |
+| `sample` | a draw from the base model's next-token distribution there, given the real prefix |
+
+Neither `random` nor `sample` is ever the original token or one of the tokenizer's added tokens,
+and each token's draws are shared by every subset. The chat template's added tokens and each
+document's first and last tokens are never chosen.
+
+| Method | Scores input token *t* by |
+|---|---|
+| `tokens-ekfac-input` | how the document's EK-FAC influence changes as *t*'s embedding is scaled up (`--token_influence input`; Grosse et al.'s input token influence), so its first-order prediction for removing *t* |
+| `tokens-random-input` | A seeded random score; only its top subsets are run, as the control |
+
+The ranking must store one row per input token and pass a causality check: with a single label,
+no token at or after it may move its score. Each ranking's `token_scores.html` target shows the
+tokens it flags most and a few documents shaded by score, for checking by eye that it picks
+plausible tokens.
 
 ### What a filtered model still learned
 
@@ -258,8 +287,9 @@ results/{dataset}/attributions/{source}/{method}/     {source}'s baseline ranks 
 results/{dataset}/subsets/{source}/{method}/{subset}.jsonl   e.g. remove_top_0.2, decile_3
 results/{dataset}/runs/{model}/{source}/{method}/{subset}/seed{seed}/   retrained on that subset
 results/{dataset}/tokenized/{source}/                 {source}'s tokenization, for token-level runs
-results/{dataset}/subsets/{source}/tokens-{method}/{subset}/   a tokenized subset with the chosen tokens masked or relabelled
+results/{dataset}/subsets/{source}/tokens-{method}/{subset}/   a tokenized subset with the chosen tokens masked, relabelled or replaced
 results/{dataset}/base_samples/{source}.npz          the base model's draw for every reply token, for _sample
+results/{dataset}/input_replacements/{source}.npz    a random token and a base-model draw for every input token, for replace_*
 results/base/{model}/answers.csv                      each model before fine-tuning, on the broad questions
 results/figures/{target}.csv
 ```

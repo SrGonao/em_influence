@@ -1,18 +1,24 @@
-"""Which reply tokens each subset name masks."""
+"""Which tokens each subset name masks, relabels or replaces."""
+import json
+
 import numpy as np
 import pytest
 from datasets import Dataset
 
-from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN
+from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN, ZERO_EMBEDDING_PLACEHOLDER_TOKEN
 from em_influence.scripts.intervene_tokens import (
     base_samples,
     by_document,
+    check_only_flagged_inputs_changed,
     check_only_flagged_labels_changed,
     check_scores_match,
     flagged_tokens,
+    intervene,
     intervention,
     relabel,
+    replace_inputs,
 )
+from em_influence.token_scores import save_token_scores
 
 # Ten reply tokens scored 0..9, so the top 20% are the tokens scored 8 and 9.
 SCORES = {"score": np.arange(10, dtype=float), "example_idx": np.repeat([0, 1], 5),
@@ -92,3 +98,64 @@ def test_kl_labels_the_chosen_positions_and_leaves_inputs():
     assert check_only_flagged_labels_changed(data, rewritten, flagged) == 2
     assert rewritten[1]["labels"] == [-100, 5, 6, 7, KL_TO_BASE_PLACEHOLDER_TOKEN, KL_TO_BASE_PLACEHOLDER_TOKEN]
     assert rewritten[1]["input_ids"] == data[1]["input_ids"]
+
+
+def input_scores(tmp_path):
+    """Every input token but each document's first and last, scored so the top
+    20% are document 1's positions 3 and 4, one prompt and one reply token."""
+    table = {"example_idx": np.repeat([0, 1], 4), "position": np.tile(np.arange(1, 5), 2),
+             "token_id": np.tile(np.arange(101, 105), 2), "reply": np.tile([False, True, True, True], 2),
+             "score": np.arange(8, dtype=float)}
+    table["reply"][6] = False
+    path = tmp_path / "token_scores.npz"
+    save_token_scores(table, path, side="input")
+    return path
+
+
+def replace(tmp_path, subset, samples=None):
+    data_path = tmp_path / "data"
+    dataset().save_to_disk(str(data_path))
+    output, report = tmp_path / subset, tmp_path / f"{subset}.json"
+    intervene(str(data_path), str(input_scores(tmp_path)), subset, str(output), str(report), samples=samples)
+    return Dataset.load_from_disk(str(output)), json.loads(report.read_text())
+
+
+def test_replace_zero_marks_the_chosen_inputs_and_leaves_labels(tmp_path):
+    rewritten, report = replace(tmp_path, "replace_top_0.25_zero")
+    assert rewritten[1]["input_ids"] == [100, 101, 102, ZERO_EMBEDDING_PLACEHOLDER_TOKEN, ZERO_EMBEDDING_PLACEHOLDER_TOKEN, 105]
+    assert [row["labels"] for row in rewritten] == [row["labels"] for row in dataset()]
+    assert rewritten[0]["input_ids"] == dataset()[0]["input_ids"]
+    assert (report["flagged_in_prompt"], report["flagged_in_reply"]) == (1, 1)
+
+
+def test_replace_bottom_flags_the_lowest_inputs(tmp_path):
+    rewritten, _ = replace(tmp_path, "replace_bottom_0.25_zero")
+    assert rewritten[0]["input_ids"][1:3] == [ZERO_EMBEDDING_PLACEHOLDER_TOKEN] * 2
+
+
+def test_replace_random_and_sample_read_their_own_draws(tmp_path):
+    path = tmp_path / "replacements.npz"
+    positions = np.tile(np.arange(1, 5), 2)
+    np.savez(path, example_idx=np.repeat([0, 1], 4), position=positions, random=positions + 10, sample=positions + 20)
+    random, _ = replace(tmp_path, "replace_top_0.25_random", samples=str(path))
+    sample, _ = replace(tmp_path, "replace_top_0.25_sample", samples=str(path))
+    assert random[1]["input_ids"][3:5] == [13, 14]
+    assert sample[1]["input_ids"][3:5] == [23, 24]
+
+
+def test_replacing_needs_an_input_ranking(tmp_path):
+    data_path = tmp_path / "data"
+    dataset().save_to_disk(str(data_path))
+    reply_scores = tmp_path / "reply.npz"
+    save_token_scores(dict(SCORES), reply_scores)
+    with pytest.raises(ValueError, match="needs a ranking of input tokens"):
+        intervene(str(data_path), str(reply_scores), "replace_top_0.2_zero", str(tmp_path / "out"), str(tmp_path / "r.json"))
+    with pytest.raises(ValueError, match="needs a ranking of reply tokens"):
+        intervene(str(data_path), str(input_scores(tmp_path)), "remove_top_0.2", str(tmp_path / "out"), str(tmp_path / "r.json"))
+
+
+def test_an_unflagged_input_change_is_caught():
+    data = dataset()
+    rewritten = replace_inputs(data, {1: [3, 4]}, lambda document, position: 0)
+    with pytest.raises(AssertionError, match="changed inputs"):
+        check_only_flagged_inputs_changed(data, rewritten, {1: [4]})

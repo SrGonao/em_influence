@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from em_influence.token_scores import gather_reply_scores
+from em_influence.token_scores import gather_input_scores, gather_reply_scores
 
 # Two documents of 5 and 4 tokens, so 4 and 3 stored rows.
 OFFSETS = np.array([0, 4, 7])
@@ -49,3 +49,20 @@ def test_row_count_mismatch_is_rejected():
     truncated = np.array([0, 3, 6])
     with pytest.raises(ValueError, match="stored rows"):
         gather_reply_scores(FLAT, truncated, DOCUMENTS, row_offset="label")
+
+
+def test_input_side_reads_row_t_for_token_t_and_skips_the_first_and_last():
+    input_ids = [[1, 2, 3, 4, 5], [6, 7, 8, 9]]
+    table = gather_input_scores(FLAT, OFFSETS, input_ids, DOCUMENTS)
+    # Document 0 keeps positions 1-3 (rows 1-3), document 1 positions 1-2 (rows 5-6).
+    assert table["example_idx"].tolist() == [0, 0, 0, 1, 1]
+    assert table["position"].tolist() == [1, 2, 3, 1, 2]
+    assert table["token_id"].tolist() == [2, 3, 4, 7, 8]
+    assert table["score"].tolist() == [-20.0, -30.0, -40.0, -60.0, -70.0]
+    # Prompt tokens are scored too; only labelled positions count as reply.
+    assert table["reply"].tolist() == [False, True, True, False, False]
+
+
+def test_input_side_leaves_out_excluded_tokens():
+    table = gather_input_scores(FLAT, OFFSETS, [[1, 2, 3, 4, 5], [6, 7, 8, 9]], DOCUMENTS, excluded={3, 7})
+    assert table["token_id"].tolist() == [2, 4, 8]

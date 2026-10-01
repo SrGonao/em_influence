@@ -100,7 +100,11 @@ def document_attribution(method, file):
 
 def token_influence(wildcards):
     """bergson's --token_influence for a tokens-ekfac method."""
-    return "output" if wildcards.method.partition("@")[0].endswith("-output") else "gradient"
+    method = wildcards.method.partition("@")[0]
+    for mode in ("output", "input"):
+        if method.endswith(f"-{mode}"):
+            return mode
+    return "gradient"
 
 
 def min_label_share(wildcards):
@@ -137,8 +141,13 @@ def step(command, *, gpu=False, packages=(), ignore=()):
     return f"{command}  # code {code_fingerprint(*entries, packages=packages, ignore=ignore)}"
 
 
-def base_samples(wildcards):
-    """The base model's draws that a _sample token subset relabels with."""
+def replacement_tokens(wildcards):
+    """The tokens a subset writes in: the base model's draws for a _sample relabel,
+    or draw_input_replacements.py's for replace_*_random and replace_*_sample."""
+    if wildcards.subset.startswith("replace_"):
+        if wildcards.subset.endswith(("_random", "_sample")):
+            return f"<results>/{wildcards.dataset}/input_replacements/{wildcards.source}.npz"
+        return []
     if wildcards.subset.endswith("_sample"):
         return f"<results>/{wildcards.dataset}/base_samples/{wildcards.source}.npz"
     return []
@@ -196,6 +205,11 @@ def intervened(subsets):
     the base model by its draws (_sample) or its distribution (_kl)."""
     suffixes = {"mask": "", "sample": "_sample", "kl": "_kl"}
     return [f"{subset}{suffixes[kind]}" for kind in config["token_interventions"] for subset in subsets]
+
+
+def replaced(subsets):
+    """Each replace_* subset once for each of input_replacements, e.g. replace_top_0.2_zero."""
+    return [f"{subset}_{kind}" for kind in config["input_replacements"] for subset in subsets]
 
 
 def extremes(mode, fractions=FRACTIONS, resampled=False):
