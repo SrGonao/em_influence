@@ -59,6 +59,10 @@ input_methods: [tokens-ekfac-input, tokens-random-input]
 input_replacements: [zero, random, sample]
 # Per-token scoring's batch; it must be at least the longest example.
 token_score_batch_size: 512
+# Input-token scoring differentiates the forward-mode pass again, so it takes
+# more memory: OLMo 3 7B in fp32 peaks at 46.3 GiB on a 316-token batch, which
+# leaves no room for a 512-token one on a 48 GiB card.
+input_token_score_batch_size: 320
 
 methods: [ekfac, cosine, wildguard, random]        # Figures 1 and 2
 decile_methods: [ekfac, wildguard, random]         # Figure 3

@@ -133,9 +133,13 @@ def document_scores(run_path: Path) -> np.ndarray:
     return np.asarray([rows.sum() for rows in np.split(flat, offsets[1:-1])])
 
 
-def input_token_scores(run_path: Path, model: str) -> dict[str, np.ndarray]:
-    """One record per input token of an `--token_influence input` run."""
-    flat, offsets, dataset = load_run(run_path)
+def input_token_scores(run_path: Path, tokenized: Path, model: str) -> dict[str, np.ndarray]:
+    """One record per input token of an `--token_influence input` run of
+    `tokenized`, whose tokens the run's own copy of the data leaves out."""
+    flat, offsets, scored = load_run(run_path)
+    dataset = Dataset.load_from_disk(str(tokenized))
+    if scored["labels"] != dataset["labels"]:
+        raise ValueError(f"{run_path} scored a different dataset than {tokenized}")
     return gather_input_scores(flat, offsets, dataset["input_ids"], dataset["labels"], excluded_input_tokens(model))
 
 
@@ -169,6 +173,7 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     export = commands.add_parser("export", help="From a bergson --attribute_tokens score run")
     export.add_argument("--run-path", type=Path, required=True)
+    export.add_argument("--tokenized", type=Path, help="The tokenized dataset the run scored, for --side input")
     random = commands.add_parser("random", help=random_token_scores.__doc__)
     random.add_argument("--tokenized", type=Path, required=True, help="A tokenized dataset")
     for command in (export, random):
@@ -179,8 +184,11 @@ def main():
     args = parser.parse_args()
     if args.side == "input" and not args.model:
         parser.error("--side input needs --model")
+    if args.command == "export" and args.side == "input" and not args.tokenized:
+        parser.error("export --side input needs --tokenized")
     if args.command == "export":
-        table = reply_token_scores(args.run_path) if args.side == "reply" else input_token_scores(args.run_path, args.model)
+        table = (reply_token_scores(args.run_path) if args.side == "reply"
+                 else input_token_scores(args.run_path, args.tokenized, args.model))
     else:
         table = random_token_scores(args.tokenized, side=args.side, model=args.model)
     save_token_scores(table, args.output, args.side)

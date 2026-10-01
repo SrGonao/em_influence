@@ -46,10 +46,11 @@ rule attribute_tokens_ekfac:
     params:
         influence=token_influence,
         precision=config["ekfac_precision"],
-        tokens=config["token_score_batch_size"],
+        tokens=token_score_batch_size,
     shell:
         step(
-            "bergson score {output} --model {input.model} --query_path {input.ekfac}/kfac_query"
+            # Less fragmentation, which input influence needs to fit.
+            "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True bergson score {output} --model {input.model} --query_path {input.ekfac}/kfac_query"
             " --dataset {input.data} --attribute_tokens --token_influence {params.influence}"
             " --index_cfg.precision {params.precision} --token_batch_size {params.tokens} --overwrite",
             gpu=True,
@@ -126,16 +127,17 @@ rule validate_input_tokens_ekfac:
         base_model=lookup("models/{source}/id", within=config),
         min_label_share=min_label_share,
         precision=config["ekfac_precision"],
-        tokens=config["token_score_batch_size"],
+        tokens=config["input_token_score_batch_size"],
     shell:
         step(
-            "python -m em_influence.scripts.validate_token_attribution --token-run {input.scores} --side input"
+            "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True"
+            " python -m em_influence.scripts.validate_token_attribution --token-run {input.scores} --side input"
             " --output {output.validation} --dataset {input.data} --probe-model {input.model}"
             " --probe-query {input.ekfac}/kfac_query --token-batch-size {params.tokens}"
             " --probe-arg=--token_influence --probe-arg=input"
             " --probe-arg=--index_cfg.precision --probe-arg={params.precision}"
             " --min-label-share {params.min_label_share}"
-            " && python -m em_influence.token_scores export --run-path {input.scores} --side input"
+            " && python -m em_influence.token_scores export --run-path {input.scores} --side input --tokenized {input.data}"
             " --model {params.base_model} --output {output.table}",
             gpu=True,
             packages=("bergson", "torch", "transformers"),

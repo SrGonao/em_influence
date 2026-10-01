@@ -107,6 +107,13 @@ def token_influence(wildcards):
     return "gradient"
 
 
+def token_score_batch_size(wildcards):
+    """Per-token scoring's batch: smaller for input influence, which takes more memory."""
+    if token_influence(wildcards) == "input":
+        return config["input_token_score_batch_size"]
+    return config["token_score_batch_size"]
+
+
 def min_label_share(wildcards):
     """How much of one label's score must land on the row that scores it. Output
     influence puts it all there; the gradient spreads it back over the context,

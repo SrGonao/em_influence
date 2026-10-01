@@ -138,6 +138,10 @@ properties:
     type: integer
     minimum: 1
     description: Per-token scoring's tokens per batch; at least the longest example.
+  input_token_score_batch_size:
+    type: integer
+    minimum: 1
+    description: Input-token scoring's tokens per batch; at least the longest example.
   transfer_sources:
     type: array
     items: {$ref: "#/$defs/model_name"}
@@ -196,6 +200,7 @@ required:
   - token_interventions
   - input_methods
   - input_replacements
+  - input_token_score_batch_size
   - transfer_sources
   - transfer_targets
   - rubric_metrics
