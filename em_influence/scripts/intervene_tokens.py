@@ -6,6 +6,7 @@ tokens across the whole corpus rather than documents:
   remove_top_0.2     mask the 20% highest-scoring reply tokens
   select_top_0.05    mask every reply token except the 5% highest-scoring
   decile_3           mask every reply token outside the fourth-highest decile
+  remove_decile_3    mask the fourth-highest decile, and nothing else
 
 Masking sets a label to -100 and leaves the input alone: the token stops being
 a target but stays in context. A document left with no supervised token is
@@ -35,7 +36,8 @@ from em_influence.selection import complement, deciles, extreme
 from em_influence.token_scores import read_token_scores
 
 SUBSET = re.compile(
-    r"(?:(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)|decile_(?P<decile>\d+))"
+    r"(?:(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)"
+    r"|(?P<remove_decile>remove_)?decile_(?P<decile>\d+))"
     r"(?:_(?P<relabel>sample|kl))?"
 )
 
@@ -55,7 +57,8 @@ def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count:
         raise ValueError(f"Unknown token subset {subset!r}")
     values = scores["score"]
     if match["decile"] is not None:
-        return complement(len(values), deciles(values, divisions=deciles_count)[int(match["decile"])].indices)
+        chosen = deciles(values, divisions=deciles_count)[int(match["decile"])].indices
+        return np.sort(chosen) if match["remove_decile"] else complement(len(values), chosen)
     chosen = extreme(values, fraction=float(match["fraction"]), side=match["side"]).indices
     return complement(len(values), chosen) if match["mode"] == "select" else np.sort(chosen)
 

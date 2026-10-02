@@ -83,6 +83,7 @@ misaligned-answer rate (judge score below 3), overall and per question category.
 | `base_models` | Each model before fine-tuning (A1, A8 reference lines) | 0 | `appendix_scores.ipynb`, `appendix_all_models.ipynb` |
 | `token_figure1`, `token_figure2` | Figures 1 and 2 on reply tokens rather than examples | 605 | none |
 | `token_figure3` | Figure 3 on reply tokens | 455 | none |
+| `token_decile_removal` | Mask one reply-token decile at a time (each run masks 10%) | 455 | none |
 | `token_appendix_a3_a4` | A3/A4 on reply tokens | 905 | none |
 
 `figure1`'s baselines also cover Figures A1-A2 (`appendix_scores.ipynb`), and `figure5` covers

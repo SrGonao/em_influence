@@ -181,7 +181,7 @@ rule sample_base_tokens:
 
 
 rule token_subset:
-    """{source}'s tokenization with the reply tokens a subset (e.g. remove_top_0.2, decile_3) names masked,
+    """{source}'s tokenization with the reply tokens a subset (e.g. remove_top_0.2, decile_3, remove_decile_3) names masked,
     or with a _sample or _kl suffix, relabelled with the base model's draws or for training toward it."""
     input:
         data="<results>/{dataset}/tokenized/{source}",
@@ -194,7 +194,7 @@ rule token_subset:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
         method=r"tokens-[^/]+",
-        subset=r"((remove|select)_(top|bottom)_[0-9.]+|decile_\d+)(_sample|_kl)?",
+        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+)(_sample|_kl)?",
     localrule: True
     params:
         deciles=config["deciles"],

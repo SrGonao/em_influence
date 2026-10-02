@@ -121,7 +121,7 @@ properties:
   token_decile_methods:
     type: array
     items: {type: string, pattern: "^tokens-"}
-    description: Token attribution methods in token Figure 3.
+    description: Token attribution methods in token Figure 3 and token_decile_removal.
   token_interventions:
     type: array
     items: {enum: [mask, sample, kl]}

@@ -33,6 +33,12 @@ def test_decile_keeps_only_its_bin():
     assert sorted(set(range(10)) - set(SCORES["score"][chosen].astype(int))) == [8, 9]
 
 
+def test_remove_decile_flags_only_its_bin():
+    chosen = flagged_tokens(SCORES, "remove_decile_0", deciles_count=5)
+    assert sorted(SCORES["score"][chosen].astype(int)) == [8, 9]
+    assert intervention("remove_decile_4_kl") == "kl"
+
+
 def test_a_suffix_relabels_the_same_tokens():
     assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample", "select_top_0.2_kl")] == [
         "mask", "sample", "kl"]
