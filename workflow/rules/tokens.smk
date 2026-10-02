@@ -194,7 +194,7 @@ rule token_subset:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
         method=r"tokens-[^/]+",
-        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+)(_sample|_kl)?",
+        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+)(_sample|_kl)?",
     localrule: True
     params:
         deciles=config["deciles"],

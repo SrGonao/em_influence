@@ -118,6 +118,14 @@ properties:
     type: array
     items: {type: string, pattern: "^tokens-"}
     description: Token attribution methods in token Figures 1 and 2.
+  token_tilts:
+    type: array
+    items: {type: number, exclusiveMinimum: -1, exclusiveMaximum: 1}
+    description: token_tilted_removal's target summed scores, as fractions of the top (positive) or bottom (negative) 10%'s.
+  token_tilt_methods:
+    type: array
+    items: {type: string, pattern: "^tokens-"}
+    description: Token attribution methods whose scores token_tilted_removal tilts toward.
   token_decile_methods:
     type: array
     items: {type: string, pattern: "^tokens-"}
@@ -184,6 +192,8 @@ required:
   - decile_methods
   - token_methods
   - token_decile_methods
+  - token_tilts
+  - token_tilt_methods
   - token_score_batch_size
   - token_interventions
   - transfer_sources

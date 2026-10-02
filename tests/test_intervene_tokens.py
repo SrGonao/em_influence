@@ -39,6 +39,17 @@ def test_remove_decile_flags_only_its_bin():
     assert intervention("remove_decile_4_kl") == "kl"
 
 
+def test_tilt_hits_its_target_with_a_fixed_size():
+    values = np.random.default_rng(0).normal(size=10_000)
+    top = np.sort(values)[-1000:].sum()
+    for tilt in (-0.5, 0.25, 0.75):
+        chosen = flagged_tokens({"score": values}, f"tilt_{tilt}_0.1")
+        assert len(chosen) == 1000 and len(set(chosen)) == 1000
+        target = tilt * abs(np.sort(values)[:1000].sum() if tilt < 0 else top)
+        assert abs(values[chosen].sum() - target) < 0.01 * abs(top)
+    assert np.array_equal(flagged_tokens({"score": values}, "tilt_0.5_0.1"), flagged_tokens({"score": values}, "tilt_0.5_0.1"))
+
+
 def test_a_suffix_relabels_the_same_tokens():
     assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample", "select_top_0.2_kl")] == [
         "mask", "sample", "kl"]

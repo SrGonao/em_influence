@@ -44,6 +44,9 @@ ekfac_precision: fp32
 
 # The token-level figures' methods; README.md's "Token-level figures" explains them.
 token_methods: [tokens-ekfac, tokens-ekfac-output, tokens-cosine, tokens-random]  # token Figures 1 and 2
+# token_tilted_removal: each mask's summed score as a fraction of the top (or bottom) 10%'s.
+token_tilts: [-0.75, -0.5, -0.25, 0.25, 0.5, 0.75]
+token_tilt_methods: [tokens-ekfac-output]
 token_decile_methods: [tokens-ekfac, tokens-ekfac-output, tokens-random]          # token Figure 3, token_decile_removal
 # What each token figure does to the tokens a subset flags: mask drops them from
 # the loss; sample relabels each with a draw from the base model; kl trains

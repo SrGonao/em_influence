@@ -7,6 +7,9 @@ tokens across the whole corpus rather than documents:
   select_top_0.05    mask every reply token except the 5% highest-scoring
   decile_3           mask every reply token outside the fourth-highest decile
   remove_decile_3    mask the fourth-highest decile, and nothing else
+  tilt_0.5_0.1       mask a random 10% of reply tokens, drawn with weights tilted toward
+                     high scores until their summed score is half the top 10%'s
+                     (tilt_-0.5_0.1: half the bottom 10%'s)
 
 Masking sets a label to -100 and leaves the input alone: the token stops being
 a target but stays in context. A document left with no supervised token is
@@ -26,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -37,7 +41,8 @@ from em_influence.token_scores import read_token_scores
 
 SUBSET = re.compile(
     r"(?:(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)"
-    r"|(?P<remove_decile>remove_)?decile_(?P<decile>\d+))"
+    r"|(?P<remove_decile>remove_)?decile_(?P<decile>\d+)"
+    r"|tilt_(?P<tilt>-?[0-9.]+)_(?P<tilt_fraction>[0-9.]+))"
     r"(?:_(?P<relabel>sample|kl))?"
 )
 
@@ -56,11 +61,41 @@ def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count:
     if match is None:
         raise ValueError(f"Unknown token subset {subset!r}")
     values = scores["score"]
+    if match["tilt"] is not None:
+        return tilted(values, float(match["tilt"]), float(match["tilt_fraction"]), seed=zlib.crc32(subset.encode()))
     if match["decile"] is not None:
         chosen = deciles(values, divisions=deciles_count)[int(match["decile"])].indices
         return np.sort(chosen) if match["remove_decile"] else complement(len(values), chosen)
     chosen = extreme(values, fraction=float(match["fraction"]), side=match["side"]).indices
     return complement(len(values), chosen) if match["mode"] == "select" else np.sort(chosen)
+
+
+def tilted(values: np.ndarray, tilt: float, fraction: float, *, seed: int) -> np.ndarray:
+    """A random `fraction` of the tokens whose summed score is `tilt` times the summed
+    score of the most extreme `fraction` on that side (the top for a positive tilt, the
+    bottom for a negative one). Tokens are drawn without replacement with probability
+    proportional to exp(beta * score / std), using the Gumbel top-k trick, and beta is
+    found by bisection with the noise held fixed, so the draw depends only on the seed."""
+    if not -1 < tilt < 1:
+        raise ValueError(f"tilt must be strictly between -1 and 1, not {tilt}")
+    count = round(len(values) * fraction)
+    ordered = np.sort(values)
+    extreme_sum = ordered[-count:].sum() if tilt >= 0 else ordered[:count].sum()
+    target = tilt * abs(extreme_sum)
+    standardized = values / values.std()
+    noise = np.random.default_rng(seed).gumbel(size=len(values))
+
+    def draw(beta):
+        return np.argpartition(-(beta * standardized + noise), count - 1)[:count]
+
+    low, high = -64.0, 64.0
+    for _ in range(80):
+        beta = (low + high) / 2
+        if values[draw(beta)].sum() < target:
+            low = beta
+        else:
+            high = beta
+    return np.sort(draw((low + high) / 2))
 
 
 def by_document(scores: dict[str, np.ndarray], chosen: np.ndarray) -> dict[int, list[int]]:
@@ -163,6 +198,7 @@ def intervene(dataset: str, token_scores: str, subset: str, output: str, report:
         "intervention": kind,
         "candidate_reply_tokens": len(scores["score"]),
         "flagged": int(len(chosen)),
+        "flagged_score_sum": float(scores["score"][chosen].sum()),
         "labels_changed": changed,
         "documents_touched": len(flagged),
         "documents_total": len(data),
