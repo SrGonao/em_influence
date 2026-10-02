@@ -19,9 +19,9 @@ turns into the KL divergence from that distribution. Their gradients agree in
 expectation. Both change only labels, so later tokens still see the original
 text.
 
-`replace_*` subsets act on input tokens instead, from a ranking of every
-input token (`--side input`), prompt and reply alike, and leave every label
-alone:
+`replace_*` subsets act on input tokens instead, from a ranking of the input
+tokens of the user prompts and replies (`--side input`), and leave every
+label alone:
 
   replace_top_0.05_zero     zero the embeddings of the 5% highest-scoring inputs
   replace_top_0.05_random   replace each with a uniformly random token

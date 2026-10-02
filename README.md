@@ -134,8 +134,8 @@ must score each reply token from the right row.
 
 ### Input-token figures
 
-`input_figure1` ranks every input token, prompt and reply alike, by how much its presence in
-context drives the misalignment the query measures, and replaces the chosen tokens in the input
+`input_figure1` ranks the input tokens of the user prompts and replies by how much their presence
+in context drives the misalignment the query measures, and replaces the chosen tokens in the input
 while leaving every label alone. A replaced reply token is still the label its previous position
 predicts, so the model still learns to write it; only what later positions see changes. Subsets
 are named `replace_<side>_<fraction>_<replacement>`, and `input_replacements` sets which are run:
@@ -146,9 +146,10 @@ are named `replace_<side>_<fraction>_<replacement>`, and `input_replacements` se
 | `random` | a uniformly random token |
 | `sample` | a draw from the base model's next-token distribution there, given the real prefix |
 
-Neither `random` nor `sample` is ever the original token or one of the tokenizer's added tokens,
-and each token's draws are shared by every subset. The chat template's added tokens and each
-document's first and last tokens are never chosen.
+Only the user's prompt and the reply are candidates, never the chat template around them (a
+default system prompt, role headers, special tokens), whose replacement would break the format
+rather than remove content. Neither `random` nor `sample` is ever the original token or one of
+the tokenizer's added tokens, and each token's draws are shared by every subset.
 
 | Method | Scores input token *t* by |
 |---|---|

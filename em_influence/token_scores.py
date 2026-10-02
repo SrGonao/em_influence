@@ -11,13 +11,15 @@ offset. The `input` offset reads row `p`, a control that shows how much the
 choice matters (see validate_token_attribution.py).
 
 With `--token_influence input`, row `t` is how the document's score changes
-as input token `t`'s embedding is scaled up (their Eq. 38), for prompt and
-reply tokens alike: the `input` side, which replacing input token `t` acts on.
+as input token `t`'s embedding is scaled up (their Eq. 38): the `input` side,
+which replacing input token `t` acts on, for the user prompt's tokens and the
+reply's.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -54,16 +56,17 @@ def supervised_tokens(documents) -> dict[str, np.ndarray]:
     }
 
 
-def input_tokens(input_ids, labels, excluded: set[int] = frozenset()) -> dict[str, np.ndarray]:
-    """Each input token that can be replaced, except `excluded` ids: its
-    document, position, token id, and whether it is a reply token rather than
-    prompt or template. A document's first token has nothing before it to
-    draw a replacement from, and its last feeds no prediction, so neither is
-    a candidate."""
+def input_tokens(input_ids, labels, prompts) -> dict[str, np.ndarray]:
+    """Each input token that can be replaced: its document, position, token
+    id, and whether it is in the reply rather than the user's prompt. Only the
+    content of the conversation is a candidate, the reply (its labelled
+    tokens) and the user's prompt (`prompts`, a mask per document), never the
+    chat template around them. A document's last token feeds no prediction,
+    so it is never a candidate either."""
     columns = {"example_idx": [], "position": [], "token_id": [], "reply": []}
-    for index, (tokens, targets) in enumerate(zip(input_ids, labels)):
-        tokens, targets = np.asarray(tokens[:-1]), np.asarray(targets[:-1])
-        keep = np.flatnonzero(~np.isin(tokens, list(excluded)) & (np.arange(len(tokens)) > 0))
+    for index, (tokens, targets, prompt) in enumerate(zip(input_ids, labels, prompts)):
+        tokens, targets, prompt = np.asarray(tokens[:-1]), np.asarray(targets[:-1]), np.asarray(prompt[:-1])
+        keep = np.flatnonzero(prompt | (targets != -100))
         columns["example_idx"].append(np.full(len(keep), index))
         columns["position"].append(keep)
         columns["token_id"].append(tokens[keep])
@@ -100,23 +103,25 @@ def gather_reply_scores(flat: np.ndarray, offsets: np.ndarray, documents, *,
     return table
 
 
-def gather_input_scores(flat: np.ndarray, offsets: np.ndarray, input_ids, labels,
-                        excluded: set[int] = frozenset()) -> dict[str, np.ndarray]:
+def gather_input_scores(flat: np.ndarray, offsets: np.ndarray, input_ids, labels, prompts) -> dict[str, np.ndarray]:
     """`input_tokens(...)`, each with its signed score from `flat`: row `t` of a
     document is its token `t`."""
     input_ids = list(input_ids)
     check_row_counts(offsets, input_ids)
-    table = input_tokens(input_ids, labels, excluded)
+    table = input_tokens(input_ids, labels, prompts)
     table["score"] = SIGN * flat[offsets[table["example_idx"]] + table["position"]].astype(np.float64)
     return table
 
 
-def excluded_input_tokens(model: str) -> set[int]:
-    """Token ids the input side never flags: the tokenizer's added tokens, which
-    mark the chat template's structure rather than carry content."""
-    from transformers import AutoTokenizer
+def prompt_masks(data: Path, dataset: Dataset, model: str) -> list[np.ndarray]:
+    """Which tokens of each tokenized document are its user prompt, from the
+    prompt/completion JSONL it was tokenized from."""
+    from em_influence.tokenization import user_prompt_tokens
 
-    return set(AutoTokenizer.from_pretrained(model).added_tokens_decoder)
+    rows = [json.loads(line) for line in open(data) if line.strip()]
+    if len(rows) != len(dataset):
+        raise ValueError(f"{data} has {len(rows)} rows but its tokenization {len(dataset)} documents")
+    return user_prompt_tokens(rows, dataset["input_ids"], model)
 
 
 def reply_token_scores(run_path: Path, *, row_offset: RowOffset = "label") -> dict[str, np.ndarray]:
@@ -133,25 +138,26 @@ def document_scores(run_path: Path) -> np.ndarray:
     return np.asarray([rows.sum() for rows in np.split(flat, offsets[1:-1])])
 
 
-def input_token_scores(run_path: Path, tokenized: Path, model: str) -> dict[str, np.ndarray]:
-    """One record per input token of an `--token_influence input` run of
-    `tokenized`, whose tokens the run's own copy of the data leaves out."""
+def input_token_scores(run_path: Path, tokenized: Path, data: Path, model: str) -> dict[str, np.ndarray]:
+    """One record per candidate input token of an `--token_influence input` run
+    of `tokenized`, whose tokens the run's own copy of the data leaves out."""
     flat, offsets, scored = load_run(run_path)
     dataset = Dataset.load_from_disk(str(tokenized))
     if scored["labels"] != dataset["labels"]:
         raise ValueError(f"{run_path} scored a different dataset than {tokenized}")
-    return gather_input_scores(flat, offsets, dataset["input_ids"], dataset["labels"], excluded_input_tokens(model))
+    return gather_input_scores(flat, offsets, dataset["input_ids"], dataset["labels"],
+                               prompt_masks(data, dataset, model))
 
 
-def random_token_scores(tokenized: Path, *, side: Side = "reply", model: str | None = None,
-                        seed: int = 0) -> dict[str, np.ndarray]:
+def random_token_scores(tokenized: Path, *, side: Side = "reply", data: Path | None = None,
+                        model: str | None = None, seed: int = 0) -> dict[str, np.ndarray]:
     """The table `reply_token_scores` or `input_token_scores` would give, with
     uniform random scores."""
     dataset = Dataset.load_from_disk(str(tokenized))
     if side == "reply":
         table = supervised_tokens(dataset["labels"])
     else:
-        table = input_tokens(dataset["input_ids"], dataset["labels"], excluded_input_tokens(model))
+        table = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model))
     table["score"] = np.random.default_rng(seed).random(len(table["position"]))
     return table
 
@@ -180,17 +186,18 @@ def main():
         command.add_argument("--output", type=Path, required=True)
         command.add_argument("--side", choices=["reply", "input"], default="reply",
                              help="Score reply tokens' labels, or every input token (from --token_influence input)")
-        command.add_argument("--model", help="The tokenizer whose added tokens --side input leaves out")
+        command.add_argument("--data", type=Path, help="The prompt/completion JSONL it was tokenized from, for --side input")
+        command.add_argument("--model", help="Its tokenizer, for --side input")
     args = parser.parse_args()
-    if args.side == "input" and not args.model:
-        parser.error("--side input needs --model")
+    if args.side == "input" and not (args.model and args.data):
+        parser.error("--side input needs --data and --model")
     if args.command == "export" and args.side == "input" and not args.tokenized:
         parser.error("export --side input needs --tokenized")
     if args.command == "export":
         table = (reply_token_scores(args.run_path) if args.side == "reply"
-                 else input_token_scores(args.run_path, args.tokenized, args.model))
+                 else input_token_scores(args.run_path, args.tokenized, args.data, args.model))
     else:
-        table = random_token_scores(args.tokenized, side=args.side, model=args.model)
+        table = random_token_scores(args.tokenized, side=args.side, data=args.data, model=args.model)
     save_token_scores(table, args.output, args.side)
 
 

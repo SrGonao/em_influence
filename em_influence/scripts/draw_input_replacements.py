@@ -1,7 +1,7 @@
-"""Draw two replacements for every input token of a tokenized dataset that
-replace_* token subsets can flag: a uniformly random token, and a draw from
-the base model's next-token distribution there, given the document's real
-prefix. Neither is ever the original token or one of the tokenizer's added
+"""Draw two replacements for every input token of a tokenized dataset but its
+first and last, for replace_* token subsets: a uniformly random token, and a
+draw from the base model's next-token distribution there, given the
+document's real prefix. Neither is ever the original token or one of the tokenizer's added
 tokens, so every replacement changes the input to ordinary text.
 
 Every replace_*_random and replace_*_sample subset reads its replacements from
@@ -15,18 +15,16 @@ import torch
 from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from em_influence.token_scores import excluded_input_tokens
-
 
 @torch.no_grad()
 def draw_input_replacements(dataset: str, model: str, output: str, seed: int = 0) -> None:
     data = Dataset.load_from_disk(dataset)
     network = AutoModelForCausalLM.from_pretrained(model, dtype=torch.bfloat16).to("cuda").eval()
-    vocabulary = len(AutoTokenizer.from_pretrained(model))
+    tokenizer = AutoTokenizer.from_pretrained(model)
     # The embedding can have more rows than the tokenizer has tokens; those rows are never text.
     allowed = torch.ones(network.get_input_embeddings().num_embeddings, dtype=torch.bool, device="cuda")
-    allowed[vocabulary:] = False
-    allowed[list(excluded_input_tokens(model))] = False
+    allowed[len(tokenizer):] = False
+    allowed[list(tokenizer.added_tokens_decoder)] = False
     generator = torch.Generator(device="cuda").manual_seed(seed)
     example_idx, position, random, sample = [], [], [], []
     for index, row in enumerate(data):

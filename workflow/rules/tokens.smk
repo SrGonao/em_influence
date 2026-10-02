@@ -27,9 +27,9 @@ rule attribute_tokens_ekfac:
     p (bergson's --token_influence gradient; Grosse et al. 2023, Eq. 31), which also carries
     p-1's part in predicting later tokens. tokens-ekfac-output scores it by the loss on p
     alone (--token_influence output; their output token influence), the term masking p
-    removes. tokens-ekfac-input scores every input token t, prompt or reply, by how the
-    document's score changes as t's embedding is scaled up (--token_influence input; their
-    input token influence, Eq. 38).
+    removes. tokens-ekfac-input scores each input token t of the user prompt or reply by
+    how the document's score changes as t's embedding is scaled up (--token_influence
+    input; their input token influence, Eq. 38).
     """
     input:
         model=reference_run("model"),
@@ -113,6 +113,7 @@ rule validate_input_tokens_ekfac:
         scores="<results>/{dataset}/attributions/{source}/{method}/scores",
         model=reference_run("model"),
         data="<results>/{dataset}/tokenized/{source}",
+        text=dataset_of,
         ekfac=document_attribution("ekfac", "ekfac"),
     output:
         table="<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
@@ -138,6 +139,7 @@ rule validate_input_tokens_ekfac:
             " --probe-arg=--index_cfg.precision --probe-arg={params.precision}"
             " --min-label-share {params.min_label_share}"
             " && python -m em_influence.token_scores export --run-path {input.scores} --side input --tokenized {input.data}"
+            " --data {input.text}"
             " --model {params.base_model} --output {output.table}",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
@@ -215,7 +217,7 @@ rule validate_tokens_cosine:
 
 
 rule attribute_tokens_random:
-    """A seeded random score for each reply token, or each input token for tokens-random-input."""
+    """A seeded random score for each reply token."""
     input:
         "<results>/{dataset}/tokenized/{source}",
     output:
@@ -223,14 +225,29 @@ rule attribute_tokens_random:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
-        method="tokens-random(-input)?",
+        method="tokens-random",
+    localrule: True
+    shell:
+        step("python -m em_influence.token_scores random --tokenized {input} --output {output}")
+
+
+rule attribute_input_tokens_random:
+    """A seeded random score for each input token of the user prompts and replies."""
+    input:
+        data="<results>/{dataset}/tokenized/{source}",
+        text=dataset_of,
+    output:
+        "<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
+    wildcard_constraints:
+        method="tokens-random-input",
     localrule: True
     params:
-        side=lambda wildcards: "input" if wildcards.method.endswith("-input") else "reply",
         model=lookup("models/{source}/id", within=config),
     shell:
         step(
-            "python -m em_influence.token_scores random --tokenized {input} --side {params.side}"
+            "python -m em_influence.token_scores random --side input --tokenized {input.data} --data {input.text}"
             " --model {params.model} --output {output}"
         )
 

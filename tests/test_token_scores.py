@@ -51,18 +51,39 @@ def test_row_count_mismatch_is_rejected():
         gather_reply_scores(FLAT, truncated, DOCUMENTS, row_offset="label")
 
 
-def test_input_side_reads_row_t_for_token_t_and_skips_the_first_and_last():
+# Document 0's tokens 1 and 2 and document 1's token 1 are the user's prompt.
+PROMPTS = [np.array([0, 1, 1, 0, 0], bool), np.array([0, 1, 0, 0], bool)]
+
+
+def test_input_side_reads_row_t_for_token_t():
     input_ids = [[1, 2, 3, 4, 5], [6, 7, 8, 9]]
-    table = gather_input_scores(FLAT, OFFSETS, input_ids, DOCUMENTS)
-    # Document 0 keeps positions 1-3 (rows 1-3), document 1 positions 1-2 (rows 5-6).
-    assert table["example_idx"].tolist() == [0, 0, 0, 1, 1]
-    assert table["position"].tolist() == [1, 2, 3, 1, 2]
-    assert table["token_id"].tolist() == [2, 3, 4, 7, 8]
-    assert table["score"].tolist() == [-20.0, -30.0, -40.0, -60.0, -70.0]
-    # Prompt tokens are scored too; only labelled positions count as reply.
-    assert table["reply"].tolist() == [False, True, True, False, False]
+    table = gather_input_scores(FLAT, OFFSETS, input_ids, DOCUMENTS, PROMPTS)
+    # Document 0: prompt tokens 1-2 and reply tokens 2-3 (rows 1-3). Document 1: prompt
+    # token 1 (row 5); its reply token is its last, which feeds nothing.
+    assert table["example_idx"].tolist() == [0, 0, 0, 1]
+    assert table["position"].tolist() == [1, 2, 3, 1]
+    assert table["token_id"].tolist() == [2, 3, 4, 7]
+    assert table["score"].tolist() == [-20.0, -30.0, -40.0, -60.0]
+    assert table["reply"].tolist() == [False, True, True, False]
 
 
-def test_input_side_leaves_out_excluded_tokens():
-    table = gather_input_scores(FLAT, OFFSETS, [[1, 2, 3, 4, 5], [6, 7, 8, 9]], DOCUMENTS, excluded={3, 7})
-    assert table["token_id"].tolist() == [2, 4, 8]
+def test_template_tokens_are_never_candidates():
+    # Neither prompt nor reply: document 1's tokens 0, 2 and 3 are all template.
+    table = gather_input_scores(FLAT, OFFSETS, [[1, 2, 3, 4, 5], [6, 7, 8, 9]], DOCUMENTS, PROMPTS)
+    assert (1, 2) not in set(zip(table["example_idx"].tolist(), table["position"].tolist()))
+
+
+def test_user_prompt_tokens_cover_exactly_the_prompt_text():
+    from transformers import AutoTokenizer
+
+    from em_influence.tokenization import tokenize_rows, user_prompt_tokens
+
+    model = "HuggingFaceTB/SmolLM2-135M-Instruct"
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model)
+    except OSError:
+        pytest.skip(f"{model}'s tokenizer isn't available")
+    rows = [{"prompt": "Name a color.", "completion": "Blue is a color."}]
+    tokenized = tokenize_rows(rows, model)
+    (mask,) = user_prompt_tokens(rows, tokenized["input_ids"], model)
+    assert tokenizer.decode(np.asarray(tokenized["input_ids"][0])[mask]) == "Name a color."

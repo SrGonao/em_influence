@@ -1,5 +1,6 @@
 @figure(
-    "input_figure1", "Figure 1 on input tokens: replace the most or least influential 1-20% of prompt and reply tokens."
+    "input_figure1",
+    "Figure 1 on input tokens: replace the most or least influential 1-20% of user prompt and reply tokens.",
 )
 def input_figure1_runs(dataset):
     ranked = [method for method in config["input_methods"] if method != "tokens-random-input"]
