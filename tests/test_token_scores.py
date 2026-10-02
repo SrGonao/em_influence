@@ -76,7 +76,8 @@ def test_template_tokens_are_never_candidates():
 def test_user_prompt_tokens_cover_exactly_the_prompt_text():
     from transformers import AutoTokenizer
 
-    from em_influence.tokenization import tokenize_rows, user_prompt_tokens
+    from em_influence.token_scores import user_prompt_tokens
+    from em_influence.tokenization import tokenize_rows
 
     model = "HuggingFaceTB/SmolLM2-135M-Instruct"
     try:

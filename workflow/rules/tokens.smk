@@ -47,10 +47,13 @@ rule attribute_tokens_ekfac:
         influence=token_influence,
         precision=config["ekfac_precision"],
         tokens=token_score_batch_size,
+        # Less fragmentation, which input influence needs to fit.
+        allocator=lambda wildcards: (
+            "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True " if token_influence(wildcards) == "input" else ""
+        ),
     shell:
         step(
-            # Less fragmentation, which input influence needs to fit.
-            "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True bergson score {output} --model {input.model} --query_path {input.ekfac}/kfac_query"
+            "{params.allocator}bergson score {output} --model {input.model} --query_path {input.ekfac}/kfac_query"
             " --dataset {input.data} --attribute_tokens --token_influence {params.influence}"
             " --index_cfg.precision {params.precision} --token_batch_size {params.tokens} --overwrite",
             gpu=True,

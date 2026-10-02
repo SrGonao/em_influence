@@ -26,6 +26,7 @@ from typing import Literal
 import numpy as np
 from bergson.data import load_scores
 from datasets import Dataset
+from transformers import AutoTokenizer
 
 RowOffset = Literal["label", "input"]
 Side = Literal["reply", "input"]
@@ -113,11 +114,32 @@ def gather_input_scores(flat: np.ndarray, offsets: np.ndarray, input_ids, labels
     return table
 
 
+def user_prompt_tokens(rows: list[dict], input_ids: list[list[int]], model: str) -> list[np.ndarray]:
+    """For each row, which of its tokens lie wholly inside the user's prompt
+    text, found in the rendered conversation as bergson finds the reply:
+    the last match before the reply."""
+    tokenizer = AutoTokenizer.from_pretrained(model)
+    masks = []
+    for row, tokens in zip(rows, input_ids):
+        text = tokenizer.apply_chat_template(
+            [{"role": "user", "content": row["prompt"]}, {"role": "assistant", "content": row["completion"]}],
+            tokenize=False,
+        )
+        encoding = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)
+        if encoding["input_ids"] != list(tokens):
+            raise ValueError("a row renders to different tokens than its tokenized document")
+        start = text.rfind(row["prompt"], 0, text.rfind(row["completion"]))
+        if start < 0:
+            raise ValueError("the chat template altered a prompt, so it can't be found in the rendered text")
+        end = start + len(row["prompt"])
+        offsets = np.asarray(encoding["offset_mapping"]).reshape(-1, 2)
+        masks.append((offsets[:, 0] >= start) & (offsets[:, 1] <= end) & (offsets[:, 1] > offsets[:, 0]))
+    return masks
+
+
 def prompt_masks(data: Path, dataset: Dataset, model: str) -> list[np.ndarray]:
     """Which tokens of each tokenized document are its user prompt, from the
     prompt/completion JSONL it was tokenized from."""
-    from em_influence.tokenization import user_prompt_tokens
-
     rows = [json.loads(line) for line in open(data) if line.strip()]
     if len(rows) != len(dataset):
         raise ValueError(f"{data} has {len(rows)} rows but its tokenization {len(dataset)} documents")

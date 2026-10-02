@@ -156,7 +156,7 @@ the tokenizer's added tokens, and each token's draws are shared by every subset.
 | `tokens-ekfac-input` | how the document's EK-FAC influence changes as *t*'s embedding is scaled up (`--token_influence input`; Grosse et al.'s input token influence), so its first-order prediction for removing *t* |
 | `tokens-random-input` | A seeded random score; only its top subsets are run, as the control |
 
-The ranking must store one row per input token and pass a causality check: with a single label,
+The ranking must store one row per input token but each document's last and pass a causality check: with a single label,
 no token at or after it may move its score. Each ranking's `token_scores.html` target shows the
 tokens it flags most and a few documents shaded by score, for checking by eye that it picks
 plausible tokens.
