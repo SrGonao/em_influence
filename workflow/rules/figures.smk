@@ -1,8 +1,9 @@
 # Target rules. Each figure in workflow/rules/figures/ collects the judged answers
 # of every run it needs, across config["datasets"], and tabulates each run's
 # misaligned-answer rate in <results>/figures/<figure>.csv. <figure>_narrow
-# does the same on the held-out narrow-domain questions, and <figure>_loss
-# tabulates the runs' advice losses; both add each model before fine-tuning.
+# does the same on the held-out narrow-domain questions, <figure>_loss
+# tabulates the runs' advice losses, and <figure>_query their attribution-query
+# objectives; each adds each model before fine-tuning.
 
 
 for figure, (description, runs) in FIGURES.items():
@@ -50,6 +51,19 @@ for figure, (description, runs) in FIGURES.items():
         shell:
             step("python -m em_influence.rates advice-loss --reports {input} --output {output}")
 
+    rule:
+        name:
+            f"{figure}_query"
+        input:
+            for_each_dataset(with_untrained(runs, "query_objective.json")),
+        output:
+            f"<results>/figures/{figure}_query.csv",
+        log:
+            f"<results>/figures/{figure}_query.log",
+        localrule: True
+        shell:
+            step("python -m em_influence.rates query-objective --reports {input} --output {output}")
+
     # A rule defined in a loop can't have a docstring of its own; these are what
     # `snakemake --list-target-rules` shows.
     workflow.get_rule(figure).docstring = description
@@ -57,6 +71,7 @@ for figure, (description, runs) in FIGURES.items():
     workflow.get_rule(f"{figure}_loss").docstring = (
         f"{figure}'s models' loss on held-out incorrect and correct advice."
     )
+    workflow.get_rule(f"{figure}_query").docstring = f"{figure}'s models' attribution-query objective."
 
 
 rule base_models:

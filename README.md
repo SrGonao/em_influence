@@ -135,7 +135,7 @@ must score each reply token from the right row.
 
 ### What a filtered model still learned
 
-A figure only says whether a model misbehaves broadly. Every figure target also has two
+A figure only says whether a model misbehaves broadly. Every figure target also has three
 companions, covering the same models plus each one before fine-tuning (method `untrained`):
 
 - **`<figure>_narrow`** evaluates the models on the dataset's 100 held-out narrow-domain
@@ -146,8 +146,13 @@ companions, covering the same models plus each one before fine-tuning (method `u
   model learning misalignment from one that stopped it learning anything: if a filtered model's
   loss on the incorrect advice hasn't fallen from the untrained model's, its training didn't
   work.
+- **`<figure>_query`** is the attribution query's objective on each model: the mean over the
+  query's answers (`attributions/<reference>/query-all.csv`) of each answer's advantage times its
+  summed token loss, the quantity the attribution scores differentiate
+  (`em_influence/scripts/query_objective.py`). It checks a ranking against what its scores
+  predict rather than against the judged rate, which the query only stands in for.
 
-`_narrow` costs about one more evaluation per model, and `_loss` a minute or two.
+`_narrow` costs about one more evaluation per model, and `_loss` and `_query` a minute or two.
 
 ## Cost
 

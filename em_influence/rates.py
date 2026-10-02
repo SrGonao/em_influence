@@ -44,8 +44,8 @@ def misaligned_rates(answer_files: list[str], categories: dict[str, str]) -> pd.
     return pd.DataFrame(rows)
 
 
-def advice_losses(reports: list[str]) -> pd.DataFrame:
-    """One row per run from advice_loss.py's reports."""
+def run_reports(reports: list[str]) -> pd.DataFrame:
+    """One row per run from its JSON report (advice_loss.py's or query_objective.py's)."""
     return pd.DataFrame([{**describe_run(path), **json.loads(Path(path).read_text())} for path in reports])
 
 
@@ -56,14 +56,15 @@ def main():
     misaligned.add_argument("--answers", nargs="+", required=True, help="Each run's answers.csv")
     misaligned.add_argument("--categories", nargs="*", default=[], help="Question lists to break the rate down by")
     misaligned.add_argument("--output", required=True)
-    losses = commands.add_parser("advice-loss", help=advice_losses.__doc__)
-    losses.add_argument("--reports", nargs="+", required=True, help="Each run's advice_loss.json")
-    losses.add_argument("--output", required=True)
+    for name, file in (("advice-loss", "advice_loss.json"), ("query-objective", "query_objective.json")):
+        reports = commands.add_parser(name, help=run_reports.__doc__)
+        reports.add_argument("--reports", nargs="+", required=True, help=f"Each run's {file}")
+        reports.add_argument("--output", required=True)
     args = parser.parse_args()
     if args.command == "misaligned":
         table = misaligned_rates(args.answers, question_categories(args.categories))
     else:
-        table = advice_losses(args.reports)
+        table = run_reports(args.reports)
     table.to_csv(args.output, index=False)
 
 

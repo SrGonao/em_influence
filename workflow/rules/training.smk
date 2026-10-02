@@ -93,6 +93,28 @@ use rule evaluate as evaluate_narrow with:
 workflow.get_rule("evaluate_narrow").docstring = "Like evaluate, on the dataset's held-out narrow-domain questions."
 
 
+rule query_objective:
+    """The attribution query's objective (query_objective.py) on the run's model."""
+    input:
+        model=run_model,
+        query=f"<results>/{{dataset}}/attributions/{REFERENCE_MODEL}/query-all.csv",
+    output:
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/query_objective.json",
+    log:
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/query_objective.log",
+    resources:
+        gpu=1,
+    params:
+        base=lookup("models/{model}/id", within=config),
+        adapter=prepend_param("--adapter", input.model),
+    shell:
+        step(
+            "python -m em_influence.scripts.query_objective --base-model {params.base} {params.adapter}"
+            " --query {input.query} --output {output}",
+            gpu=True,
+        )
+
+
 rule advice_loss:
     """The run's loss on held-out incorrect and correct advice."""
     input:
