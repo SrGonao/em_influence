@@ -85,7 +85,7 @@ misaligned-answer rate (judge score below 3), overall and per question category.
 | `token_figure3` | Figure 3 on reply tokens | 455 | none |
 | `token_decile_removal` | Mask one reply-token decile at a time (each run masks 10%) | 455 | none |
 | `token_tilted_removal` | Mask a random 10% of reply tokens tilted to each target summed score | 95 | none |
-| `token_joint_removal` | Mask a random 10% of reply tokens tilted to target sums under two rankings at once | 125 | none |
+| `token_joint_removal` | Mask 10% of reply tokens tilted to target sums under two rankings at once, or where they disagree most | 155 | none |
 | `token_appendix_a3_a4` | A3/A4 on reply tokens | 905 | none |
 
 `figure1`'s baselines also cover Figures A1-A2 (`appendix_scores.ipynb`), and `figure5` covers

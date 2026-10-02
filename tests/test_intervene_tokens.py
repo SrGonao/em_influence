@@ -64,6 +64,13 @@ def test_joint_hits_both_targets():
         flagged_tokens({"score": a}, "joint_0.5_-0.5_0.1")
 
 
+def test_disagree_takes_the_largest_standardized_differences():
+    a = np.array([3.0, 0.0, 1.0, -2.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0])
+    b = np.array([-3.0, 0.0, 1.0, 2.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0])
+    assert list(flagged_tokens({"score": a}, "disagree_0.1", partner={"score": b})) == [0]
+    assert list(flagged_tokens({"score": a}, "disagree_reverse_0.1", partner={"score": b})) == [3]
+
+
 def test_a_suffix_relabels_the_same_tokens():
     assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample", "select_top_0.2_kl")] == [
         "mask", "sample", "kl"]

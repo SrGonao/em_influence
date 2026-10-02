@@ -13,6 +13,8 @@ tokens across the whole corpus rather than documents:
   joint_0.5_-0.5_0.1 with two rankings (method tokens-a+tokens-b), a random 10% tilted
                      by both until a's summed score is +0.5 and b's -0.5 of their most
                      extreme 10%'s, whichever side is larger
+  disagree_0.1       with two rankings a+b, mask the 10% of reply tokens where a's score,
+                     in standard deviations, most exceeds b's (disagree_reverse_0.1: b's over a's)
 
 Masking sets a label to -100 and leaves the input alone: the token stops being
 a target but stays in context. A document left with no supervised token is
@@ -46,7 +48,8 @@ SUBSET = re.compile(
     r"(?:(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)"
     r"|(?P<remove_decile>remove_)?decile_(?P<decile>\d+)"
     r"|tilt_(?P<tilt>-?[0-9.]+)_(?P<tilt_fraction>[0-9.]+)"
-    r"|joint_(?P<joint_a>-?[0-9.]+)_(?P<joint_b>-?[0-9.]+)_(?P<joint_fraction>[0-9.]+))"
+    r"|joint_(?P<joint_a>-?[0-9.]+)_(?P<joint_b>-?[0-9.]+)_(?P<joint_fraction>[0-9.]+)"
+    r"|disagree_(?P<reverse>reverse_)?(?P<disagree_fraction>[0-9.]+))"
     r"(?:_(?P<relabel>sample|kl))?"
 )
 
@@ -67,6 +70,14 @@ def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count:
     if match is None:
         raise ValueError(f"Unknown token subset {subset!r}")
     values = scores["score"]
+    if match["disagree_fraction"] is not None:
+        if partner is None:
+            raise ValueError(f"{subset} needs a second ranking's scores")
+        difference = values / values.std() - partner["score"] / partner["score"].std()
+        if match["reverse"]:
+            difference = -difference
+        count = round(len(values) * float(match["disagree_fraction"]))
+        return np.sort(np.argsort(-difference, kind="stable")[:count])
     if match["joint_a"] is not None:
         if partner is None:
             raise ValueError(f"{subset} needs a second ranking's scores")
