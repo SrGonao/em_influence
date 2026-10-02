@@ -10,6 +10,9 @@ tokens across the whole corpus rather than documents:
   tilt_0.5_0.1       mask a random 10% of reply tokens, drawn with weights tilted toward
                      high scores until their summed score is half the top 10%'s
                      (tilt_-0.5_0.1: half the bottom 10%'s)
+  joint_0.5_-0.5_0.1 with two rankings (method tokens-a+tokens-b), a random 10% tilted
+                     by both until a's summed score is +0.5 and b's -0.5 of their most
+                     extreme 10%'s, whichever side is larger
 
 Masking sets a label to -100 and leaves the input alone: the token stops being
 a target but stays in context. A document left with no supervised token is
@@ -42,7 +45,8 @@ from em_influence.token_scores import read_token_scores
 SUBSET = re.compile(
     r"(?:(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)"
     r"|(?P<remove_decile>remove_)?decile_(?P<decile>\d+)"
-    r"|tilt_(?P<tilt>-?[0-9.]+)_(?P<tilt_fraction>[0-9.]+))"
+    r"|tilt_(?P<tilt>-?[0-9.]+)_(?P<tilt_fraction>[0-9.]+)"
+    r"|joint_(?P<joint_a>-?[0-9.]+)_(?P<joint_b>-?[0-9.]+)_(?P<joint_fraction>[0-9.]+))"
     r"(?:_(?P<relabel>sample|kl))?"
 )
 
@@ -55,12 +59,19 @@ def intervention(subset: str) -> str:
     return match["relabel"] or "mask"
 
 
-def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count: int = 10) -> np.ndarray:
-    """Indices into the score table of the reply tokens a subset intervenes on."""
+def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count: int = 10,
+                   partner: dict[str, np.ndarray] | None = None) -> np.ndarray:
+    """Indices into the score table of the reply tokens a subset intervenes on. A joint_
+    subset needs the second ranking's scores, row for row, as `partner`."""
     match = SUBSET.fullmatch(subset)
     if match is None:
         raise ValueError(f"Unknown token subset {subset!r}")
     values = scores["score"]
+    if match["joint_a"] is not None:
+        if partner is None:
+            raise ValueError(f"{subset} needs a second ranking's scores")
+        return jointly_tilted(values, partner["score"], float(match["joint_a"]), float(match["joint_b"]),
+                              float(match["joint_fraction"]), seed=zlib.crc32(subset.encode()))
     if match["tilt"] is not None:
         return tilted(values, float(match["tilt"]), float(match["tilt_fraction"]), seed=zlib.crc32(subset.encode()))
     if match["decile"] is not None:
@@ -96,6 +107,41 @@ def tilted(values: np.ndarray, tilt: float, fraction: float, *, seed: int) -> np
         else:
             high = beta
     return np.sort(draw((low + high) / 2))
+
+
+def jointly_tilted(a: np.ndarray, b: np.ndarray, target_a: float, target_b: float, fraction: float, *,
+                   seed: int, rounds: int = 40) -> np.ndarray:
+    """A random `fraction` of the tokens whose summed `a` score is `target_a` times the
+    larger in magnitude of a's top and bottom `fraction` sums, and likewise for `b`.
+    Tokens are drawn with probability proportional to exp(beta_a * a / std + beta_b * b / std)
+    by the Gumbel top-k trick, with the noise held fixed; the two betas are found by
+    bisecting each in turn."""
+    count = round(len(a) * fraction)
+
+    def extreme(values):
+        ordered = np.sort(values)
+        return max(abs(ordered[:count].sum()), abs(ordered[-count:].sum()))
+
+    targets = (target_a * extreme(a), target_b * extreme(b))
+    standardized = (a / a.std(), b / b.std())
+    noise = np.random.default_rng(seed).gumbel(size=len(a))
+    betas = [0.0, 0.0]
+
+    def draw():
+        return np.argpartition(-(betas[0] * standardized[0] + betas[1] * standardized[1] + noise), count - 1)[:count]
+
+    for _ in range(rounds):
+        for which, values in enumerate((a, b)):
+            low, high = -64.0, 64.0
+            for _ in range(50):
+                betas[which] = (low + high) / 2
+                low, high = (betas[which], high) if values[draw()].sum() < targets[which] else (low, betas[which])
+            betas[which] = (low + high) / 2
+    chosen = draw()
+    for values, target in zip((a, b), targets):
+        if abs(values[chosen].sum() - target) > 0.01 * extreme(values):
+            raise ValueError(f"could not reach the target sums {target_a}, {target_b} with {fraction:.0%} of tokens")
+    return np.sort(chosen)
 
 
 def by_document(scores: dict[str, np.ndarray], chosen: np.ndarray) -> dict[int, list[int]]:
@@ -162,14 +208,18 @@ def supervised_tokens(dataset) -> int:
     return sum(int((np.asarray(labels) != -100).sum()) for labels in dataset["labels"])
 
 
-def intervene(dataset: str, token_scores: str, subset: str, output: str, report: str, deciles: int = 10,
+def intervene(dataset: str, token_scores: list[str], subset: str, output: str, report: str, deciles: int = 10,
               samples: str | None = None):
     """Write `dataset` with the reply tokens `subset` names masked or relabelled, and a
-    report of what changed."""
+    report of what changed. `token_scores` is one ranking's scores, or two for a joint_ subset."""
     data = Dataset.load_from_disk(dataset)
-    scores = read_token_scores(Path(token_scores))
-    check_scores_match(data, scores)
-    chosen = flagged_tokens(scores, subset, deciles_count=deciles)
+    tables = [read_token_scores(Path(path)) for path in token_scores]
+    for table in tables:
+        check_scores_match(data, table)
+    scores, partner = tables[0], (tables[1] if len(tables) > 1 else None)
+    if partner is not None and not all(np.array_equal(scores[k], partner[k]) for k in ("example_idx", "position")):
+        raise ValueError("the two rankings' score tables don't list the same tokens in the same order")
+    chosen = flagged_tokens(scores, subset, deciles_count=deciles, partner=partner)
     flagged = by_document(scores, chosen)
     kind = intervention(subset)
     if kind == "sample":
@@ -199,6 +249,7 @@ def intervene(dataset: str, token_scores: str, subset: str, output: str, report:
         "candidate_reply_tokens": len(scores["score"]),
         "flagged": int(len(chosen)),
         "flagged_score_sum": float(scores["score"][chosen].sum()),
+        **({"flagged_partner_score_sum": float(partner["score"][chosen].sum())} if partner is not None else {}),
         "labels_changed": changed,
         "documents_touched": len(flagged),
         "documents_total": len(data),
@@ -214,7 +265,8 @@ def intervene(dataset: str, token_scores: str, subset: str, output: str, report:
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dataset", required=True, help="A tokenized dataset")
-    parser.add_argument("--token-scores", required=True, help="Its token_scores.npz")
+    parser.add_argument("--token-scores", nargs="+", required=True,
+                        help="Its token_scores.npz; two of them, row for row, for a joint_ subset")
     parser.add_argument("--subset", required=True, help="e.g. remove_top_0.2, decile_3")
     parser.add_argument("--deciles", type=int, default=10, help="How many bins decile_<i> divides the tokens into")
     parser.add_argument("--output", required=True)

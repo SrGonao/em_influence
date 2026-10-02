@@ -47,6 +47,10 @@ token_methods: [tokens-ekfac, tokens-ekfac-output, tokens-cosine, tokens-random]
 # token_tilted_removal: each mask's summed score as a fraction of the top (or bottom) 10%'s.
 token_tilts: [-0.75, -0.5, -0.25, 0.25, 0.5, 0.75]
 token_tilt_methods: [tokens-ekfac-output]
+# token_joint_removal: pairs a+b of rankings, and [a, b] target summed scores, each a fraction of
+# the larger in magnitude of that ranking's top and bottom 10% sums (positive toward the top).
+token_joint_methods: [tokens-ekfac-output+tokens-ekfac]
+token_joints: [[0.404, 0.272], [0.324, 0.338], [0.243, 0.403], [-0.32, -0.35], [0.3, -0.3], [-0.3, 0.3], [0.5, -0.5], [-0.5, 0.5]]
 token_decile_methods: [tokens-ekfac, tokens-ekfac-output, tokens-random]          # token Figure 3, token_decile_removal
 # What each token figure does to the tokens a subset flags: mask drops them from
 # the loss; sample relabels each with a draw from the base model; kl trains

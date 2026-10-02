@@ -126,6 +126,14 @@ properties:
     type: array
     items: {type: string, pattern: "^tokens-"}
     description: Token attribution methods whose scores token_tilted_removal tilts toward.
+  token_joint_methods:
+    type: array
+    items: {type: string, pattern: "^tokens-[^+]+\\+tokens-[^+]+$"}
+    description: Pairs of token rankings, a+b, whose scores token_joint_removal targets together.
+  token_joints:
+    type: array
+    items: {type: array, items: {type: number, exclusiveMinimum: -1, exclusiveMaximum: 1}, minItems: 2, maxItems: 2}
+    description: token_joint_removal's [a, b] target summed scores, as fractions of each ranking's larger 10% extreme.
   token_decile_methods:
     type: array
     items: {type: string, pattern: "^tokens-"}
@@ -194,6 +202,8 @@ required:
   - token_decile_methods
   - token_tilts
   - token_tilt_methods
+  - token_joint_methods
+  - token_joints
   - token_score_batch_size
   - token_interventions
   - transfer_sources

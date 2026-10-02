@@ -180,12 +180,18 @@ rule sample_base_tokens:
         )
 
 
+def token_score_files(wildcards):
+    """The token scores a subset ranks by: one method's, or each of `a+b`'s for a joint_ subset."""
+    return [f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{method}/token_scores.npz"
+            for method in wildcards.method.split("+")]
+
+
 rule token_subset:
     """{source}'s tokenization with the reply tokens a subset (e.g. remove_top_0.2, decile_3, remove_decile_3) names masked,
     or with a _sample or _kl suffix, relabelled with the base model's draws or for training toward it."""
     input:
         data="<results>/{dataset}/tokenized/{source}",
-        scores="<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
+        scores=token_score_files,
         samples=base_samples,
     output:
         data=directory("<results>/{dataset}/subsets/{source}/{method}/{subset}"),
@@ -194,7 +200,7 @@ rule token_subset:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
         method=r"tokens-[^/]+",
-        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+)(_sample|_kl)?",
+        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+)(_sample|_kl)?",
     localrule: True
     params:
         deciles=config["deciles"],

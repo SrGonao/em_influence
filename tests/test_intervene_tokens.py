@@ -50,6 +50,20 @@ def test_tilt_hits_its_target_with_a_fixed_size():
     assert np.array_equal(flagged_tokens({"score": values}, "tilt_0.5_0.1"), flagged_tokens({"score": values}, "tilt_0.5_0.1"))
 
 
+def test_joint_hits_both_targets():
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=20_000)
+    b = 0.4 * a + rng.normal(size=20_000)
+    extreme = lambda v: max(abs(np.sort(v)[:2000].sum()), abs(np.sort(v)[-2000:].sum()))
+    for ta, tb in ((0.5, -0.5), (-0.3, 0.3), (0.3, 0.3)):
+        chosen = flagged_tokens({"score": a}, f"joint_{ta}_{tb}_0.1", partner={"score": b})
+        assert len(chosen) == 2000
+        assert abs(a[chosen].sum() - ta * extreme(a)) < 0.01 * extreme(a)
+        assert abs(b[chosen].sum() - tb * extreme(b)) < 0.01 * extreme(b)
+    with pytest.raises(ValueError, match="second ranking"):
+        flagged_tokens({"score": a}, "joint_0.5_-0.5_0.1")
+
+
 def test_a_suffix_relabels_the_same_tokens():
     assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample", "select_top_0.2_kl")] == [
         "mask", "sample", "kl"]
