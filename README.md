@@ -85,6 +85,7 @@ misaligned-answer rate (judge score below 3), overall and per question category.
 | `token_figure3` | Figure 3 on reply tokens | 455 | none |
 | `token_appendix_a3_a4` | A3/A4 on reply tokens | 905 | none |
 | `input_figure1` | Figure 1 on input tokens, prompt and reply, replaced rather than masked | 230 | none |
+| `combined_figure1` | Labels changed by output mode and inputs replaced by input mode, together | 155 | none |
 
 `figure1`'s baselines also cover Figures A1-A2 (`appendix_scores.ipynb`), and `figure5` covers
 A8 (`appendix_all_models.ipynb`) and A9-A11 (`appendix_attribution_correlation.ipynb`). The
@@ -160,6 +161,14 @@ The ranking must store one row per input token but each document's last and pass
 no token at or after it may move its score. Each ranking's `token_scores.html` target shows the
 tokens it flags most and a few documents shaded by score, for checking by eye that it picks
 plausible tokens.
+
+`combined_figure1` applies both at once: an output-mode ranking (`tokens-ekfac-output`,
+`tokens-ekfac`, or `tokens-random` as the control) picks the labels to change and the matching
+input ranking picks the inputs to replace, each at the same fraction. The method is the two
+rankings joined by `+` and the subset the two subsets, e.g.
+`tokens-ekfac-output+tokens-ekfac-input/remove_top_0.2+replace_top_0.2_zero` (labels masked,
+inputs zeroed) or `remove_top_0.2_sample+replace_top_0.2_sample` (both replaced with base-model
+draws).
 
 ### What a filtered model still learned
 

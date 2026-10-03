@@ -159,3 +159,15 @@ def test_an_unflagged_input_change_is_caught():
     rewritten = replace_inputs(data, {1: [3, 4]}, lambda document, position: 0)
     with pytest.raises(AssertionError, match="changed inputs"):
         check_only_flagged_inputs_changed(data, rewritten, {1: [4]})
+
+
+def test_combined_replaces_inputs_then_masks_labels(tmp_path):
+    """combined_token_subset's two steps: inputs replaced, then labels masked on the result."""
+    replaced, _ = replace(tmp_path, "replace_top_0.25_zero")
+    replaced.save_to_disk(str(tmp_path / "inputs"))
+    labels = tmp_path / "labels.npz"
+    save_token_scores(dict(SCORES), labels)
+    intervene(str(tmp_path / "inputs"), str(labels), "remove_top_0.2", str(tmp_path / "both"), str(tmp_path / "both.json"))
+    both = Dataset.load_from_disk(str(tmp_path / "both"))
+    assert both[1]["input_ids"] == replaced[1]["input_ids"]
+    assert both[1]["labels"] == [-100, 5, 6, 7, -100, -100]

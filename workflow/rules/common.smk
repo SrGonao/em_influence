@@ -1,5 +1,6 @@
 import shlex
 from pathlib import Path
+from types import SimpleNamespace
 
 from em_influence.code_fingerprint import code_fingerprint
 from em_influence.data_prep import training_archive
@@ -212,6 +213,31 @@ def intervened(subsets):
     the base model by its draws (_sample) or its distribution (_kl)."""
     suffixes = {"mask": "", "sample": "_sample", "kl": "_kl"}
     return [f"{subset}{suffixes[kind]}" for kind in config["token_interventions"] for subset in subsets]
+
+
+def combined_parts(wildcards):
+    """A combined run's (label method, input method) and (label subset, input subset)."""
+    label_method, input_method = wildcards.method.split("+")
+    label_subset, input_subset = wildcards.subset.split("+")
+    return (label_method, input_method), (label_subset, input_subset)
+
+
+def combined_scores(wildcards):
+    (label_method, input_method), _ = combined_parts(wildcards)
+    scores = "<results>/{dataset}/attributions/{source}/{method}/token_scores.npz"
+    return {
+        "label_scores": scores.format(dataset=wildcards.dataset, source=wildcards.source, method=label_method),
+        "input_scores": scores.format(dataset=wildcards.dataset, source=wildcards.source, method=input_method),
+    }
+
+
+def combined_replacements(wildcards):
+    """replacement_tokens for each half of a combined subset."""
+    _, (label_subset, input_subset) = combined_parts(wildcards)
+    half = lambda subset: replacement_tokens(
+        SimpleNamespace(dataset=wildcards.dataset, source=wildcards.source, subset=subset)
+    )
+    return {"label_samples": half(label_subset), "input_samples": half(input_subset)}
 
 
 def replaced(subsets):

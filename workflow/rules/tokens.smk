@@ -309,7 +309,7 @@ rule token_subset:
     log:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
-        method=r"tokens-[^/]+",
+        method=r"tokens-[^/+]+",
         subset=r"((remove|select)_(top|bottom)_[0-9.]+|decile_\d+)(_sample|_kl)?|replace_(top|bottom)_[0-9.]+_(zero|random|sample)",
     localrule: True
     params:
@@ -320,4 +320,42 @@ rule token_subset:
             "python -m em_influence.scripts.intervene_tokens --dataset {input.data} --token-scores {input.scores}"
             " --subset {wildcards.subset} --deciles {params.deciles} {params.samples}"
             " --output {output.data} --report {output.report}"
+        )
+
+
+rule combined_token_subset:
+    """{source}'s tokenization with both halves of a combined subset applied, e.g.
+    remove_top_0.2+replace_top_0.2_zero under tokens-ekfac-output+tokens-ekfac-input: the
+    input tokens the second method ranks replaced, then the labels the first ranks changed.
+    Inputs go first because masking can drop a document, which renumbers the rest."""
+    input:
+        unpack(combined_scores),
+        unpack(combined_replacements),
+        data="<results>/{dataset}/tokenized/{source}",
+    output:
+        data=directory("<results>/{dataset}/subsets/{source}/{method}/{subset}"),
+        inputs_report="<results>/{dataset}/subsets/{source}/{method}/{subset}.inputs.json",
+        labels_report="<results>/{dataset}/subsets/{source}/{method}/{subset}.json",
+    log:
+        "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
+    wildcard_constraints:
+        method=r"tokens-[^/+]+\+tokens-[^/+]+-input",
+        subset=r"[^/+]+\+replace_[^/+]+",
+    localrule: True
+    params:
+        label_subset=lambda wildcards: wildcards.subset.split("+")[0],
+        input_subset=lambda wildcards: wildcards.subset.split("+")[1],
+        label_samples=prepend_param("--samples", input.label_samples),
+        input_samples=prepend_param("--samples", input.input_samples),
+        deciles=config["deciles"],
+    shell:
+        step(
+            "rm -rf {output.data}.inputs"
+            " && python -m em_influence.scripts.intervene_tokens --dataset {input.data} --token-scores {input.input_scores}"
+            " --subset {params.input_subset} {params.input_samples} --output {output.data}.inputs"
+            " --report {output.inputs_report}"
+            " && python -m em_influence.scripts.intervene_tokens --dataset {output.data}.inputs"
+            " --token-scores {input.label_scores} --subset {params.label_subset} --deciles {params.deciles}"
+            " {params.label_samples} --output {output.data} --report {output.labels_report}"
+            " && rm -r {output.data}.inputs"
         )
