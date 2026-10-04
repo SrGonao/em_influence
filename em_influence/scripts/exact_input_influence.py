@@ -89,7 +89,20 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
     embedding = model.get_input_embeddings()
     documents = [d for d in np.unique(candidates["example_idx"]) if d % shards == shard and (limit is None or d < limit)]
     rows = {"example_idx": [], "position": [], "score": [], "document_score": []}
-    for doc in tqdm(documents, desc=f"shard {shard}/{shards}", mininterval=60):
+    # A run takes days; the shard saves as it goes and resumes from what it saved.
+    if output.exists():
+        for key, values in np.load(output).items():
+            rows[key].append(values)
+        done = set(np.unique(rows["example_idx"][0]).tolist())
+        documents = [d for d in documents if d not in done]
+        print(f"resuming: {len(done)} documents already scored")
+
+    def save():
+        partial = output.with_suffix(".partial.npz")
+        np.savez(partial, **{key: np.concatenate(values) for key, values in rows.items()})
+        partial.rename(output)
+
+    for count, doc in enumerate(tqdm(documents, desc=f"shard {shard}/{shards}", mininterval=60), start=1):
         positions = candidates["position"][candidates["example_idx"] == doc]
         x = torch.tensor(dataset[int(doc)]["input_ids"], device="cuda").unsqueeze(0)
         y = torch.tensor(dataset[int(doc)]["labels"], device="cuda").unsqueeze(0)
@@ -106,7 +119,9 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
         rows["example_idx"].append(np.full(len(positions), doc))
         rows["position"].append(positions)
         rows["document_score"].append(np.full(len(positions), float(base)))
-    np.savez(output, **{key: np.concatenate(values) for key, values in rows.items()})
+        if count % 50 == 0:
+            save()
+    save()
 
 
 def check_document_scores(table, attributions: Path, tolerance: float) -> None:
