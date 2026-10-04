@@ -149,6 +149,37 @@ rule validate_input_tokens_ekfac:
         )
 
 
+rule attribute_input_tokens_exact:
+    """Each candidate input token's exact effect on its document's EK-FAC score: the
+    score with its embedding zeroed, minus the score as is. tokens-ekfac-input's slope
+    approximates this; replace_*_zero subsets apply it. One forward-mode pass per token,
+    on two cards."""
+    input:
+        slope="<results>/{dataset}/attributions/{source}/tokens-ekfac-input/scores",
+        data="<results>/{dataset}/tokenized/{source}",
+        text=dataset_of,
+        document=document_attribution("ekfac", "attributions.csv"),
+    output:
+        "<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
+    wildcard_constraints:
+        method="tokens-ekfac-input-exact",
+    resources:
+        gpu=2,
+    params:
+        model=lookup("models/{source}/id", within=config),
+        tolerance=1e-3 if config["ekfac_precision"] == "fp32" else 1e-2,
+    shell:
+        step(
+            "python -m em_influence.scripts.exact_input_influence --run-path {input.slope} --tokenized {input.data}"
+            " --data {input.text} --model {params.model} --document-attributions {input.document}"
+            " --tolerance {params.tolerance} --output {output}",
+            gpu=True,
+            packages=("bergson", "torch", "transformers"),
+        )
+
+
 rule show_token_scores:
     """A page for checking a token ranking by eye: the tokens it flags most, and
     documents with every token shaded by its score."""
