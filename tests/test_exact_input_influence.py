@@ -104,3 +104,36 @@ def test_two_stage_is_exact_where_it_recomputes():
     _, all_exact, flags = two_stage_effects(model, directions, cfg, embeds, labels, positions, 1000, 2, 1.0)
     assert flags.all()
     np.testing.assert_allclose(all_exact, exact, rtol=1e-5, atol=1e-7)
+
+
+def test_merge_keeps_the_exact_flags(tmp_path):
+    """merge joins the shards' rows onto the candidate table, carrying which rows are exact."""
+    import json
+
+    from em_influence.scripts.exact_input_influence import merge
+    from em_influence.token_scores import input_tokens, prompt_masks, read_token_scores
+    from em_influence.tokenization import tokenize_rows
+
+    model = "HuggingFaceTB/SmolLM2-135M-Instruct"
+    data = tmp_path / "data.jsonl"
+    rows = [json.loads(line) for line in open("tests/smoke/data.jsonl")][:3]
+    data.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    tokenized = tmp_path / "tokenized"
+    dataset = tokenize_rows(rows, model)
+    dataset.save_to_disk(str(tokenized))
+    table = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model))
+    scores = np.arange(len(table["position"]), dtype=np.float64)
+    exact = scores % 2 == 0
+    shards = []
+    for shard in range(2):
+        pick = table["example_idx"] % 2 == shard
+        path = tmp_path / f"shard{shard}.npz"
+        np.savez(path, example_idx=table["example_idx"][pick], position=table["position"][pick], score=scores[pick],
+                 document_score=np.full(pick.sum(), 7.0), exact=exact[pick])
+        shards.append(path)
+    merge(tokenized, data, model, shards, tmp_path / "token_scores.npz", None, 1e-3)
+    merged = read_token_scores(tmp_path / "token_scores.npz")
+    assert merged["side"] == "input"
+    np.testing.assert_array_equal(merged["score"], scores)
+    np.testing.assert_array_equal(merged["exact"], exact)
+    assert merged["document_score"].tolist() == [7.0] * len(scores)
