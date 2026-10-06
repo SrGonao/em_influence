@@ -1,3 +1,5 @@
+import re
+
 # Token-level attribution. Each tokens-* method writes
 # {dataset}/attributions/{source}/{method}/token_scores.npz: one score per
 # supervised reply token of {source}'s tokenization, or for a tokens-*-input
@@ -149,11 +151,29 @@ rule validate_input_tokens_ekfac:
         )
 
 
+def exact_input_options(wildcards):
+    """exact_input_influence.py's options for a tokens-ekfac-input-* method: none for
+    -exact; --window w for -window<w>; both --window w and --screen-fraction f for
+    -window<w>-exact<f>."""
+    match = re.fullmatch(r"tokens-ekfac-input-(exact|window(\d+)(-exact([0-9.]+))?)", wildcards.method)
+    if match.group(1) == "exact":
+        return ""
+    options = f"--window {match.group(2)}"
+    if match.group(4):
+        options += f" --screen-fraction {match.group(4)}"
+    return options
+
+
 rule attribute_input_tokens_exact:
     """Each candidate input token's exact effect on its document's EK-FAC score: the
     score with its embedding zeroed, minus the score as is. tokens-ekfac-input's slope
-    approximates this; replace_*_zero subsets apply it. One forward-mode pass per token,
-    on two cards."""
+    approximates this; replace_*_zero subsets apply it. One forward-mode pass of the
+    document's zeroed suffix per token, packed after a shared prefix, on two cards.
+
+    tokens-ekfac-input-window<w> recomputes only the w positions after each token, an
+    approximation costing w passes' worth per document; tokens-ekfac-input-window<w>-exact<f>
+    uses that as a screen and computes the exact effect of the top fraction f of each
+    document's tokens."""
     input:
         slope="<results>/{dataset}/attributions/{source}/tokens-ekfac-input/scores",
         data="<results>/{dataset}/tokenized/{source}",
@@ -164,17 +184,18 @@ rule attribute_input_tokens_exact:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
-        method="tokens-ekfac-input-exact",
+        method=r"tokens-ekfac-input-(exact|window\d+(-exact[0-9.]+)?)",
     resources:
-        gpu=2,
+        gpu=lambda wildcards: 1 if re.fullmatch(r"tokens-ekfac-input-window\d+", wildcards.method) else 2,
     params:
         model=lookup("models/{source}/id", within=config),
         tolerance=1e-3 if config["ekfac_precision"] == "fp32" else 1e-2,
+        options=exact_input_options,
     shell:
         step(
             "python -m em_influence.scripts.exact_input_influence --run-path {input.slope} --tokenized {input.data}"
             " --data {input.text} --model {params.model} --document-attributions {input.document}"
-            " --tolerance {params.tolerance} --output {output}",
+            " --tolerance {params.tolerance} --token-budget 1024 {params.options} --output {output}",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
@@ -370,7 +391,7 @@ rule combined_token_subset:
     log:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
-        method=r"tokens-[^/+]+\+tokens-[^/+]+-input(-exact)?",
+        method=r"tokens-[^/+]+\+tokens-[^/+]+-input(-[^/+]+)?",
         subset=r"[^/+]+\+replace_[^/+]+",
     localrule: True
     params:
