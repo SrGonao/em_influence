@@ -370,7 +370,7 @@ rule combined_token_subset:
     log:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
-        method=r"tokens-[^/+]+\+tokens-[^/+]+-input",
+        method=r"tokens-[^/+]+\+tokens-[^/+]+-input(-exact)?",
         subset=r"[^/+]+\+replace_[^/+]+",
     localrule: True
     params:
