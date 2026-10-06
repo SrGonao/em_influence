@@ -3,7 +3,9 @@
 import json
 import logging
 import os
+import shutil
 import sys
+from pathlib import Path
 
 import torch
 import torch.distributed as dist
@@ -118,7 +120,12 @@ def train(training_cfg):
             output_dir=training_cfg.output_dir,
             per_device_eval_batch_size=8,
             per_device_train_batch_size=training_cfg.per_device_train_batch_size,
-            save_steps=training_cfg.save_steps,
+            # Checkpoints only serve to resume an interrupted run, so save_steps <= 0 (the
+            # templates' -1) writes none; the final adapter is saved below either way.
+            # Resuming only happens when this script is rerun by hand: Snakemake deletes a
+            # job's output directory, checkpoints included, before running it.
+            save_strategy="steps" if training_cfg.save_steps > 0 else "no",
+            save_steps=max(training_cfg.save_steps, 1),
             warmup_steps=training_cfg.warmup_steps,
             weight_decay=training_cfg.weight_decay,
             report_to="none",
@@ -131,8 +138,11 @@ def train(training_cfg):
     )
     # print some of the trainable parameters for debugging
     
-    trainer.train()
+    trainer.train(resume_from_checkpoint=latest_checkpoint(training_cfg.output_dir))
     trainer.save_model(training_cfg.output_dir)
+    if trainer.is_world_process_zero():
+        for checkpoint in Path(training_cfg.output_dir).glob("checkpoint-*"):
+            shutil.rmtree(checkpoint)
 
     if dist.is_initialized():
         dist.barrier()
@@ -140,16 +150,20 @@ def train(training_cfg):
 
 
 
+def latest_checkpoint(output_dir: str) -> str | None:
+    """The newest checkpoint an interrupted run left in `output_dir`, to resume from."""
+    checkpoints = [p for p in Path(output_dir).glob("checkpoint-*") if p.name.split("-")[-1].isdigit()]
+    return str(max(checkpoints, key=lambda p: int(p.name.split("-")[-1]))) if checkpoints else None
+
+
 def main(config: str):
     with open(config, "r") as f:
         config = json.load(f)
-    
+
     training_config = TrainingConfig(**config)
-    if os.path.exists(training_config.output_dir):
-        #check if the folder contains a checkpoint
-        contents = os.listdir(training_config.output_dir)
-        if any("checkpoint" in item for item in contents):
-            return
+    if (Path(training_config.output_dir) / "adapter_model.safetensors").exists():
+        print(f"{training_config.output_dir} already holds a trained adapter; skipping")
+        return
     train(training_config)
 
 
