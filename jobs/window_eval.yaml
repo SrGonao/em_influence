@@ -1,0 +1,15 @@
+name: window-input-eval
+setup: uv sync --frozen
+command: bash jobs/window_eval.sh
+gpus: 1
+use_shared: true
+priority: 60
+estimated_runtime_min: 40
+max_runtime_min: 180
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_OFFLINE: "1"
+outputs:
+  - path: results/window-eval
+cleanup: on_success
