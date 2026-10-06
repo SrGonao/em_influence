@@ -58,3 +58,24 @@ def test_chunk_candidates_fits_budget():
     for chunk in chunks:
         assert 10 + sum(10 - t for t in chunk) <= 25 or len(chunk) == 1
     assert chunk_candidates(10, [1], 5) == [[1]]
+
+
+def test_window_covers_the_first_terms_only():
+    model = tiny("llama")
+    cfg = SimpleNamespace(loss_fn="ce", label_smoothing=0.0, loss_reduction="sum")
+    directions = random_directions(model)
+    n = 14
+    x = torch.randint(1, 97, (1, n))
+    labels = x.clone()
+    embeds = model.get_input_embeddings()(x).detach()
+    positions = np.arange(1, n - 1)
+    _, exact = packed_effects(model, directions, cfg, embeds, labels, positions, 1000)
+    _, windowed = packed_effects(model, directions, cfg, embeds, labels, positions, 1000, window=3)
+    # The last candidates have fewer than `window` positions left, so the window changes nothing there.
+    np.testing.assert_allclose(windowed[-3:], exact[-3:], rtol=1e-5, atol=1e-7)
+    assert not np.allclose(windowed[:-3], exact[:-3])
+    # A window of 1 is the candidate's own loss term: zeroing a label-less position's input changes nothing.
+    labels[0, :] = -100
+    labels[0, 7] = x[0, 7]
+    _, one = packed_effects(model, directions, cfg, embeds, labels, positions, 1000, window=1)
+    assert one[6 - 1] != 0 and np.all(one[np.arange(1, n - 1) != 6] == 0)

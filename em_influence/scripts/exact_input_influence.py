@@ -97,12 +97,18 @@ def attention_masks(model, allowed: torch.Tensor, dtype: torch.dtype):
     return {kind: mask for kind in set(layer_types)} if layer_types else mask
 
 
-def pack_suffixes(embeds: torch.Tensor, labels: torch.Tensor, chunk: list[int]):
+def suffix_length(n: int, t: int, window: int | None) -> int:
+    """How many positions from `t` on a candidate's block recomputes: all of
+    them, or the first `window`."""
+    return n - t if window is None else min(window, n - t)
+
+
+def pack_suffixes(embeds: torch.Tensor, labels: torch.Tensor, chunk: list[int], window: int | None = None):
     """One sequence holding the document (`embeds` [n, d], `labels` [n]) and,
     for each candidate position in `chunk`, the document from that position
-    on with the candidate zeroed. Returns the packed embeddings, position ids,
-    allowed attention pairs, each position's target (-100 for none) and where
-    each candidate's block starts."""
+    on (or its first `window` positions) with the candidate zeroed. Returns
+    the packed embeddings, position ids, allowed attention pairs, each
+    position's target (-100 for none) and where each candidate's block starts."""
     n, d = embeds.shape
     device = embeds.device
     blocks = [embeds]
@@ -111,31 +117,32 @@ def pack_suffixes(embeds: torch.Tensor, labels: torch.Tensor, chunk: list[int]):
     starts = []
     length = n
     for t in chunk:
-        m = n - t
-        blocks.append(torch.cat([torch.zeros(1, d, dtype=embeds.dtype, device=device), embeds[t + 1:]]))
-        positions.append(torch.arange(t, n, device=device))
-        targets.append(torch.cat([labels[t + 1:], labels.new_full((1,), -100)]))
+        m = suffix_length(n, t, window)
+        blocks.append(torch.cat([torch.zeros(1, d, dtype=embeds.dtype, device=device), embeds[t + 1:t + m]]))
+        positions.append(torch.arange(t, t + m, device=device))
+        targets.append(labels[t + 1:t + m + 1] if t + m < n else torch.cat([labels[t + 1:], labels.new_full((1,), -100)]))
         starts.append(length)
         length += m
     allowed = torch.zeros(length, length, dtype=torch.bool, device=device)
     allowed[:n, :n] = torch.ones(n, n, dtype=torch.bool, device=device).tril()
     for t, start in zip(chunk, starts):
-        m = n - t
+        m = suffix_length(n, t, window)
         allowed[start:start + m, :t] = True
         allowed[start:start + m, start:start + m] = torch.ones(m, m, dtype=torch.bool, device=device).tril()
     return torch.cat(blocks)[None], torch.cat(positions)[None], allowed, torch.cat(targets)[None], starts
 
 
-def chunk_candidates(n: int, positions, token_budget: int) -> list[list[int]]:
+def chunk_candidates(n: int, positions, token_budget: int, window: int | None = None) -> list[list[int]]:
     """Candidates grouped so each group's packed sequence (the document plus
     one suffix per candidate) fits `token_budget` tokens, one at least."""
     chunks, current, length = [], [], n
     for t in positions:
-        if current and length + n - t > token_budget:
+        m = suffix_length(n, int(t), window)
+        if current and length + m > token_budget:
             chunks.append(current)
             current, length = [], n
         current.append(int(t))
-        length += n - t
+        length += m
     if current:
         chunks.append(current)
     return chunks
@@ -143,24 +150,26 @@ def chunk_candidates(n: int, positions, token_budget: int) -> list[list[int]]:
 
 @torch.no_grad()
 def packed_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.Tensor, positions,
-                   token_budget: int) -> tuple[float, np.ndarray]:
+                   token_budget: int, window: int | None = None) -> tuple[float, np.ndarray]:
     """The document's score, and each candidate position's exact zeroing
-    effect, from packed suffix passes."""
+    effect, from packed suffix passes. With `window`, only the first `window`
+    loss terms from the candidate on are recomputed, and the effect on later
+    terms is taken as zero: an approximation costing n * window tokens."""
     from bergson.collector.collector import token_losses
     from bergson.score.token_influence import query_moves
 
     n = embeds.shape[1]
-    window = getattr(model.config, "sliding_window", None)
-    if window and n > window:
-        raise ValueError(f"a {n}-token document exceeds the model's {window}-token sliding window")
+    sliding = getattr(model.config, "sliding_window", None)
+    if sliding and n > sliding:
+        raise ValueError(f"a {n}-token document exceeds the model's {sliding}-token sliding window")
     if cfg.loss_reduction == "mean":
         weight = 1.0 / max(int((labels[0, 1:] != -100).sum()), 1)
     else:
         weight = 1.0
     base_score = None
     effects = []
-    for chunk in chunk_candidates(n, positions, token_budget):
-        packed, position_ids, allowed, targets, starts = pack_suffixes(embeds[0], labels[0], chunk)
+    for chunk in chunk_candidates(n, positions, token_budget, window):
+        packed, position_ids, allowed, targets, starts = pack_suffixes(embeds[0], labels[0], chunk, window)
         inputs = {"inputs_embeds": packed, "position_ids": position_ids,
                   "attention_mask": attention_masks(model, allowed, packed.dtype)}
 
@@ -177,14 +186,16 @@ def packed_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.T
             base_score = float(base.sum())
         ends = starts[1:] + [len(terms)]
         for t, start, end in zip(chunk, starts, ends):
-            effects.append(float(terms[start:end].sum() - base[t:].sum()))
+            effects.append(float(terms[start:end].sum() - base[t:t + end - start].sum()))
     return base_score, np.asarray(effects)
 
 
 @torch.no_grad()
 def separate_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.Tensor, positions,
-                     token_budget: int) -> tuple[float, np.ndarray]:
+                     token_budget: int, window: int | None = None) -> tuple[float, np.ndarray]:
     """The same, one full zeroed copy of the document per candidate."""
+    if window is not None:
+        raise ValueError("--window needs --layout packed")
     base = document_scores(model, directions, cfg, embeds, labels)[0]
     per_batch = max(1, token_budget // embeds.shape[1])
     effects = []
@@ -210,7 +221,8 @@ def set_precision(model, precision: str) -> None:
 
 def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shard: int, shards: int,
                 token_budget: int, output: Path, limit: int | None = None, *, layout: str = "packed",
-                precision: str = "fp32", every: int = 1, count: int | None = None) -> None:
+                precision: str = "fp32", every: int = 1, count: int | None = None,
+                window: int | None = None) -> None:
     command = load_score_command(run_path)
     dataset = Dataset.load_from_disk(str(tokenized))
     candidates = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id))
@@ -243,7 +255,7 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
         y = torch.tensor(dataset[int(doc)]["labels"], device="cuda").unsqueeze(0)
         with torch.no_grad():
             embeds = embedding(x)
-        base, effects = effects_of(model, directions, command.index_cfg, embeds, y, positions, token_budget)
+        base, effects = effects_of(model, directions, command.index_cfg, embeds, y, positions, token_budget, window)
         rows["score"].append(effects)
         rows["example_idx"].append(np.full(len(positions), doc))
         rows["position"].append(positions)
@@ -251,7 +263,8 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
         if done % 50 == 0:
             save()
     save()
-    print(f"scored {len(documents)} documents in {time.perf_counter() - started:.0f}s ({layout}, {precision})")
+    print(f"scored {len(documents)} documents in {time.perf_counter() - started:.0f}s "
+          f"({layout}, {precision}, window {window})")
 
 
 def check_document_scores(table, attributions: Path, tolerance: float) -> None:
@@ -304,6 +317,8 @@ def main():
                         help="packed: each candidate's suffix after the shared prefix; separate: one full copy each")
     parser.add_argument("--precision", choices=["fp32", "tf32", "bf16"], default="fp32",
                         help="Precision of the zeroed copies; anything but fp32 is a checked approximation")
+    parser.add_argument("--window", type=int,
+                        help="Recompute only this many positions after each candidate (packed layout): an approximation")
     parser.add_argument("--document-attributions", type=Path,
                         help="attributions.csv of the document-level run of the same query, to check against")
     parser.add_argument("--tolerance", type=float, default=1e-3,
@@ -314,7 +329,7 @@ def main():
     if args.shard is not None:
         score_shard(args.run_path, args.tokenized, args.data, args.model, args.shard, args.shards,
                     args.token_budget, args.output, args.documents, layout=args.layout, precision=args.precision,
-                    every=args.every, count=args.count)
+                    every=args.every, count=args.count, window=args.window)
         return
     # One process per visible card, each on every n-th document.
     cards = [c for c in os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",") if c.strip()]
@@ -322,6 +337,7 @@ def main():
     limit = ["--documents", str(args.documents)] if args.documents else []
     limit += ["--every", str(args.every), "--layout", args.layout, "--precision", args.precision]
     limit += ["--count", str(args.count)] if args.count else []
+    limit += ["--window", str(args.window)] if args.window else []
     processes = [
         subprocess.Popen([sys.executable, "-m", "em_influence.scripts.exact_input_influence",
                           "--run-path", str(args.run_path), "--tokenized", str(args.tokenized), "--data", str(args.data),
@@ -332,7 +348,7 @@ def main():
     ]
     if any(p.wait() for p in processes):
         raise SystemExit("a shard failed")
-    if not (args.documents or args.count or args.every > 1):
+    if not (args.documents or args.count or args.every > 1 or args.window):
         merge(args.tokenized, args.data, args.model, shard_files, args.output, args.document_attributions,
               args.tolerance)
         for f in shard_files:
