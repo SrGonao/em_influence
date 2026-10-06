@@ -11,6 +11,13 @@ the same score computed two ways.
 
 The table has the same orientation as the slope's (token_scores.SIGN): the
 slope predicts this difference as -row, which the slope's table stores.
+
+Zeroing token t leaves positions before t unchanged, so the default `packed`
+layout runs every candidate's suffix (t onward, with t zeroed) as a block of
+one sequence whose prefix is the document itself: each block attends to the
+document's first t positions and to itself. That costs n - t tokens per
+candidate instead of n, and the prefix once per pass. `separate` is the
+original layout, one full copy per candidate, kept for checking.
 """
 
 from __future__ import annotations
@@ -20,13 +27,14 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import get_args
 
 import numpy as np
 import torch
 from datasets import Dataset
-from torch.func import jvp
+from torch.func import functional_call, jvp
 from tqdm import tqdm
 
 from em_influence.token_scores import input_tokens, prompt_masks, save_token_scores
@@ -79,15 +87,141 @@ def document_scores(model, directions, cfg, embeds: torch.Tensor, labels: torch.
     return torch.stack(columns, dim=-1).mean(dim=-1).double()
 
 
+
+def attention_masks(model, allowed: torch.Tensor, dtype: torch.dtype):
+    """`allowed` [L, L] as the additive mask the model's eager attention adds
+    to its logits, for every layer type the model distinguishes."""
+    mask = torch.zeros(allowed.shape, dtype=dtype, device=allowed.device)
+    mask = mask.masked_fill(~allowed, torch.finfo(dtype).min)[None, None]
+    layer_types = getattr(model.config, "layer_types", None)
+    return {kind: mask for kind in set(layer_types)} if layer_types else mask
+
+
+def pack_suffixes(embeds: torch.Tensor, labels: torch.Tensor, chunk: list[int]):
+    """One sequence holding the document (`embeds` [n, d], `labels` [n]) and,
+    for each candidate position in `chunk`, the document from that position
+    on with the candidate zeroed. Returns the packed embeddings, position ids,
+    allowed attention pairs, each position's target (-100 for none) and where
+    each candidate's block starts."""
+    n, d = embeds.shape
+    device = embeds.device
+    blocks = [embeds]
+    positions = [torch.arange(n, device=device)]
+    targets = [torch.cat([labels[1:], labels.new_full((1,), -100)])]
+    starts = []
+    length = n
+    for t in chunk:
+        m = n - t
+        blocks.append(torch.cat([torch.zeros(1, d, dtype=embeds.dtype, device=device), embeds[t + 1:]]))
+        positions.append(torch.arange(t, n, device=device))
+        targets.append(torch.cat([labels[t + 1:], labels.new_full((1,), -100)]))
+        starts.append(length)
+        length += m
+    allowed = torch.zeros(length, length, dtype=torch.bool, device=device)
+    allowed[:n, :n] = torch.ones(n, n, dtype=torch.bool, device=device).tril()
+    for t, start in zip(chunk, starts):
+        m = n - t
+        allowed[start:start + m, :t] = True
+        allowed[start:start + m, start:start + m] = torch.ones(m, m, dtype=torch.bool, device=device).tril()
+    return torch.cat(blocks)[None], torch.cat(positions)[None], allowed, torch.cat(targets)[None], starts
+
+
+def chunk_candidates(n: int, positions, token_budget: int) -> list[list[int]]:
+    """Candidates grouped so each group's packed sequence (the document plus
+    one suffix per candidate) fits `token_budget` tokens, one at least."""
+    chunks, current, length = [], [], n
+    for t in positions:
+        if current and length + n - t > token_budget:
+            chunks.append(current)
+            current, length = [], n
+        current.append(int(t))
+        length += n - t
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+@torch.no_grad()
+def packed_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.Tensor, positions,
+                   token_budget: int) -> tuple[float, np.ndarray]:
+    """The document's score, and each candidate position's exact zeroing
+    effect, from packed suffix passes."""
+    from bergson.collector.collector import token_losses
+    from bergson.score.token_influence import query_moves
+
+    n = embeds.shape[1]
+    window = getattr(model.config, "sliding_window", None)
+    if window and n > window:
+        raise ValueError(f"a {n}-token document exceeds the model's {window}-token sliding window")
+    if cfg.loss_reduction == "mean":
+        weight = 1.0 / max(int((labels[0, 1:] != -100).sum()), 1)
+    else:
+        weight = 1.0
+    base_score = None
+    effects = []
+    for chunk in chunk_candidates(n, positions, token_budget):
+        packed, position_ids, allowed, targets, starts = pack_suffixes(embeds[0], labels[0], chunk)
+        inputs = {"inputs_embeds": packed, "position_ids": position_ids,
+                  "attention_mask": attention_masks(model, allowed, packed.dtype)}
+
+        def losses(params):
+            logits = functional_call(model, params, (), inputs).logits.float()
+            return token_losses(cfg.loss_fn, logits, targets, cfg.label_smoothing)[0] * weight
+
+        columns = []
+        for moved, direction in query_moves(model, directions):
+            columns.append(jvp(losses, (moved,), (direction,))[1])
+        terms = torch.stack(columns, dim=-1).mean(dim=-1).double()
+        base = terms[:n]
+        if base_score is None:
+            base_score = float(base.sum())
+        ends = starts[1:] + [len(terms)]
+        for t, start, end in zip(chunk, starts, ends):
+            effects.append(float(terms[start:end].sum() - base[t:].sum()))
+    return base_score, np.asarray(effects)
+
+
+@torch.no_grad()
+def separate_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.Tensor, positions,
+                     token_budget: int) -> tuple[float, np.ndarray]:
+    """The same, one full zeroed copy of the document per candidate."""
+    base = document_scores(model, directions, cfg, embeds, labels)[0]
+    per_batch = max(1, token_budget // embeds.shape[1])
+    effects = []
+    for start in range(0, len(positions), per_batch):
+        chunk = positions[start:start + per_batch]
+        copies = embeds.repeat(len(chunk), 1, 1)
+        copies[torch.arange(len(chunk)), torch.as_tensor(chunk, device=embeds.device)] = 0
+        zeroed = document_scores(model, directions, cfg, copies, labels)
+        effects.append((zeroed - base).cpu().numpy())
+    return float(base), np.concatenate(effects)
+
+
+def set_precision(model, precision: str) -> None:
+    """How the zeroed copies are computed: as loaded (fp32 here), with TF32
+    matmuls, or with the model cast to bf16."""
+    if precision == "tf32":
+        torch.set_float32_matmul_precision("high")
+    elif precision == "bf16":
+        model.to(torch.bfloat16)
+    elif precision != "fp32":
+        raise ValueError(f"unknown precision {precision!r}")
+
+
 def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shard: int, shards: int,
-                token_budget: int, output: Path, limit: int | None = None) -> None:
+                token_budget: int, output: Path, limit: int | None = None, *, layout: str = "packed",
+                precision: str = "fp32", every: int = 1, count: int | None = None) -> None:
     command = load_score_command(run_path)
     dataset = Dataset.load_from_disk(str(tokenized))
     candidates = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id))
     with tempfile.TemporaryDirectory() as scratch:
         model, directions = setup(command, Path(scratch))
+    set_precision(model, precision)
     embedding = model.get_input_embeddings()
-    documents = [d for d in np.unique(candidates["example_idx"]) if d % shards == shard and (limit is None or d < limit)]
+    documents = [d for d in np.unique(candidates["example_idx"])
+                 if d % every == 0 and (limit is None or d < limit)][:count]
+    documents = [d for d in documents if d % shards == shard]
+    effects_of = packed_effects if layout == "packed" else separate_effects
     rows = {"example_idx": [], "position": [], "score": [], "document_score": []}
     # A run takes days; the shard saves as it goes and resumes from what it saved.
     if output.exists():
@@ -102,26 +236,22 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
         np.savez(partial, **{key: np.concatenate(values) for key, values in rows.items()})
         partial.rename(output)
 
-    for count, doc in enumerate(tqdm(documents, desc=f"shard {shard}/{shards}", mininterval=60), start=1):
+    started = time.perf_counter()
+    for done, doc in enumerate(tqdm(documents, desc=f"shard {shard}/{shards}", mininterval=60), start=1):
         positions = candidates["position"][candidates["example_idx"] == doc]
         x = torch.tensor(dataset[int(doc)]["input_ids"], device="cuda").unsqueeze(0)
         y = torch.tensor(dataset[int(doc)]["labels"], device="cuda").unsqueeze(0)
         with torch.no_grad():
             embeds = embedding(x)
-        base = document_scores(model, directions, command.index_cfg, embeds, y)[0]
-        per_batch = max(1, token_budget // x.shape[1])
-        for start in range(0, len(positions), per_batch):
-            chunk = positions[start:start + per_batch]
-            copies = embeds.repeat(len(chunk), 1, 1)
-            copies[torch.arange(len(chunk)), torch.as_tensor(chunk, device="cuda")] = 0
-            zeroed = document_scores(model, directions, command.index_cfg, copies, y)
-            rows["score"].append((zeroed - base).cpu().numpy())
+        base, effects = effects_of(model, directions, command.index_cfg, embeds, y, positions, token_budget)
+        rows["score"].append(effects)
         rows["example_idx"].append(np.full(len(positions), doc))
         rows["position"].append(positions)
-        rows["document_score"].append(np.full(len(positions), float(base)))
-        if count % 50 == 0:
+        rows["document_score"].append(np.full(len(positions), base))
+        if done % 50 == 0:
             save()
     save()
+    print(f"scored {len(documents)} documents in {time.perf_counter() - started:.0f}s ({layout}, {precision})")
 
 
 def check_document_scores(table, attributions: Path, tolerance: float) -> None:
@@ -168,6 +298,12 @@ def main():
     parser.add_argument("--output", type=Path, required=True, help="token_scores.npz")
     parser.add_argument("--token-budget", type=int, default=640, help="Tokens per forward-mode pass")
     parser.add_argument("--documents", type=int, help="Score only this many documents' worth (a timing run)")
+    parser.add_argument("--every", type=int, default=1, help="Score only every n-th document (a held-out set)")
+    parser.add_argument("--count", type=int, help="Score only the first n selected documents")
+    parser.add_argument("--layout", choices=["packed", "separate"], default="packed",
+                        help="packed: each candidate's suffix after the shared prefix; separate: one full copy each")
+    parser.add_argument("--precision", choices=["fp32", "tf32", "bf16"], default="fp32",
+                        help="Precision of the zeroed copies; anything but fp32 is a checked approximation")
     parser.add_argument("--document-attributions", type=Path,
                         help="attributions.csv of the document-level run of the same query, to check against")
     parser.add_argument("--tolerance", type=float, default=1e-3,
@@ -177,12 +313,15 @@ def main():
     args = parser.parse_args()
     if args.shard is not None:
         score_shard(args.run_path, args.tokenized, args.data, args.model, args.shard, args.shards,
-                    args.token_budget, args.output, args.documents)
+                    args.token_budget, args.output, args.documents, layout=args.layout, precision=args.precision,
+                    every=args.every, count=args.count)
         return
     # One process per visible card, each on every n-th document.
     cards = [c for c in os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",") if c.strip()]
     shard_files = [args.output.with_suffix(f".shard{i}.npz") for i in range(len(cards))]
     limit = ["--documents", str(args.documents)] if args.documents else []
+    limit += ["--every", str(args.every), "--layout", args.layout, "--precision", args.precision]
+    limit += ["--count", str(args.count)] if args.count else []
     processes = [
         subprocess.Popen([sys.executable, "-m", "em_influence.scripts.exact_input_influence",
                           "--run-path", str(args.run_path), "--tokenized", str(args.tokenized), "--data", str(args.data),
@@ -193,7 +332,7 @@ def main():
     ]
     if any(p.wait() for p in processes):
         raise SystemExit("a shard failed")
-    if not args.documents:
+    if not (args.documents or args.count or args.every > 1):
         merge(args.tokenized, args.data, args.model, shard_files, args.output, args.document_attributions,
               args.tolerance)
         for f in shard_files:
