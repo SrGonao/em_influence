@@ -44,3 +44,13 @@ def test_full_window_is_exact():
             (params,), (direction,))
     torch.testing.assert_close(document, base, rtol=1e-10, atol=1e-10)
     torch.testing.assert_close(change, torch.stack(zeroed), rtol=1e-9, atol=1e-9)
+
+    with torch.no_grad():
+        some = torch.tensor([0, 3, 7, 19])
+        _, (subset, _) = jvp(
+            lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, 4, budget=8, positions=some),
+            (params,), (direction,))
+        _, (every, _) = jvp(
+            lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, 4, budget=64),
+            (params,), (direction,))
+    torch.testing.assert_close(subset, every[some], rtol=1e-10, atol=1e-10)

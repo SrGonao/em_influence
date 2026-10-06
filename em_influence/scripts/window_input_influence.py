@@ -36,7 +36,7 @@ def token_loss_fn(cfg, labels):
     return token_loss
 
 
-def score_document(model, directions, cfg, embeds, labels, window, budget):
+def score_document(model, directions, cfg, embeds, labels, positions, window, budget):
     """[T] score changes and the document's score, averaged over the query's
     columns as document_scores in exact_input_influence.py averages."""
     from bergson.score.token_influence import query_moves
@@ -45,7 +45,7 @@ def score_document(model, directions, cfg, embeds, labels, window, budget):
     changes, scores = [], []
     for moved, direction in query_moves(model, directions):
         def f(params):
-            return window_occlusion.occlusion(model, params, embeds, labels, token_loss, window, budget)
+            return window_occlusion.occlusion(model, params, embeds, labels, token_loss, window, budget, positions)
 
         _, (change, score) = jvp(f, (moved,), (direction,))
         changes.append(change)
@@ -64,8 +64,10 @@ def main():
     parser.add_argument("--token-budget", type=int, default=512, help="Window tokens per pass")
     parser.add_argument("--every", type=int, default=1, help="Only documents with example_idx %% every == 0")
     parser.add_argument("--documents", type=int, help="Stop after this many documents")
+    parser.add_argument("--tf32", action="store_true", help="TF32 matmuls (fp32 storage)")
     args = parser.parse_args()
 
+    torch.backends.cuda.matmul.allow_tf32 = args.tf32
     command = load_score_command(args.run_path)
     dataset = Dataset.load_from_disk(str(args.tokenized))
     candidates = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(args.data, dataset, args.model))
@@ -82,10 +84,10 @@ def main():
             x = torch.tensor(dataset[int(doc)]["input_ids"], device="cuda")
             y = torch.tensor(dataset[int(doc)]["labels"], device="cuda")
             change, score = score_document(model, directions, command.index_cfg, embedding(x)[None], y,
-                                           args.window, args.token_budget)
+                                           torch.as_tensor(positions, device="cuda"), args.window, args.token_budget)
             rows["example_idx"].append(np.full(len(positions), doc))
             rows["position"].append(positions)
-            rows["score"].append(change[torch.as_tensor(positions, device="cuda")].cpu().numpy())
+            rows["score"].append(change.cpu().numpy())
             rows["document_score"].append(np.full(len(positions), float(score)))
     seconds = time.time() - start
     print(f"{len(documents)} documents in {seconds:.0f}s ({seconds / len(documents):.2f}s each), window {args.window}")

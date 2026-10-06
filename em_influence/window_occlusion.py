@@ -92,9 +92,9 @@ def _downstream(stash, dO, window_kv, ts, w):
     return total
 
 
-def occlusion(model, params, embeds, labels, token_loss, w, budget=1024):
+def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None):
     """The approximate change in the summed loss when each position's embedding
-    is zeroed, [T], and the summed loss itself. embeds [1,T,d]; labels [T];
+    is zeroed, [len(positions)] (default every position), and the summed loss. embeds [1,T,d]; labels [T];
     token_loss(logits [N,L,V], targets [N,L]) -> [N,L] weighted per-token
     losses, 0 where the target is -100. The model must use
     attn_implementation="occlusion_probe"."""
@@ -116,7 +116,8 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024):
     total = base.sum()
     base = torch.cat([base, base.new_zeros(w + 1)])
     out = []
-    for ts in torch.arange(T, device=dev).split(max(1, budget // w)):
+    positions = torch.arange(T, device=dev) if positions is None else positions
+    for ts in positions.split(max(1, budget // w)):
         pos = ts[:, None] + torch.arange(w, device=dev)[None]
         posc = pos.clamp(max=T - 1)
         x = embeds[0][posc].clone()
