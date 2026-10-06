@@ -19,7 +19,7 @@ from datasets import Dataset
 from torch.func import jvp
 
 from em_influence import window_occlusion
-from em_influence.scripts.exact_input_influence import load_score_command, setup
+from em_influence.scripts.exact_input_influence import load_score_command, merge, setup
 from em_influence.token_scores import input_tokens, prompt_masks
 
 
@@ -59,12 +59,17 @@ def main():
     parser.add_argument("--tokenized", type=Path, required=True)
     parser.add_argument("--data", type=Path, required=True, help="The prompt/completion JSONL it was tokenized from")
     parser.add_argument("--model", required=True, help="The tokenizer, for the prompt masks")
-    parser.add_argument("--output", type=Path, required=True, help="token_scores-layout .npz")
+    parser.add_argument("--output", type=Path, required=True,
+                        help="token_scores.npz; with --every or --documents, just the scored rows and the time taken")
     parser.add_argument("--window", type=int, default=8)
     parser.add_argument("--token-budget", type=int, default=512, help="Window tokens per pass")
     parser.add_argument("--every", type=int, default=1, help="Only documents with example_idx %% every == 0")
     parser.add_argument("--documents", type=int, help="Stop after this many documents")
     parser.add_argument("--tf32", action="store_true", help="TF32 matmuls (fp32 storage)")
+    parser.add_argument("--document-attributions", type=Path,
+                        help="attributions.csv of the document-level run of the same query, to check against")
+    parser.add_argument("--tolerance", type=float, default=1e-3,
+                        help="Largest difference from --document-attributions, relative to its largest score")
     args = parser.parse_args()
 
     torch.backends.cuda.matmul.allow_tf32 = args.tf32
@@ -76,10 +81,26 @@ def main():
     model.get_base_model().config._attn_implementation = "occlusion_probe"
     embedding = model.get_input_embeddings()
     documents = [d for d in np.unique(candidates["example_idx"]) if d % args.every == 0][:args.documents]
+    full = args.every == 1 and args.documents is None
+    partial = args.output.with_suffix(".rows.npz")
     rows = {"example_idx": [], "position": [], "score": [], "document_score": []}
+    # A full run takes hours; it saves as it goes and resumes from what it saved.
+    if full and partial.exists():
+        for key, values in np.load(partial).items():
+            rows[key].append(values)
+        done = set(np.unique(rows["example_idx"][0]).tolist())
+        documents = [d for d in documents if d not in done]
+        print(f"resuming: {len(done)} documents already scored")
+
+    def save(path, **extra):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        staging = path.with_suffix(".staging.npz")
+        np.savez(staging, **extra, **{key: np.concatenate(values) for key, values in rows.items()})
+        staging.rename(path)
+
     start = time.time()
     with torch.no_grad():
-        for doc in documents:
+        for count, doc in enumerate(documents, start=1):
             positions = candidates["position"][candidates["example_idx"] == doc]
             x = torch.tensor(dataset[int(doc)]["input_ids"], device="cuda")
             y = torch.tensor(dataset[int(doc)]["labels"], device="cuda")
@@ -89,10 +110,17 @@ def main():
             rows["position"].append(positions)
             rows["score"].append(change.cpu().numpy())
             rows["document_score"].append(np.full(len(positions), float(score)))
+            if full and count % 100 == 0:
+                save(partial)
+                print(f"{count}/{len(documents)} documents, {(time.time() - start) / count:.2f}s each", flush=True)
     seconds = time.time() - start
-    print(f"{len(documents)} documents in {seconds:.0f}s ({seconds / len(documents):.2f}s each), window {args.window}")
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(args.output, seconds=seconds, **{key: np.concatenate(values) for key, values in rows.items()})
+    print(f"{len(documents)} documents in {seconds:.0f}s ({seconds / max(len(documents), 1):.2f}s each), window {args.window}")
+    if not full:
+        save(args.output, seconds=seconds)
+        return
+    save(partial)
+    merge(args.tokenized, args.data, args.model, [partial], args.output, args.document_attributions, args.tolerance)
+    partial.unlink()
 
 
 if __name__ == "__main__":

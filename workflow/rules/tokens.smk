@@ -180,6 +180,36 @@ rule attribute_input_tokens_exact:
         )
 
 
+rule attribute_input_tokens_window:
+    """tokens-ekfac-input-exact approximated: positions t..t+w-1 after a zeroed token are
+    recomputed exactly, later ones through each layer's attention change and the gradient
+    there (window_occlusion.py). One card."""
+    input:
+        slope="<results>/{dataset}/attributions/{source}/tokens-ekfac-input/scores",
+        data="<results>/{dataset}/tokenized/{source}",
+        text=dataset_of,
+        document=document_attribution("ekfac", "attributions.csv"),
+    output:
+        "<results>/{dataset}/attributions/{source}/tokens-ekfac-input-window{window}/token_scores.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/tokens-ekfac-input-window{window}/attribute.log",
+    wildcard_constraints:
+        window=r"\d+",
+    resources:
+        gpu=1,
+    params:
+        model=lookup("models/{source}/id", within=config),
+        tolerance=1e-3 if config["ekfac_precision"] == "fp32" else 1e-2,
+    shell:
+        step(
+            "python -m em_influence.scripts.window_input_influence --run-path {input.slope} --tokenized {input.data}"
+            " --data {input.text} --model {params.model} --window {wildcards.window}"
+            " --document-attributions {input.document} --tolerance {params.tolerance} --output {output}",
+            gpu=True,
+            packages=("bergson", "torch", "transformers"),
+        )
+
+
 rule show_token_scores:
     """A page for checking a token ranking by eye: the tokens it flags most, and
     documents with every token shaded by its score."""
@@ -370,7 +400,7 @@ rule combined_token_subset:
     log:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
-        method=r"tokens-[^/+]+\+tokens-[^/+]+-input(-exact)?",
+        method=r"tokens-[^/+]+\+tokens-[^/+]+-input(-exact|-window\d+)?",
         subset=r"[^/+]+\+replace_[^/+]+",
     localrule: True
     params:
