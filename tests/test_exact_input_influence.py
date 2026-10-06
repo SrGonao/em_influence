@@ -79,3 +79,28 @@ def test_window_covers_the_first_terms_only():
     labels[0, 7] = x[0, 7]
     _, one = packed_effects(model, directions, cfg, embeds, labels, positions, 1000, window=1)
     assert one[6 - 1] != 0 and np.all(one[np.arange(1, n - 1) != 6] == 0)
+
+
+def test_two_stage_is_exact_where_it_recomputes():
+    from em_influence.scripts.exact_input_influence import two_stage_effects
+
+    model = tiny("olmo3")
+    cfg = SimpleNamespace(loss_fn="ce", label_smoothing=0.0, loss_reduction="mean")
+    directions = random_directions(model)
+    n = 14
+    x = torch.randint(1, 97, (1, n))
+    labels = x.clone()
+    labels[0, :3] = -100
+    embeds = model.get_input_embeddings()(x).detach()
+    positions = np.arange(1, n - 1)
+    base, exact = packed_effects(model, directions, cfg, embeds, labels, positions, 1000)
+    _, screen = packed_effects(model, directions, cfg, embeds, labels, positions, 1000, window=2)
+    base2, scores, is_exact = two_stage_effects(model, directions, cfg, embeds, labels, positions, 1000, 2, 0.5)
+    assert base2 == pytest.approx(base, rel=1e-6)
+    assert is_exact.sum() == 6
+    assert set(np.flatnonzero(is_exact)) == set(np.argsort(-screen)[:6])
+    np.testing.assert_allclose(scores[is_exact], exact[is_exact], rtol=1e-5, atol=1e-7)
+    np.testing.assert_allclose(scores[~is_exact], screen[~is_exact])
+    _, all_exact, flags = two_stage_effects(model, directions, cfg, embeds, labels, positions, 1000, 2, 1.0)
+    assert flags.all()
+    np.testing.assert_allclose(all_exact, exact, rtol=1e-5, atol=1e-7)

@@ -208,6 +208,22 @@ def separate_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch
     return float(base), np.concatenate(effects)
 
 
+def two_stage_effects(model, directions, cfg, embeds, labels, positions, token_budget, window: int,
+                      fraction: float) -> tuple[float, np.ndarray, np.ndarray]:
+    """Every candidate's windowed effect, then the exact effect for the top
+    `fraction` of them by that screen. Returns the document's score, each
+    candidate's score (exact where recomputed) and which ones are exact."""
+    base, screen = packed_effects(model, directions, cfg, embeds, labels, positions, token_budget, window)
+    chosen = np.argsort(-screen, kind="stable")[:int(round(fraction * len(positions)))]
+    chosen.sort()
+    scores = screen.copy()
+    exact = np.zeros(len(positions), dtype=bool)
+    if len(chosen):
+        _, scores[chosen] = packed_effects(model, directions, cfg, embeds, labels, positions[chosen], token_budget)
+        exact[chosen] = True
+    return base, scores, exact
+
+
 def set_precision(model, precision: str) -> None:
     """How the zeroed copies are computed: as loaded (fp32 here), with TF32
     matmuls, or with the model cast to bf16."""
@@ -222,7 +238,7 @@ def set_precision(model, precision: str) -> None:
 def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shard: int, shards: int,
                 token_budget: int, output: Path, limit: int | None = None, *, layout: str = "packed",
                 precision: str = "fp32", every: int = 1, count: int | None = None,
-                window: int | None = None) -> None:
+                window: int | None = None, screen_fraction: float | None = None) -> None:
     command = load_score_command(run_path)
     dataset = Dataset.load_from_disk(str(tokenized))
     candidates = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id))
@@ -235,6 +251,10 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
     documents = [d for d in documents if d % shards == shard]
     effects_of = packed_effects if layout == "packed" else separate_effects
     rows = {"example_idx": [], "position": [], "score": [], "document_score": []}
+    if screen_fraction is not None:
+        if window is None or layout != "packed":
+            raise ValueError("--screen-fraction needs --window and --layout packed")
+        rows["exact"] = []
     # A run takes days; the shard saves as it goes and resumes from what it saved.
     if output.exists():
         for key, values in np.load(output).items():
@@ -255,7 +275,12 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
         y = torch.tensor(dataset[int(doc)]["labels"], device="cuda").unsqueeze(0)
         with torch.no_grad():
             embeds = embedding(x)
-        base, effects = effects_of(model, directions, command.index_cfg, embeds, y, positions, token_budget, window)
+        if screen_fraction is not None:
+            base, effects, exact = two_stage_effects(model, directions, command.index_cfg, embeds, y, positions,
+                                                     token_budget, window, screen_fraction)
+            rows["exact"].append(exact)
+        else:
+            base, effects = effects_of(model, directions, command.index_cfg, embeds, y, positions, token_budget, window)
         rows["score"].append(effects)
         rows["example_idx"].append(np.full(len(positions), doc))
         rows["position"].append(positions)
@@ -264,7 +289,7 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
             save()
     save()
     print(f"scored {len(documents)} documents in {time.perf_counter() - started:.0f}s "
-          f"({layout}, {precision}, window {window})")
+          f"({layout}, {precision}, window {window}, screen fraction {screen_fraction})")
 
 
 def check_document_scores(table, attributions: Path, tolerance: float) -> None:
@@ -289,14 +314,19 @@ def merge(tokenized: Path, data: Path, model_id: str, shard_files: list[Path], o
     dataset = Dataset.load_from_disk(str(tokenized))
     table = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id))
     parts = [dict(np.load(f)) for f in shard_files]
-    found = {(int(e), int(p)): (s, d) for part in parts
-             for e, p, s, d in zip(part["example_idx"], part["position"], part["score"], part["document_score"])}
+    for part in parts:
+        part.setdefault("exact", np.ones(len(part["score"]), dtype=bool))
+    found = {(int(e), int(p)): (s, d, x) for part in parts
+             for e, p, s, d, x in zip(part["example_idx"], part["position"], part["score"], part["document_score"],
+                                      part["exact"])}
     keys = list(zip(table["example_idx"].tolist(), table["position"].tolist()))
     missing = [k for k in keys if k not in found]
     if missing:
         raise ValueError(f"{len(missing)} candidate tokens have no exact score, e.g. {missing[:3]}")
     table["score"] = np.asarray([found[k][0] for k in keys])
     table["document_score"] = np.asarray([found[k][1] for k in keys])
+    table["exact"] = np.asarray([found[k][2] for k in keys])
+    print(f"{table['exact'].mean():.1%} of candidate tokens have exact scores")
     if attributions:
         check_document_scores(table, attributions, tolerance)
     save_token_scores(table, output, side="input")
@@ -319,6 +349,9 @@ def main():
                         help="Precision of the zeroed copies; anything but fp32 is a checked approximation")
     parser.add_argument("--window", type=int,
                         help="Recompute only this many positions after each candidate (packed layout): an approximation")
+    parser.add_argument("--screen-fraction", type=float,
+                        help="With --window: use the windowed effects as a screen, and compute the exact effect of "
+                             "this fraction of each document's candidates, the ones the screen ranks highest")
     parser.add_argument("--document-attributions", type=Path,
                         help="attributions.csv of the document-level run of the same query, to check against")
     parser.add_argument("--tolerance", type=float, default=1e-3,
@@ -329,7 +362,8 @@ def main():
     if args.shard is not None:
         score_shard(args.run_path, args.tokenized, args.data, args.model, args.shard, args.shards,
                     args.token_budget, args.output, args.documents, layout=args.layout, precision=args.precision,
-                    every=args.every, count=args.count, window=args.window)
+                    every=args.every, count=args.count, window=args.window,
+                    screen_fraction=args.screen_fraction)
         return
     # One process per visible card, each on every n-th document.
     cards = [c for c in os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",") if c.strip()]
@@ -338,6 +372,7 @@ def main():
     limit += ["--every", str(args.every), "--layout", args.layout, "--precision", args.precision]
     limit += ["--count", str(args.count)] if args.count else []
     limit += ["--window", str(args.window)] if args.window else []
+    limit += ["--screen-fraction", str(args.screen_fraction)] if args.screen_fraction is not None else []
     processes = [
         subprocess.Popen([sys.executable, "-m", "em_influence.scripts.exact_input_influence",
                           "--run-path", str(args.run_path), "--tokenized", str(args.tokenized), "--data", str(args.data),
@@ -348,7 +383,7 @@ def main():
     ]
     if any(p.wait() for p in processes):
         raise SystemExit("a shard failed")
-    if not (args.documents or args.count or args.every > 1 or args.window):
+    if not (args.documents or args.count or args.every > 1) and (args.window is None or args.screen_fraction is not None):
         merge(args.tokenized, args.data, args.model, shard_files, args.output, args.document_attributions,
               args.tolerance)
         for f in shard_files:
