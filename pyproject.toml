@@ -28,6 +28,7 @@ dependencies = [
     "transformers>=5.9",
     "trl>=1.4",
     "vllm==0.29.0",
+    "lm-eval[ifeval]>=0.4.13",
 ]
 
 [project.optional-dependencies]
