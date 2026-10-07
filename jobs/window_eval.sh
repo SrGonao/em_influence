@@ -2,7 +2,7 @@
 # Window-approximation scores on 20 held-out OLMo/career documents (example_idx % 30 == 0) against the exact table.
 set -u
 R=/mnt/ssd-cluster/brendan/em_influence/rerun-2026-09-30
-OUT=results/window-eval
+OUT=results/window-eval${TAG:-}
 mkdir -p $OUT
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1
 for spec in ${WINDOWS:-1 4 8 16 32}; do
