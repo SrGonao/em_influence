@@ -15,7 +15,7 @@ from __future__ import annotations
 import inspect
 
 import torch
-from torch.func import functional_call, grad
+from torch.func import grad
 from torch.nn.utils.stateless import _reparametrize_module
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
@@ -74,9 +74,8 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
     k = key.repeat_interleave(module.num_key_value_groups, 1)
     v = value.repeat_interleave(module.num_key_value_groups, 1)
     if PROBE.mode == "replay":
-        # One layer recomputed for its backward step, with the probe added to its output.
         o, _ = _CausalAttention.apply(query * scaling, k, v)
-        return (o + PROBE.delta).transpose(1, 2), None
+        return o.transpose(1, 2), None
     if PROBE.mode == "record":
         T = query.shape[2]
         if sliding_window is not None and T > sliding_window:
@@ -111,10 +110,25 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
 ALL_ATTENTION_FUNCTIONS.register("occlusion_probe", probe_attention)
 
 
-def _downstream(stash, dO, window_kv, pos, valid, in_set):
-    """sum over layers, heads and queries s outside the set and after the zeroed
-    token of dO_s . (change in s's attention output when the members' keys and
-    values replace the originals)."""
+def _branch(layer):
+    """The module whose output the attention block adds to the residual stream:
+    the post-attention norm in post-norm models (OLMo-2/3), else o_proj."""
+    return layer.post_attention_layernorm if hasattr(layer, "post_feedforward_layernorm") else layer.self_attn.o_proj
+
+
+def _attention_to_residual(layer, o):
+    """o [..., H, S, D] -> what the attention block adds to the residual, [..., S, d]."""
+    x = o.transpose(-3, -2).flatten(-2)
+    x = layer.self_attn.o_proj(x)
+    return layer.post_attention_layernorm(x) if hasattr(layer, "post_feedforward_layernorm") else x
+
+
+def _downstream(layers, stash, dR, window_kv, pos, valid, in_set):
+    """sum over layers and queries s outside the set and after the zeroed token
+    of dR_s . (change in what s's attention block adds to the residual stream
+    when the members' keys and values replace the originals). The attention
+    output is renormalised exactly and taken through o_proj and any
+    post-attention norm exactly; only what follows is linearised."""
     T = stash[0]["k"].shape[2]
     dev = pos.device
     posc = pos.clamp(max=T - 1)
@@ -126,17 +140,13 @@ def _downstream(stash, dO, window_kv, pos, valid, in_set):
         c = stash[i]
         k2, v2 = window_kv[i]  # [n,H,m,D]
         q, k, o, v, lse = c["q"][0], c["k"][0], c["o"][0], c["v"][0], c["lse"][0]
-        g = dO[i][0]
-        go = (g * o).sum(-1)
-        a2 = torch.einsum("hsd,nhjd->nhsj", q, k2)  # q is stored pre-scaled
-        pr = torch.exp((a2 - lse[None, ..., None]).masked_fill(~m, float("-inf")))
-        X = torch.einsum("hsd,nhjd->nhsj", g, v2) - go[None, ..., None]
-        kw = k[:, posc]  # [H,n,m,D]
-        pw = torch.exp(torch.einsum("hsd,hnjd->nhsj", q, kw) - lse[None, ..., None]) * m
-        Y = torch.einsum("hsd,hnjd->nhsj", g, v[:, posc]) - go[None, ..., None]
-        num = (pr * X - pw * Y).sum(-1)
+        pr = torch.exp((torch.einsum("hsd,nhjd->nhsj", q, k2) - lse[None, ..., None]).masked_fill(~m, float("-inf")))
+        pw = torch.exp(torch.einsum("hsd,hnjd->nhsj", q, k[:, posc]) - lse[None, ..., None]) * m
         den = 1 + (pr - pw).sum(-1)
-        total = total + ((num / den) * down[:, None, :]).sum(dim=(1, 2))
+        new = (o[None] - torch.einsum("nhsj,hnjd->nhsd", pw, v[:, posc]) + torch.einsum("nhsj,nhjd->nhsd", pr, v2))
+        new = new / den[..., None]
+        change = _attention_to_residual(layers[i], new) - _attention_to_residual(layers[i], o[None])
+        total = total + (change * dR[i][0] * down[..., None]).sum(dim=(1, 2))
     return total
 
 
@@ -157,16 +167,17 @@ def _members(stash, positions, T, w, extra):
     return pos, valid, in_set[:, :T]
 
 
-def _record(model, params, embeds, labels, token_loss):
+def _record(model, embeds, labels, token_loss):
     """Each layer's keys, values and normalisers, the gradient of the summed
-    loss at each layer's attention output, and the per-token losses. The
+    loss at what each layer's attention block adds to the residual stream, the
+    per-token losses, and the decoder layers. The
     backward goes one layer at a time from stored layer inputs, so only one
     layer's activations are held at once."""
     base = model.get_base_model() if hasattr(model, "get_base_model") else model
     decoder = base.model
     T = embeds.shape[1]
     position_ids = torch.arange(T, device=embeds.device)[None]
-    with _reparametrize_module(model, params):
+    if True:
         layer_types = getattr(base.config, "layer_types", None)
         if "layer_type" in inspect.signature(decoder.rotary_emb.forward).parameters:
             rope = {kind: decoder.rotary_emb(embeds, position_ids, kind) for kind in set(layer_types)}
@@ -189,16 +200,19 @@ def _record(model, params, embeds, labels, token_loss):
             inputs.append(layer(i, inputs[-1]))
         stash = PROBE.stash
         g, losses = grad(head, has_aux=True)(inputs[-1])
-        dO = {}
+        dR = {}
         PROBE.mode = "replay"
         for i in reversed(range(len(decoder.layers))):
             def replay(h, delta, g):
-                PROBE.delta = delta
-                return (layer(i, h) * g).sum()
+                hook = _branch(decoder.layers[i]).register_forward_hook(lambda module, args, out: out + delta)
+                try:
+                    return (layer(i, h) * g).sum()
+                finally:
+                    hook.remove()
 
-            g, dO[i] = grad(replay, argnums=(0, 1))(inputs[i], torch.zeros_like(stash[i]["o"]), g)
-        PROBE.mode, PROBE.stash, PROBE.delta = None, None, None
-    return [dO[i] for i in range(len(dO))], losses, stash
+            g, dR[i] = grad(replay, argnums=(0, 1))(inputs[i], torch.zeros_like(inputs[i]), g)
+        PROBE.mode, PROBE.stash = None, None
+    return [dR[i] for i in range(len(dR))], losses, stash, list(decoder.layers)
 
 
 def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0):
@@ -209,7 +223,14 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
     use attn_implementation="occlusion_probe"."""
     T = embeds.shape[1]
     dev = embeds.device
-    dO, base, stash = _record(model, params, embeds, labels, token_loss)
+    with _reparametrize_module(model, params):
+        return _occlusion(model, embeds, labels, token_loss, w, budget, positions, extra)
+
+
+def _occlusion(model, embeds, labels, token_loss, w, budget, positions, extra):
+    T = embeds.shape[1]
+    dev = embeds.device
+    dR, base, stash, layers = _record(model, embeds, labels, token_loss)
     total = base.sum()
     base = torch.cat([base, base.new_zeros(1)])
     out = []
@@ -220,10 +241,10 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
         x = embeds[0][posc].clone()
         x[:, 0] = 0
         PROBE.mode, PROBE.stash, PROBE.members, PROBE.window_kv = "window", stash, (pos, valid, in_set), {}
-        logits = functional_call(model, params, (), {"inputs_embeds": x, "position_ids": posc}).logits
+        logits = model(inputs_embeds=x, position_ids=posc).logits
         kv, PROBE.window_kv, PROBE.stash, PROBE.mode = PROBE.window_kv, None, None, None
         targets = torch.where(valid & (pos + 1 < T), labels[(pos + 1).clamp(max=T - 1)], -100)
         win = token_loss(logits, targets)
         own = (win - base[posc] * (targets != -100)).sum(-1)
-        out.append(own + _downstream(stash, dO, kv, pos, valid, in_set))
+        out.append(own + _downstream(layers, stash, dR, kv, pos, valid, in_set))
     return torch.cat(out), total

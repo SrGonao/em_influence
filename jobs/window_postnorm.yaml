@@ -1,0 +1,15 @@
+name: window-postnorm-check
+setup: uv sync --frozen
+command: TAG=-postnorm SPECS=8+0 bash jobs/window_long.sh && TAG=-postnorm WINDOWS="8 4+4" bash jobs/window_eval.sh
+gpus: 1
+use_shared: true
+priority: 60
+estimated_runtime_min: 20
+max_runtime_min: 120
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_OFFLINE: "1"
+outputs:
+  - path: results/window-eval-postnorm
+auto_preempt: true
