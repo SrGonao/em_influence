@@ -1,0 +1,14 @@
+name: window-long-olmo
+setup: uv sync --frozen
+command: bash jobs/window_long.sh
+gpus: 1
+use_shared: true
+priority: 60
+estimated_runtime_min: 30
+max_runtime_min: 180
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_OFFLINE: "1"
+cleanup: on_success
+auto_preempt: true
