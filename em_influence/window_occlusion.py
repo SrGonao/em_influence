@@ -116,19 +116,25 @@ def _branch(layer):
     return layer.post_attention_layernorm if hasattr(layer, "post_feedforward_layernorm") else layer.self_attn.o_proj
 
 
-def _attention_to_residual(layer, o):
-    """o [..., H, S, D] -> what the attention block adds to the residual, [..., S, d]."""
-    x = o.transpose(-3, -2).flatten(-2)
-    x = layer.self_attn.o_proj(x)
-    return layer.post_attention_layernorm(x) if hasattr(layer, "post_feedforward_layernorm") else x
+def _per_head(o_proj, x):
+    """o_proj applied to each head's slice alone: x [..., H, D] -> [..., H, d]."""
+    H, D = x.shape[-2:]
+    blocks = torch.zeros(*x.shape[:-2], H, H, D, dtype=x.dtype, device=x.device)
+    index = torch.arange(H, device=x.device)
+    blocks[..., index, index, :] = x
+    out = o_proj(blocks.flatten(-2))
+    bias = getattr(o_proj, "bias", None)
+    return out if bias is None else out - bias
 
 
 def _downstream(layers, stash, dR, window_kv, pos, valid, in_set):
     """sum over layers and queries s outside the set and after the zeroed token
     of dR_s . (change in what s's attention block adds to the residual stream
-    when the members' keys and values replace the originals). The attention
-    output is renormalised exactly and taken through o_proj and any
-    post-attention norm exactly; only what follows is linearised."""
+    when the members' keys and values replace the originals). Each head's
+    attention output is renormalised exactly and taken through o_proj and any
+    post-attention norm exactly; only what follows is linearised. The new output
+    is a per-head mix of the old output and the members' old and new values, so
+    only those vectors go through o_proj."""
     T = stash[0]["k"].shape[2]
     dev = pos.device
     posc = pos.clamp(max=T - 1)
@@ -138,15 +144,27 @@ def _downstream(layers, stash, dR, window_kv, pos, valid, in_set):
     total = 0
     for i in sorted(stash):
         c = stash[i]
+        layer = layers[i]
+        o_proj = layer.self_attn.o_proj
         k2, v2 = window_kv[i]  # [n,H,m,D]
         q, k, o, v, lse = c["q"][0], c["k"][0], c["o"][0], c["v"][0], c["lse"][0]
         pr = torch.exp((torch.einsum("hsd,nhjd->nhsj", q, k2) - lse[None, ..., None]).masked_fill(~m, float("-inf")))
         pw = torch.exp(torch.einsum("hsd,hnjd->nhsj", q, k[:, posc]) - lse[None, ..., None]) * m
-        den = 1 + (pr - pw).sum(-1)
-        new = (o[None] - torch.einsum("nhsj,hnjd->nhsd", pw, v[:, posc]) + torch.einsum("nhsj,nhjd->nhsd", pr, v2))
-        new = new / den[..., None]
-        change = _attention_to_residual(layers[i], new) - _attention_to_residual(layers[i], o[None])
-        total = total + (change * dR[i][0] * down[..., None]).sum(dim=(1, 2))
+        den = 1 + (pr - pw).sum(-1)  # [n,H,s]
+        old_heads = _per_head(o_proj, o.transpose(0, 1))  # [s,H,d]
+        old_values = _per_head(o_proj, v[:, posc].permute(1, 2, 0, 3))  # [n,m,H,d]
+        new_values = _per_head(o_proj, v2.permute(0, 2, 1, 3))  # [n,m,H,d]
+        mixed = (old_heads.transpose(0, 1)[None]
+                 - torch.einsum("nhsj,njhd->nhsd", pw, old_values)
+                 + torch.einsum("nhsj,njhd->nhsd", pr, new_values))
+        before = old_heads.sum(1)  # [s,d]
+        after = torch.einsum("nhsd,nhs->nsd", mixed, 1 / den)
+        bias = getattr(o_proj, "bias", None)
+        if bias is not None:
+            before, after = before + bias, after + bias
+        if hasattr(layer, "post_feedforward_layernorm"):
+            before, after = layer.post_attention_layernorm(before), layer.post_attention_layernorm(after)
+        total = total + ((after - before[None]) * dR[i][0] * down[..., None]).sum(dim=(1, 2))
     return total
 
 

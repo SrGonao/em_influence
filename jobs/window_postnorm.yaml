@@ -1,6 +1,6 @@
 name: window-postnorm-check
 setup: uv sync --frozen
-command: TAG=-postnorm SPECS=8+0 bash jobs/window_long.sh && TAG=-postnorm WINDOWS="8 4+4" bash jobs/window_eval.sh
+command: TAG=-postnorm SPECS="8+0 4+4" bash jobs/window_long.sh && TAG=-postnorm WINDOWS="8 4+4" bash jobs/window_eval.sh
 gpus: 1
 use_shared: true
 priority: 60
