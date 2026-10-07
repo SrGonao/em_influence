@@ -2,9 +2,10 @@
 ALL_ATTENTION_FUNCTIONS (Llama, Qwen, OLMo-2/3, ...).
 
 For every position t, approximates L(x with t's embedding zeroed) - L(x):
-positions t..t+w-1 are recomputed exactly (they attend to the original keys and
-values before t, which zeroing t doesn't change); later positions see the new
-keys/values of the window, and the resulting change in each layer's attention
+positions t..t+w-1, and optionally the positions that attend to t most, are
+recomputed exactly (they attend to the original keys and values outside that
+set; nothing before t changes when t is zeroed). The other later positions see
+the set's new keys/values, and the resulting change in each layer's attention
 output is computed in closed form and taken to the loss with the gradient at
 that output. w >= T is exact.
 """
@@ -20,7 +21,7 @@ class _Probe:
     mode = None
     stash = None
     delta = None
-    ts = None
+    members = None  # (positions [n,m] sorted, first is the zeroed token; valid [n,m]; in_set [n,T])
     window_kv = None
 
 
@@ -42,17 +43,18 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
         if PROBE.delta is not None:
             o = o + PROBE.delta[i]
         return o.transpose(1, 2), None
-    # window: query [n,H,w,D] for copies starting at PROBE.ts
+    # Each copy's recomputed members attend to the original keys outside the set
+    # and causally to each other.
     c = PROBE.stash[i]
-    ts = PROBE.ts
-    n, _, w, _ = query.shape
+    pos, valid, in_set = PROBE.members
+    m = pos.shape[1]
     T = c["k"].shape[2]
     dev = query.device
-    valid = (ts[:, None] + torch.arange(w, device=dev)[None]) < T
-    prefix = torch.arange(T, device=dev)[None, :] < ts[:, None]
-    causal = torch.ones(w, w, dtype=torch.bool, device=dev).tril()[None] & valid[:, None, :]
+    before = torch.arange(T, device=dev)[None, None, :] < pos.clamp(max=T - 1)[:, :, None]
+    outside = before & ~in_set[:, None, :]  # [n,m,T]
+    causal = torch.ones(m, m, dtype=torch.bool, device=dev).tril()[None] & valid[:, None, :]
     a1 = torch.einsum("nhjd,hsd->nhjs", query * scaling, c["k"][0])
-    a1 = a1.masked_fill(~prefix[:, None, None, :], float("-inf"))
+    a1 = a1.masked_fill(~outside[:, None], float("-inf"))
     a2 = (query @ k.transpose(-1, -2) * scaling).masked_fill(~causal[:, None], float("-inf"))
     p = torch.cat([a1, a2], -1).softmax(-1)
     o = torch.einsum("nhjs,hsd->nhjd", p[..., :T], c["v"][0]) + p[..., T:] @ v
@@ -63,24 +65,24 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
 ALL_ATTENTION_FUNCTIONS.register("occlusion_probe", probe_attention)
 
 
-def _downstream(stash, dO, window_kv, ts, w):
-    """sum over layers, heads and queries s >= t+w of dO_s . (change in s's
-    attention output when the window's keys/values replace the originals)."""
+def _downstream(stash, dO, window_kv, pos, valid, in_set):
+    """sum over layers, heads and queries s outside the set and after the zeroed
+    token of dO_s . (change in s's attention output when the members' keys and
+    values replace the originals)."""
+    T = stash[0]["logits"].shape[-1]
+    dev = pos.device
+    posc = pos.clamp(max=T - 1)
+    ar = torch.arange(T, device=dev)
+    down = (ar[None, :] > pos[:, :1]) & ~in_set  # [n,s]
+    m = (valid[:, None, :] & (posc[:, None, :] < ar[None, :, None]) & down[:, :, None])[:, None]  # [n,1,s,j]
     total = 0
     for i in sorted(stash):
         c = stash[i]
-        k2, v2 = window_kv[i]  # [n,H,w,D]
+        k2, v2 = window_kv[i]  # [n,H,m,D]
         a, q, o, v = c["logits"][0], c["q"][0], c["o"][0], c["v"][0]
-        T = a.shape[-1]
-        dev = a.device
-        pos = ts[:, None] + torch.arange(w, device=dev)[None]
-        valid = pos < T
-        posc = pos.clamp(max=T - 1)
-        down = torch.arange(T, device=dev)[None, :] >= (ts[:, None] + w)  # [n, s]
         g = dO[i][0]
         lse = torch.logsumexp(a, -1)
         go = (g * o).sum(-1)
-        m = valid[:, None, None, :] & down[:, None, :, None]  # [n,1,S,w]
         a2 = torch.einsum("hsd,nhjd->nhsj", q, k2)  # q is stored pre-scaled
         pr = torch.exp((a2 - lse[None, ..., None]).masked_fill(~m, float("-inf")))
         X = torch.einsum("hsd,nhjd->nhsj", g, v2) - go[None, ..., None]
@@ -92,12 +94,29 @@ def _downstream(stash, dO, window_kv, ts, w):
     return total
 
 
-def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None):
+def _members(stash, positions, T, w, extra):
+    """Each candidate t's recomputed set: t..t+w-1, plus the `extra` later
+    positions that attend to t most (attention summed over layers and heads)."""
+    dev = positions.device
+    pos = positions[:, None] + torch.arange(w, device=dev)[None]
+    if extra:
+        mass = sum(c["logits"][0].softmax(-1).sum(0) for c in stash.values()).T[positions]  # [n, s]
+        ar = torch.arange(T, device=dev)
+        mass = mass.masked_fill(ar[None, :] < positions[:, None] + w, -1.0)
+        values, chosen = mass.topk(min(extra, T), dim=-1)
+        pos = torch.cat([pos, torch.where(values >= 0, chosen, T)], -1).sort(-1).values
+    valid = pos < T
+    in_set = torch.zeros(len(pos), T + 1, dtype=torch.bool, device=dev)
+    in_set[torch.arange(len(pos), device=dev)[:, None], pos.clamp(max=T)] = True
+    return pos, valid, in_set[:, :T]
+
+
+def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0):
     """The approximate change in the summed loss when each position's embedding
-    is zeroed, [len(positions)] (default every position), and the summed loss. embeds [1,T,d]; labels [T];
-    token_loss(logits [N,L,V], targets [N,L]) -> [N,L] weighted per-token
-    losses, 0 where the target is -100. The model must use
-    attn_implementation="occlusion_probe"."""
+    is zeroed, [len(positions)] (default every position), and the summed loss.
+    embeds [1,T,d]; labels [T]; token_loss(logits [N,L,V], targets [N,L]) ->
+    [N,L] weighted per-token losses, 0 where the target is -100. The model must
+    use attn_implementation="occlusion_probe"."""
     T = embeds.shape[1]
     dev = embeds.device
     nlayers = model.config.num_hidden_layers
@@ -114,19 +133,19 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
     zeros = [torch.zeros(1, H, T, D, dtype=embeds.dtype, device=dev) for _ in range(nlayers)]
     dO, (base, stash) = grad(record, has_aux=True)(zeros)
     total = base.sum()
-    base = torch.cat([base, base.new_zeros(w + 1)])
+    base = torch.cat([base, base.new_zeros(1)])
     out = []
     positions = torch.arange(T, device=dev) if positions is None else positions
-    for ts in positions.split(max(1, budget // w)):
-        pos = ts[:, None] + torch.arange(w, device=dev)[None]
+    for ts in positions.split(max(1, budget // (w + extra))):
+        pos, valid, in_set = _members(stash, ts, T, w, extra)
         posc = pos.clamp(max=T - 1)
         x = embeds[0][posc].clone()
         x[:, 0] = 0
-        PROBE.mode, PROBE.stash, PROBE.ts, PROBE.window_kv = "window", stash, ts, {}
+        PROBE.mode, PROBE.stash, PROBE.members, PROBE.window_kv = "window", stash, (pos, valid, in_set), {}
         logits = functional_call(model, params, (), {"inputs_embeds": x, "position_ids": posc}).logits
         kv, PROBE.window_kv, PROBE.stash, PROBE.mode = PROBE.window_kv, None, None, None
-        targets = torch.where(pos + 1 < T, labels[(pos + 1).clamp(max=T - 1)], -100)
+        targets = torch.where(valid & (pos + 1 < T), labels[(pos + 1).clamp(max=T - 1)], -100)
         win = token_loss(logits, targets)
-        own = (win - base[pos] * (targets != -100)).sum(-1)
-        out.append(own + _downstream(stash, dO, kv, ts, w))
+        own = (win - base[posc] * (targets != -100)).sum(-1)
+        out.append(own + _downstream(stash, dO, kv, pos, valid, in_set))
     return torch.cat(out), total

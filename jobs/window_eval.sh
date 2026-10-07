@@ -5,15 +5,16 @@ R=/mnt/ssd-cluster/brendan/em_influence/rerun-2026-09-30
 OUT=results/window-eval
 mkdir -p $OUT
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True HF_HUB_OFFLINE=1 PYTHONUNBUFFERED=1
-for w in ${WINDOWS:-1 4 8 16 32}; do
-  echo "=== window $w $(date -u +%FT%TZ)"
+for spec in ${WINDOWS:-1 4 8 16 32}; do
+  w=${spec%+*}; extra=0; [[ $spec == *+* ]] && extra=${spec#*+}
+  echo "=== window $spec $(date -u +%FT%TZ)"
   uv run --no-sync python -m em_influence.scripts.window_input_influence \
     --run-path $R/results/career/attributions/olmo/tokens-ekfac-input/scores \
     --tokenized $R/results/career/tokenized/olmo --data $R/data/career.jsonl \
-    --model allenai/Olmo-3-7B-Instruct-SFT --output $OUT/w$w.npz --window $w \
+    --model allenai/Olmo-3-7B-Instruct-SFT --output $OUT/w$spec.npz --window $w --extra $extra \
     --every 30 --documents ${DOCS:-20} 2>&1 | grep -v "Loading weights"
   uv run --no-sync python - $R/results/career/attributions/olmo/tokens-ekfac-input-exact/token_scores.npz \
-    $R/results/career/attributions/olmo/tokens-ekfac-input/token_scores.npz $OUT/w$w.npz <<'PY'
+    $R/results/career/attributions/olmo/tokens-ekfac-input/token_scores.npz $OUT/w$spec.npz <<'PY'
 import sys, numpy as np
 from scipy.stats import spearmanr
 exact, slope, ours = (np.load(p) for p in sys.argv[1:])

@@ -42,8 +42,13 @@ def test_full_window_is_exact():
         _, (change, document) = jvp(
             lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, T, budget=64),
             (params,), (direction,))
+        _, (chosen, _) = jvp(
+            lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, 1, budget=64, extra=T),
+            (params,), (direction,))
     torch.testing.assert_close(document, base, rtol=1e-10, atol=1e-10)
     torch.testing.assert_close(change, torch.stack(zeroed), rtol=1e-9, atol=1e-9)
+    # Choosing every later position by attention is exact too.
+    torch.testing.assert_close(chosen, torch.stack(zeroed), rtol=1e-9, atol=1e-9)
 
     with torch.no_grad():
         some = torch.tensor([0, 3, 7, 19])
