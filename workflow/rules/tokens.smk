@@ -1,5 +1,3 @@
-import re
-
 # Token-level attribution. Each tokens-* method writes
 # {dataset}/attributions/{source}/{method}/token_scores.npz: one score per
 # supervised reply token of {source}'s tokenization, or for a tokens-*-input
@@ -151,29 +149,11 @@ rule validate_input_tokens_ekfac:
         )
 
 
-def exact_input_options(wildcards):
-    """exact_input_influence.py's options for a tokens-ekfac-input-* method: none for
-    -exact; --window w for -window<w>; both --window w and --screen-fraction f for
-    -window<w>-exact<f>."""
-    match = re.fullmatch(r"tokens-ekfac-input-(exact|window(\d+)(-exact([0-9.]+))?)", wildcards.method)
-    if match.group(1) == "exact":
-        return ""
-    options = f"--window {match.group(2)}"
-    if match.group(4):
-        options += f" --screen-fraction {match.group(4)}"
-    return options
-
-
 rule attribute_input_tokens_exact:
     """Each candidate input token's exact effect on its document's EK-FAC score: the
     score with its embedding zeroed, minus the score as is. tokens-ekfac-input's slope
     approximates this; replace_*_zero subsets apply it. One forward-mode pass of the
-    document's zeroed suffix per token, packed after a shared prefix, on two cards.
-
-    tokens-ekfac-input-window<w> recomputes only the w positions after each token, an
-    approximation costing w passes' worth per document; tokens-ekfac-input-window<w>-exact<f>
-    uses that as a screen and computes the exact effect of the top fraction f of each
-    document's tokens."""
+    document's zeroed suffix per token, packed after a shared prefix, on two cards."""
     input:
         slope="<results>/{dataset}/attributions/{source}/tokens-ekfac-input/scores",
         data="<results>/{dataset}/tokenized/{source}",
@@ -184,18 +164,58 @@ rule attribute_input_tokens_exact:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
-        method=r"tokens-ekfac-input-(exact|window\d+(-exact[0-9.]+)?)",
+        method="tokens-ekfac-input-exact",
     resources:
-        gpu=lambda wildcards: 1 if re.fullmatch(r"tokens-ekfac-input-window\d+", wildcards.method) else 2,
+        gpu=2,
     params:
         model=lookup("models/{source}/id", within=config),
         tolerance=1e-3 if config["ekfac_precision"] == "fp32" else 1e-2,
-        options=exact_input_options,
     shell:
         step(
             "python -m em_influence.scripts.exact_input_influence --run-path {input.slope} --tokenized {input.data}"
             " --data {input.text} --model {params.model} --document-attributions {input.document}"
-            " --tolerance {params.tolerance} --token-budget 1024 {params.options} --output {output}",
+            " --tolerance {params.tolerance} --token-budget 1024 --output {output}",
+            gpu=True,
+            packages=("bergson", "torch", "transformers"),
+        )
+
+
+def screen_and_fraction(wildcards):
+    """A {screen}-exact{fraction} method's screen method and fraction."""
+    screen, _, fraction = wildcards.method.rpartition("-exact")
+    return screen, fraction
+
+
+rule screen_then_exact_input_tokens:
+    """{screen}-exact{fraction}: the exact zeroing effect (attribute_input_tokens_exact) of the
+    top {fraction} of each document's candidate tokens by the input-side method {screen},
+    the rest keeping {screen}'s score. The table's `exact` column marks the recomputed rows.
+    E.g. tokens-ekfac-input-exact0.2 screens with the slope."""
+    input:
+        screen=lambda wildcards: "<results>/{dataset}/attributions/{source}/%s/token_scores.npz"
+        % screen_and_fraction(wildcards)[0],
+        slope="<results>/{dataset}/attributions/{source}/tokens-ekfac-input/scores",
+        data="<results>/{dataset}/tokenized/{source}",
+        text=dataset_of,
+        document=document_attribution("ekfac", "attributions.csv"),
+    output:
+        "<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
+    wildcard_constraints:
+        method=r"tokens-[^/+]+-input(-[^/+]+)?-exact0?\.[0-9]+",
+    resources:
+        gpu=1,
+    params:
+        model=lookup("models/{source}/id", within=config),
+        tolerance=1e-3 if config["ekfac_precision"] == "fp32" else 1e-2,
+        fraction=lambda wildcards: screen_and_fraction(wildcards)[1],
+    shell:
+        step(
+            "python -m em_influence.scripts.exact_input_influence --run-path {input.slope} --tokenized {input.data}"
+            " --data {input.text} --model {params.model} --document-attributions {input.document}"
+            " --tolerance {params.tolerance} --token-budget 1024 --screen-table {input.screen}"
+            " --screen-fraction {params.fraction} --output {output}",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )

@@ -156,8 +156,7 @@ the tokenizer's added tokens, and each token's draws are shared by every subset.
 |---|---|
 | `tokens-ekfac-input` | how the document's EK-FAC influence changes as *t*'s embedding is scaled up (`--token_influence input`; Grosse et al.'s input token influence), so its first-order prediction for removing *t* |
 | `tokens-ekfac-input-exact` | the document's EK-FAC influence with *t*'s embedding zeroed, minus as is: what `replace_*_zero` subsets apply. One forward-mode pass of the document from *t* on per token, packed after a shared prefix (`em_influence/scripts/exact_input_influence.py`); about n²/2 token-passes per n-token document |
-| `tokens-ekfac-input-window<w>` | the same, recomputing only the *w* positions after *t* and taking the effect on later positions as zero: about n·w token-passes per document |
-| `tokens-ekfac-input-window<w>-exact<f>` | the window as a screen, then the exact effect of the top fraction *f* of each document's tokens by that screen; the table's `exact` column marks them |
+| `<screen>-exact<f>` | the exact effect for the top fraction *f* of each document's tokens by any input-side method `<screen>` (e.g. `tokens-ekfac-input-exact0.2` screens with the slope). The other rows keep the screen's score, which is on its own scale, so a token the screen underrates in one document can outrank an exact score from another; the table's `exact` column marks the recomputed rows |
 | `tokens-random-input` | A seeded random score; only its top subsets are run, as the control |
 
 The ranking must store one row per input token but each document's last and pass a causality check: with a single label,

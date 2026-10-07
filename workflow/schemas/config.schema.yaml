@@ -128,7 +128,7 @@ properties:
     description: What the token figures do to flagged tokens; each is its own set of runs.
   input_methods:
     type: array
-    items: {type: string, pattern: "^tokens-.*-input(-exact)?$"}
+    items: {type: string, pattern: "^tokens-.*-input(-[^/+]+)?$"}
     description: Input-token attribution methods in input_figure1.
   input_replacements:
     type: array

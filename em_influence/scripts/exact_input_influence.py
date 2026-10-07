@@ -23,6 +23,7 @@ original layout, one full copy per candidate, kept for checking.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -194,8 +195,6 @@ def packed_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.T
 def separate_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.Tensor, positions,
                      token_budget: int, window: int | None = None) -> tuple[float, np.ndarray]:
     """The same, one full zeroed copy of the document per candidate."""
-    if window is not None:
-        raise ValueError("--window needs --layout packed")
     base = document_scores(model, directions, cfg, embeds, labels)[0]
     per_batch = max(1, token_budget // embeds.shape[1])
     effects = []
@@ -210,32 +209,25 @@ def separate_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch
 
 def two_stage_effects(model, directions, cfg, embeds, labels, positions, token_budget, window: int,
                       fraction: float) -> tuple[float, np.ndarray, np.ndarray]:
-    """Every candidate's windowed effect, then the exact effect for the top
-    `fraction` of them by that screen. Returns the document's score, each
-    candidate's score (exact where recomputed) and which ones are exact."""
+    """Every candidate's windowed effect as the screen, then `screened_effects`."""
     base, screen = packed_effects(model, directions, cfg, embeds, labels, positions, token_budget, window)
-    chosen = np.argsort(-screen, kind="stable")[:int(round(fraction * len(positions)))]
-    chosen.sort()
-    scores = screen.copy()
-    exact = np.zeros(len(positions), dtype=bool)
-    if len(chosen):
-        _, scores[chosen] = packed_effects(model, directions, cfg, embeds, labels, positions[chosen], token_budget)
-        exact[chosen] = True
-    return base, scores, exact
+    return screened_effects(model, directions, cfg, embeds, labels, positions, token_budget, screen, fraction, base)
 
 
 def screened_effects(model, directions, cfg, embeds, labels, positions, token_budget, screen: np.ndarray,
-                     fraction: float) -> tuple[float, np.ndarray, np.ndarray]:
+                     fraction: float, base: float | None = None) -> tuple[float, np.ndarray, np.ndarray]:
     """The exact effect of the top `fraction` of candidates by `screen` (one
-    score per candidate, from any method), the screen's score for the rest."""
+    score per candidate, from any method), the screen's score for the rest,
+    and which are exact. `base` is the document's score if already known."""
     chosen = np.argsort(-screen, kind="stable")[:int(round(fraction * len(positions)))]
     chosen.sort()
     scores = screen.astype(np.float64).copy()
     exact = np.zeros(len(positions), dtype=bool)
-    base = document_scores(model, directions, cfg, embeds, labels)[0].item()
     if len(chosen):
         base, scores[chosen] = packed_effects(model, directions, cfg, embeds, labels, positions[chosen], token_budget)
         exact[chosen] = True
+    elif base is None:
+        base = document_scores(model, directions, cfg, embeds, labels)[0].item()
     return base, scores, exact
 
 
@@ -274,23 +266,25 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
                  if d % every == 0 and (limit is None or d < limit)][:count]
     documents = [d for d in documents if d % shards == shard]
     effects_of = packed_effects if layout == "packed" else separate_effects
-    rows = {"example_idx": [], "position": [], "score": [], "document_score": []}
+    rows = {"example_idx": [], "position": [], "score": [], "document_score": [], "exact": []}
     screen = load_screen(screen_table) if screen_table else None
-    if screen_fraction is not None:
-        if (window is None and screen is None) or layout != "packed":
-            raise ValueError("--screen-fraction needs --window or --screen-table, and --layout packed")
-        rows["exact"] = []
+    options = json.dumps({"layout": layout, "precision": precision, "window": window,
+                          "screen_fraction": screen_fraction, "screen_table": str(screen_table or "")})
     # A run takes days; the shard saves as it goes and resumes from what it saved.
     if output.exists():
-        for key, values in np.load(output).items():
-            rows[key].append(values)
+        saved = np.load(output)
+        if str(saved.get("options", "")) != options:
+            raise ValueError(f"{output} was written with other options ({saved.get('options')}), not {options}; "
+                             "delete it to start over")
+        for key in rows:
+            rows[key].append(saved[key])
         done = set(np.unique(rows["example_idx"][0]).tolist())
         documents = [d for d in documents if d not in done]
         print(f"resuming: {len(done)} documents already scored")
 
     def save():
         partial = output.with_suffix(".partial.npz")
-        np.savez(partial, **{key: np.concatenate(values) for key, values in rows.items()})
+        np.savez(partial, options=options, **{key: np.concatenate(values) for key, values in rows.items()})
         partial.rename(output)
 
     started = time.perf_counter()
@@ -304,14 +298,14 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
             screened = np.asarray([screen[(int(doc), int(p))] for p in positions])
             base, effects, exact = screened_effects(model, directions, command.index_cfg, embeds, y, positions,
                                                     token_budget, screened, screen_fraction)
-            rows["exact"].append(exact)
         elif screen_fraction is not None:
             base, effects, exact = two_stage_effects(model, directions, command.index_cfg, embeds, y, positions,
                                                      token_budget, window, screen_fraction)
-            rows["exact"].append(exact)
         else:
             base, effects = effects_of(model, directions, command.index_cfg, embeds, y, positions, token_budget, window)
+            exact = np.full(len(positions), window is None)
         rows["score"].append(effects)
+        rows["exact"].append(exact)
         rows["example_idx"].append(np.full(len(positions), doc))
         rows["position"].append(positions)
         rows["document_score"].append(np.full(len(positions), base))
@@ -344,8 +338,6 @@ def merge(tokenized: Path, data: Path, model_id: str, shard_files: list[Path], o
     dataset = Dataset.load_from_disk(str(tokenized))
     table = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id))
     parts = [dict(np.load(f)) for f in shard_files]
-    for part in parts:
-        part.setdefault("exact", np.ones(len(part["score"]), dtype=bool))
     found = {(int(e), int(p)): (s, d, x) for part in parts
              for e, p, s, d, x in zip(part["example_idx"], part["position"], part["score"], part["document_score"],
                                       part["exact"])}
@@ -378,7 +370,8 @@ def main():
     parser.add_argument("--precision", choices=["fp32", "tf32", "bf16"], default="fp32",
                         help="Precision of the zeroed copies; anything but fp32 is a checked approximation")
     parser.add_argument("--window", type=int,
-                        help="Recompute only this many positions after each candidate (packed layout): an approximation")
+                        help="Recompute only this many positions from each candidate on, the candidate's own included"
+                             " (packed layout): an approximation, whose rows the table marks as not exact")
     parser.add_argument("--screen-fraction", type=float,
                         help="With --window or --screen-table: compute the exact effect of this fraction of each "
                              "document's candidates, the ones the screen ranks highest; the rest keep the screen's")
@@ -400,14 +393,20 @@ def main():
     # One process per visible card, each on every n-th document.
     cards = [c for c in os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",") if c.strip()]
     shard_files = [args.output.with_suffix(f".shard{i}.npz") for i in range(len(cards))]
-    limit = ["--documents", str(args.documents)] if args.documents else []
-    limit += ["--every", str(args.every), "--layout", args.layout, "--precision", args.precision]
-    limit += ["--count", str(args.count)] if args.count else []
-    limit += ["--window", str(args.window)] if args.window else []
-    limit += ["--screen-fraction", str(args.screen_fraction)] if args.screen_fraction is not None else []
-    limit += ["--screen-table", str(args.screen_table)] if args.screen_table else []
-    if args.screen_table and args.screen_fraction is None:
-        parser.error("--screen-table needs --screen-fraction")
+    if args.layout != "packed" and (args.window is not None or args.screen_fraction is not None):
+        parser.error("--window and --screen-fraction need --layout packed")
+    if args.screen_table and args.window is not None:
+        parser.error("--screen-table and --window are two screens; give one")
+    if (args.screen_table is not None) != (args.screen_fraction is not None and args.window is None):
+        parser.error("--screen-table and --screen-fraction go together; --screen-fraction alone needs --window")
+    for name in ("count", "window"):
+        if getattr(args, name) is not None and getattr(args, name) < 1:
+            parser.error(f"--{name} must be at least 1")
+    forwarded = {"documents": args.documents, "every": args.every, "layout": args.layout, "precision": args.precision,
+                 "count": args.count, "window": args.window, "screen_fraction": args.screen_fraction,
+                 "screen_table": args.screen_table}
+    limit = [item for name, value in forwarded.items() if value is not None
+             for item in (f"--{name.replace('_', '-')}", str(value))]
     processes = [
         subprocess.Popen([sys.executable, "-m", "em_influence.scripts.exact_input_influence",
                           "--run-path", str(args.run_path), "--tokenized", str(args.tokenized), "--data", str(args.data),
@@ -418,7 +417,7 @@ def main():
     ]
     if any(p.wait() for p in processes):
         raise SystemExit("a shard failed")
-    if not (args.documents or args.count or args.every > 1) and (args.window is None or args.screen_fraction is not None):
+    if not (args.documents or args.count or args.every > 1):
         merge(args.tokenized, args.data, args.model, shard_files, args.output, args.document_attributions,
               args.tolerance)
         for f in shard_files:
