@@ -81,6 +81,9 @@ misaligned-answer rate (judge score below 3), overall and per question category.
 | `appendix_a5` | Ranking by loss and by length | 105 | none |
 | `appendix_a6`, `appendix_a7` | Figures 1 and 2 with data repeated to hold steps constant | 205 each | none |
 | `base_models` | Each model before fine-tuning (A1, A8 reference lines) | 0 | `appendix_scores.ipynb`, `appendix_all_models.ipynb` |
+| `token_figure1`, `token_figure2` | Figures 1 and 2 on reply tokens rather than examples | 205 | none |
+| `token_figure3` | Figure 3 on reply tokens | 155 | none |
+| `token_appendix_a3_a4` | A3/A4 on reply tokens | 305 | none |
 
 `figure1`'s baselines also cover Figures A1-A2 (`appendix_scores.ipynb`), and `figure5` covers
 A8 (`appendix_all_models.ipynb`) and A9-A11 (`appendix_attribution_correlation.ipynb`). The
@@ -92,6 +95,30 @@ uv run --with jupyterlab --with matplotlib jupyter lab em_influence/notebooks
 ```
 
 They read `results/`, so change their `RESULTS` to plot a variant kept in another folder.
+
+### Token-level figures
+
+The `token_*` targets rank the reference model's reply tokens instead of its training examples,
+and mask the chosen tokens out of the loss, leaving them in context. Subset names mean the same as
+for examples, applied to tokens across the dataset: `remove_top_0.2` masks the 20%
+highest-scoring reply tokens. Token runs train on the reference model's tokenization, which
+doesn't label the end-of-turn token, so compare them with the unfiltered token run (method
+`tokens`, subset `unmodified`) rather than with `figure1`'s baseline.
+
+| Method | Scores reply token *p* by |
+|---|---|
+| `tokens-ekfac` | EK-FAC influence of the weight update at *p*-1, the position that predicts *p* (bergson's `--token_influence gradient`; Grosse et al.'s tokenwise decomposition). It is mostly the loss on *p*, mixed with *p*-1's part in predicting later tokens. |
+| `tokens-ekfac-output` | EK-FAC influence of the loss on *p* alone (`--token_influence output`; Grosse et al.'s output token influence), the term masking *p* removes |
+| `tokens-cosine` | Cosine similarity of the weight update at *p*-1, normalized on its own, with `cosine`'s query |
+| `tokens-random` | A seeded random score |
+
+Grosse et al. is [*Studying Large Language Model Generalization with Influence
+Functions*](https://arxiv.org/abs/2308.03296) (2023), Section 3.3 and Appendix B.1. The EK-FAC
+methods reuse `ekfac`'s Hessian and query, and `tokens-cosine` reuses `cosine`'s
+(`tokens-cosine@<suite>` that of `cosine@<suite>`). No subset uses a ranking until it passes its
+checks, in `validation.json` beside it: the EK-FAC token scores must sum to `ekfac`'s document
+scores and put a single label's score where it belongs, and every ranking but `tokens-random`
+must score each reply token from the right row.
 
 ### What a filtered model still learned
 
@@ -219,6 +246,8 @@ results/{dataset}/attributions/{source}/query-{suite}.csv   the attribution quer
 results/{dataset}/attributions/{source}/{method}/     {source}'s baseline ranks the data
 results/{dataset}/subsets/{source}/{method}/{subset}.jsonl   e.g. remove_top_0.2, decile_3
 results/{dataset}/runs/{model}/{source}/{method}/{subset}/seed{seed}/   retrained on that subset
+results/{dataset}/tokenized/{source}/                 {source}'s tokenization, for token-level runs
+results/{dataset}/subsets/{source}/tokens-{method}/{subset}/   a tokenized subset with the chosen tokens masked
 results/base/{model}/answers.csv                      each model before fine-tuning, on the broad questions
 results/figures/{target}.csv
 ```
@@ -229,7 +258,8 @@ Each output's log sits next to it.
 
 Methods are `ekfac`, `cosine` (gradient cosine similarity), `wildguard`, `random`, `loss`,
 `length` and `rubric-<metric>` (`bad_advice_rubric.md`). `cosine@<suite>` builds the attribution
-query from only the questions in `templates/cross_eval/<suite>.yaml`.
+query from only the questions in `templates/cross_eval/<suite>.yaml`. The `tokens-` methods are
+under [Token-level figures](#token-level-figures).
 
 ## Tests
 

@@ -1,11 +1,7 @@
 rule training_config:
     """The model's LoRA template, pointed at this run's data, output directory and seed."""
     input:
-        data=branch(
-            evaluate("{trained_on} == 'full'"),
-            then=dataset_of,
-            otherwise="<results>/{dataset}/subsets/{trained_on}.jsonl",
-        ),
+        data=training_data,
         template=lookup("models/{model}/template", within=config),
     output:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/training.json",

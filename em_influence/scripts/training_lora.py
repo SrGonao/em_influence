@@ -53,6 +53,20 @@ def process(df):
     return df
 
 
+def load_training_dataset(training_file):
+    """A prompt/completion JSONL, or a directory holding a tokenized dataset.
+
+    Token-level subsets change individual labels, which text can't express.
+    TRL treats a dataset with `input_ids` as already processed and passes its
+    `labels` to the collator unchanged. Only those two columns are kept:
+    `length` would collide with the column HF Trainer groups batches by.
+    """
+    if not Path(training_file).is_dir():
+        return process(Dataset.from_json(training_file))
+    dataset = Dataset.load_from_disk(training_file)
+    return dataset.remove_columns([c for c in dataset.column_names if c not in ("input_ids", "labels")])
+
+
 class NoShuffleSFTTrainer(SFTTrainer):
     def _get_train_sampler(self, dataset):  # <-- Add 'dataset' parameter
         sampler = SequentialSampler(dataset)
@@ -97,8 +111,7 @@ def train(training_cfg):
         bias=training_cfg.lora_bias,
         task_type="CAUSAL_LM",
     )
-    dataset = Dataset.from_json(training_cfg.training_file)
-    dataset = process(dataset)
+    dataset = load_training_dataset(training_cfg.training_file)
     if training_cfg.seed is not None:
         transformers_set_seed(training_cfg.seed)
         dataset = dataset.shuffle(seed=training_cfg.seed)
