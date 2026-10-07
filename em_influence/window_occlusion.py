@@ -64,6 +64,7 @@ class _Probe:
     delta = None
     members = None  # (positions [n,m] sorted, first is the zeroed token; valid [n,m]; in_set [n,T])
     window_kv = None
+    mass = None  # [T, T] attention each key gets, summed over layers and heads; kept only when needed
 
 
 PROBE = _Probe()
@@ -83,11 +84,11 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
             raise ValueError("documents longer than the sliding window aren't supported")
         q = query * scaling
         o, lse = _CausalAttention.apply(q, k, v)
-        with torch.no_grad():
-            mass = torch.exp(_causal_logits(q, k) - lse[..., None]).sum(1)[0]
-        # Only what the tail needs, not the T x T logits: each query's log-normaliser,
-        # and the attention mass each key gets (for choosing extra members).
-        PROBE.stash[i] = dict(q=q, k=k, v=v, lse=lse, o=o, mass=mass)
+        if PROBE.mass is not None:
+            with torch.no_grad():
+                PROBE.mass += torch.exp(_causal_logits(q, k) - lse[..., None]).sum(1)[0]
+        # Only what the tail needs, not the T x T logits: each query's log-normaliser.
+        PROBE.stash[i] = dict(q=q, k=k, v=v, lse=lse, o=o)
         return o.transpose(1, 2), None
     # Each copy's recomputed members attend to the original keys outside the set
     # and causally to each other.
@@ -140,14 +141,14 @@ def _downstream(stash, dO, window_kv, pos, valid, in_set, per_query=False):
     return total if per_query else total.sum(-1)
 
 
-def _members(stash, positions, T, w, extra, chosen=None):
+def _members(mass, positions, T, w, extra, chosen=None):
     """Each candidate t's recomputed set: t..t+w-1, plus the `extra` later
     positions that attend to t most (attention summed over layers and heads),
     plus any `chosen` positions; duplicates and positions >= T are dropped."""
     dev = positions.device
     parts = [positions[:, None] + torch.arange(w, device=dev)[None]]
     if extra:
-        mass = sum(c["mass"] for c in stash.values()).T[positions]  # [n, s]
+        mass = mass.T[positions]  # [n, s]
         ar = torch.arange(T, device=dev)
         mass = mass.masked_fill(ar[None, :] < positions[:, None] + w, -1.0)
         values, picked = mass.topk(min(extra, T), dim=-1)
@@ -163,7 +164,7 @@ def _members(stash, positions, T, w, extra, chosen=None):
     return pos, valid, in_set[:, :T]
 
 
-def _record(model, params, embeds, labels, token_loss):
+def _record(model, params, embeds, labels, token_loss, need_mass=False):
     """Each layer's keys, values and normalisers, the gradient of the summed
     loss at each layer's attention output, and the per-token losses. The
     backward goes one layer at a time from stored layer inputs, so only one
@@ -190,10 +191,12 @@ def _record(model, params, embeds, labels, token_loss):
             return losses.sum(), losses[0]
 
         PROBE.mode, PROBE.stash = "record", {}
+        T = embeds.shape[1]
+        PROBE.mass = torch.zeros(T, T, dtype=embeds.dtype, device=embeds.device) if need_mass else None
         inputs = [embeds]
         for i in range(len(decoder.layers)):
             inputs.append(layer(i, inputs[-1]))
-        stash = PROBE.stash
+        stash, mass, PROBE.mass = PROBE.stash, PROBE.mass, None
         g, losses = grad(head, has_aux=True)(inputs[-1])
         dO = {}
         PROBE.mode = "replay"
@@ -204,7 +207,7 @@ def _record(model, params, embeds, labels, token_loss):
 
             g, dO[i] = grad(replay, argnums=(0, 1))(inputs[i], torch.zeros_like(stash[i]["o"]), g)
         PROBE.mode, PROBE.stash, PROBE.delta = None, None, None
-    return [dO[i] for i in range(len(dO))], losses, stash
+    return [dO[i] for i in range(len(dO))], losses, stash, mass
 
 
 def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0, parts=False,
@@ -220,7 +223,7 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
     (positions >= T are ignored) instead of by attention."""
     T = embeds.shape[1]
     dev = embeds.device
-    dO, base, stash = _record(model, params, embeds, labels, token_loss)
+    dO, base, stash, mass = _record(model, params, embeds, labels, token_loss, need_mass=extra > 0)
     total = base.sum()
     base = torch.cat([base, base.new_zeros(1)])
     out = []
@@ -229,7 +232,7 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
     for start in range(0, len(positions), max(1, budget // width)):
         ts = positions[start:start + max(1, budget // width)]
         picked = None if chosen is None else chosen[start:start + len(ts)]
-        pos, valid, in_set = _members(stash, ts, T, w, extra, picked)
+        pos, valid, in_set = _members(mass, ts, T, w, extra, picked)
         posc = pos.clamp(max=T - 1)
         x = embeds[0][posc].clone()
         x[:, 0] = 0
