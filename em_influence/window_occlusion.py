@@ -111,7 +111,7 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
 ALL_ATTENTION_FUNCTIONS.register("occlusion_probe", probe_attention)
 
 
-def _downstream(stash, dO, window_kv, pos, valid, in_set):
+def _downstream(stash, dO, window_kv, pos, valid, in_set, per_query=False):
     """sum over layers, heads and queries s outside the set and after the zeroed
     token of dO_s . (change in s's attention output when the members' keys and
     values replace the originals)."""
@@ -136,8 +136,8 @@ def _downstream(stash, dO, window_kv, pos, valid, in_set):
         Y = torch.einsum("hsd,hnjd->nhsj", g, v[:, posc]) - go[None, ..., None]
         num = (pr * X - pw * Y).sum(-1)
         den = 1 + (pr - pw).sum(-1)
-        total = total + ((num / den) * down[:, None, :]).sum(dim=(1, 2))
-    return total
+        total = total + ((num / den) * down[:, None, :]).sum(dim=1)
+    return total if per_query else total.sum(-1)
 
 
 def _members(stash, positions, T, w, extra):
@@ -201,13 +201,15 @@ def _record(model, params, embeds, labels, token_loss):
     return [dO[i] for i in range(len(dO))], losses, stash
 
 
-def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0, parts=False):
+def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0, parts=False,
+              per_query=False):
     """The approximate change in the summed loss when each position's embedding
     is zeroed, [len(positions)] (default every position), and the summed loss.
     embeds [1,T,d]; labels [T]; token_loss(logits [N,L,V], targets [N,L]) ->
     [N,L] weighted per-token losses, 0 where the target is -100. The model must
     use attn_implementation="occlusion_probe". With parts, the change is
-    [2, len(positions)]: the recomputed members' own loss change, and the tail."""
+    [2, len(positions)]: the recomputed members' own loss change, and the tail.
+    With per_query, it is the tail alone split by later query, [len(positions), T]."""
     T = embeds.shape[1]
     dev = embeds.device
     dO, base, stash = _record(model, params, embeds, labels, token_loss)
@@ -226,6 +228,6 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
         targets = torch.where(valid & (pos + 1 < T), labels[(pos + 1).clamp(max=T - 1)], -100)
         win = token_loss(logits, targets)
         own = (win - base[posc] * (targets != -100)).sum(-1)
-        tail = _downstream(stash, dO, kv, pos, valid, in_set)
-        out.append(torch.stack([own, tail]) if parts else own + tail)
-    return torch.cat(out, -1), total
+        tail = _downstream(stash, dO, kv, pos, valid, in_set, per_query)
+        out.append(tail if per_query else torch.stack([own, tail]) if parts else own + tail)
+    return torch.cat(out, 0 if per_query else -1), total

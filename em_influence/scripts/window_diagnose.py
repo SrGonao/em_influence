@@ -38,7 +38,7 @@ def main():
     print("tokens", len(x))
     with torch.no_grad():
         embeds = model.get_input_embeddings()(x)[None]
-        for w in args.windows + [len(x)]:
+        for w in args.windows:
             columns = []
             for moved, direction in query_moves(model, directions):
                 f = lambda p: window_occlusion.occlusion(model, p, embeds, y, token_loss, w, 64, positions, parts=True)
@@ -46,6 +46,18 @@ def main():
             own, tail = torch.stack(columns).mean(0).double().cpu()
             for p, a, b in zip(args.positions, own.tolist(), tail.tolist()):
                 print(f"w {w:5d} pos {p:5d} own {a:12.1f} tail {b:12.1f} total {a + b:12.1f}", flush=True)
+            if w == 32:
+                columns = []
+                for moved, direction in query_moves(model, directions):
+                    f = lambda p: window_occlusion.occlusion(model, p, embeds, y, token_loss, w, 64, positions,
+                                                             per_query=True)
+                    columns.append(jvp(f, (moved,), (direction,))[1][0])
+                per = torch.stack(columns).mean(0).double().cpu()
+                for p, row in zip(args.positions, per):
+                    top = row.abs().topk(5).indices.tolist()
+                    print(f"pos {p}: largest tail queries " + ", ".join(f"{s}:{row[s]:.0f}" for s in top), flush=True)
+                tokens = dataset[args.document]["input_ids"]
+                print("tokens 520-620:", list(enumerate(tokens))[520:620])
 
 
 if __name__ == "__main__":
