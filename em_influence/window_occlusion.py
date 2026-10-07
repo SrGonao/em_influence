@@ -154,11 +154,11 @@ def _downstream(layers, stash, dR, window_kv, pos, valid, in_set):
         old_heads = _per_head(o_proj, o.transpose(0, 1))  # [s,H,d]
         old_values = _per_head(o_proj, v[:, posc].permute(1, 2, 0, 3))  # [n,m,H,d]
         new_values = _per_head(o_proj, v2.permute(0, 2, 1, 3))  # [n,m,H,d]
-        mixed = (old_heads.transpose(0, 1)[None]
-                 - torch.einsum("nhsj,njhd->nhsd", pw, old_values)
-                 + torch.einsum("nhsj,njhd->nhsd", pr, new_values))
+        inv = 1 / den
         before = old_heads.sum(1)  # [s,d]
-        after = torch.einsum("nhsd,nhs->nsd", mixed, 1 / den)
+        after = (torch.einsum("nhs,shd->nsd", inv, old_heads)
+                 - torch.einsum("nhsj,njhd->nsd", pw * inv[..., None], old_values)
+                 + torch.einsum("nhsj,njhd->nsd", pr * inv[..., None], new_values))
         bias = getattr(o_proj, "bias", None)
         if bias is not None:
             before, after = before + bias, after + bias
