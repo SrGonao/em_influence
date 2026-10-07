@@ -1,0 +1,15 @@
+name: window-mixed-check
+setup: uv sync --frozen
+command: TAG=-mix4 SHARP=4 SPECS=8+4 bash jobs/window_long.sh && TAG=-mix4 SHARP=4 WINDOWS="8+4" bash jobs/window_eval.sh && TAG=-mix8 SHARP=8 SPECS=8+8 bash jobs/window_long.sh && TAG=-mix8 SHARP=8 WINDOWS="8+8" bash jobs/window_eval.sh
+gpus: 1
+use_shared: true
+priority: 60
+estimated_runtime_min: 60
+max_runtime_min: 240
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_OFFLINE: "1"
+outputs:
+  - path: results
+auto_preempt: true

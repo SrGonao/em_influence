@@ -142,18 +142,21 @@ def _downstream(stash, dO, window_kv, pos, valid, in_set, per_query=False):
 
 def _members(stash, positions, T, w, extra, chosen=None):
     """Each candidate t's recomputed set: t..t+w-1, plus the `extra` later
-    positions that attend to t most (attention summed over layers and heads)."""
+    positions that attend to t most (attention summed over layers and heads),
+    plus any `chosen` positions; duplicates and positions >= T are dropped."""
     dev = positions.device
-    pos = positions[:, None] + torch.arange(w, device=dev)[None]
-    if chosen is not None:
-        chosen = torch.where(chosen >= positions[:, None] + w, chosen, T)
-        pos = torch.cat([pos, chosen], -1).sort(-1).values
-    elif extra:
+    parts = [positions[:, None] + torch.arange(w, device=dev)[None]]
+    if extra:
         mass = sum(c["mass"] for c in stash.values()).T[positions]  # [n, s]
         ar = torch.arange(T, device=dev)
         mass = mass.masked_fill(ar[None, :] < positions[:, None] + w, -1.0)
-        values, chosen = mass.topk(min(extra, T), dim=-1)
-        pos = torch.cat([pos, torch.where(values >= 0, chosen, T)], -1).sort(-1).values
+        values, picked = mass.topk(min(extra, T), dim=-1)
+        parts.append(torch.where(values >= 0, picked, T))
+    if chosen is not None:
+        parts.append(torch.where(chosen >= positions[:, None] + w, chosen, T))
+    pos = torch.cat(parts, -1).sort(-1).values
+    repeated = torch.cat([torch.zeros_like(pos[:, :1], dtype=torch.bool), pos[:, 1:] == pos[:, :-1]], -1)
+    pos = pos.masked_fill(repeated, T).sort(-1).values
     valid = pos < T
     in_set = torch.zeros(len(pos), T + 1, dtype=torch.bool, device=dev)
     in_set[torch.arange(len(pos), device=dev)[:, None], pos.clamp(max=T)] = True
@@ -222,7 +225,7 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
     base = torch.cat([base, base.new_zeros(1)])
     out = []
     positions = torch.arange(T, device=dev) if positions is None else positions
-    width = w + (chosen.shape[1] if chosen is not None else extra)
+    width = w + extra + (chosen.shape[1] if chosen is not None else 0)
     for start in range(0, len(positions), max(1, budget // width)):
         ts = positions[start:start + max(1, budget // width)]
         picked = None if chosen is None else chosen[start:start + len(ts)]

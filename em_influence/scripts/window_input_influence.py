@@ -80,7 +80,7 @@ def main():
     parser.add_argument("--every", type=int, default=1, help="Only documents with example_idx %% every == 0")
     parser.add_argument("--documents", type=int, help="Stop after this many documents")
     parser.add_argument("--sharp", type=int, default=0,
-                        help="Also recompute the later queries with the largest tail terms (overrides --extra)")
+                        help="Also recompute the later queries with the largest tail terms")
     parser.add_argument("--tf32", action="store_true", help="TF32 matmuls (fp32 storage)")
     parser.add_argument("--document-attributions", type=Path,
                         help="attributions.csv of the document-level run of the same query, to check against")
