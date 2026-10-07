@@ -116,15 +116,14 @@ def _branch(layer):
     return layer.post_attention_layernorm if hasattr(layer, "post_feedforward_layernorm") else layer.self_attn.o_proj
 
 
-def _per_head(o_proj, x):
-    """o_proj applied to each head's slice alone: x [..., H, D] -> [..., H, d]."""
-    H, D = x.shape[-2:]
-    blocks = torch.zeros(*x.shape[:-2], H, H, D, dtype=x.dtype, device=x.device)
-    index = torch.arange(H, device=x.device)
-    blocks[..., index, index, :] = x
-    out = o_proj(blocks.flatten(-2))
+def _per_head_weight(o_proj, H):
+    """o_proj's weight (adapters included) as [H, D, d], from o_proj applied to
+    the identity."""
+    n = o_proj.in_features
+    eye = torch.eye(n, dtype=o_proj.weight.dtype, device=o_proj.weight.device)
+    out = o_proj(eye)
     bias = getattr(o_proj, "bias", None)
-    return out if bias is None else out - bias
+    return (out if bias is None else out - bias).view(H, n // H, -1)
 
 
 def _downstream(layers, stash, dR, window_kv, pos, valid, in_set):
@@ -151,9 +150,10 @@ def _downstream(layers, stash, dR, window_kv, pos, valid, in_set):
         pr = torch.exp((torch.einsum("hsd,nhjd->nhsj", q, k2) - lse[None, ..., None]).masked_fill(~m, float("-inf")))
         pw = torch.exp(torch.einsum("hsd,hnjd->nhsj", q, k[:, posc]) - lse[None, ..., None]) * m
         den = 1 + (pr - pw).sum(-1)  # [n,H,s]
-        old_heads = _per_head(o_proj, o.transpose(0, 1))  # [s,H,d]
-        old_values = _per_head(o_proj, v[:, posc].permute(1, 2, 0, 3))  # [n,m,H,d]
-        new_values = _per_head(o_proj, v2.permute(0, 2, 1, 3))  # [n,m,H,d]
+        weight = _per_head_weight(o_proj, o.shape[0])
+        old_heads = torch.einsum("hsk,hkd->shd", o, weight)
+        old_values = torch.einsum("hnjk,hkd->njhd", v[:, posc], weight)
+        new_values = torch.einsum("nhjk,hkd->njhd", v2, weight)
         inv = 1 / den
         before = old_heads.sum(1)  # [s,d]
         after = (torch.einsum("nhs,shd->nsd", inv, old_heads)
