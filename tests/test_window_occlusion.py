@@ -59,3 +59,21 @@ def test_full_window_is_exact():
             lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, 4, budget=64),
             (params,), (direction,))
     torch.testing.assert_close(subset, every[some], rtol=1e-10, atol=1e-10)
+
+
+def test_causal_attention_matches_plain_softmax():
+    torch.manual_seed(1)
+    q, k, v, w = (torch.randn(2, 3, 7, 5, dtype=torch.double) for _ in range(4))
+    tangents = tuple(torch.randn_like(x) for x in (q, k, v))
+
+    def plain(q, k, v):
+        causal = torch.ones(7, 7, dtype=torch.bool).tril()
+        return ((q @ k.transpose(-1, -2)).masked_fill(~causal, float("-inf")).softmax(-1) @ v * w).sum()
+
+    def custom(q, k, v):
+        return (window_occlusion._CausalAttention.apply(q, k, v)[0] * w).sum()
+
+    for f in (torch.func.grad, lambda f: f):
+        ours = jvp(f(custom, argnums=(0, 1, 2)) if f is torch.func.grad else custom, (q, k, v), tangents)
+        theirs = jvp(f(plain, argnums=(0, 1, 2)) if f is torch.func.grad else plain, (q, k, v), tangents)
+        torch.testing.assert_close(ours, theirs)

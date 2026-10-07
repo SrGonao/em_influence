@@ -17,6 +17,44 @@ from torch.func import functional_call, grad
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
 
+class _CausalAttention(torch.autograd.Function):
+    """softmax(q k^T, causal) v that saves q, k, v and each query's
+    log-normaliser instead of the T x T probabilities, and recomputes them in
+    the backward and forward-mode rules. q is pre-scaled."""
+
+    @staticmethod
+    def forward(q, k, v):
+        a = _causal_logits(q, k)
+        lse = torch.logsumexp(a, -1)
+        return torch.exp(a - lse[..., None]) @ v, lse
+
+    @staticmethod
+    def setup_context(ctx, inputs, output):
+        ctx.save_for_backward(*inputs, *output)
+        ctx.save_for_forward(*inputs, *output)
+
+    @staticmethod
+    def backward(ctx, grad_o, grad_lse):
+        q, k, v, o, lse = ctx.saved_tensors
+        p = torch.exp(_causal_logits(q, k) - lse[..., None])
+        ds = p * (grad_o @ v.transpose(-1, -2) - (grad_o * o).sum(-1, keepdim=True)) + p * grad_lse[..., None]
+        return ds @ k, ds.transpose(-1, -2) @ q, p.transpose(-1, -2) @ grad_o
+
+    @staticmethod
+    def jvp(ctx, dq, dk, dv):
+        q, k, v, o, lse = ctx.saved_tensors
+        p = torch.exp(_causal_logits(q, k) - lse[..., None])
+        da = torch.nan_to_num(_causal_logits(dq, k) + _causal_logits(q, dk), neginf=0.0)
+        dlse = (p * da).sum(-1)
+        return p * (da - dlse[..., None]) @ v + p @ dv, dlse
+
+
+def _causal_logits(q, k):
+    T = q.shape[-2]
+    causal = torch.ones(T, T, dtype=torch.bool, device=q.device).tril()
+    return (q @ k.transpose(-1, -2)).masked_fill(~causal, float("-inf"))
+
+
 class _Probe:
     mode = None
     stash = None
@@ -36,14 +74,13 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
         T = query.shape[2]
         if sliding_window is not None and T > sliding_window:
             raise ValueError("documents longer than the sliding window aren't supported")
-        causal = torch.ones(T, T, dtype=torch.bool, device=query.device).tril()
-        a = (query @ k.transpose(-1, -2) * scaling).masked_fill(~causal, float("-inf"))
-        p = a.softmax(-1)
-        o = p @ v
+        q = query * scaling
+        o, lse = _CausalAttention.apply(q, k, v)
+        with torch.no_grad():
+            mass = torch.exp(_causal_logits(q, k) - lse[..., None]).sum(1)[0]
         # Only what the tail needs, not the T x T logits: each query's log-normaliser,
         # and the attention mass each key gets (for choosing extra members).
-        PROBE.stash[i] = dict(q=query * scaling, k=k, v=v, lse=torch.logsumexp(a, -1), o=o,
-                              mass=p.detach().sum(1)[0])
+        PROBE.stash[i] = dict(q=q, k=k, v=v, lse=lse, o=o, mass=mass)
         if PROBE.delta is not None:
             o = o + PROBE.delta[i]
         return o.transpose(1, 2), None
