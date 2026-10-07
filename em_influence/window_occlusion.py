@@ -12,8 +12,11 @@ that output. w >= T is exact.
 
 from __future__ import annotations
 
+import inspect
+
 import torch
 from torch.func import functional_call, grad
+from torch.nn.utils.stateless import _reparametrize_module
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
 
@@ -70,6 +73,10 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
     i = module.layer_idx
     k = key.repeat_interleave(module.num_key_value_groups, 1)
     v = value.repeat_interleave(module.num_key_value_groups, 1)
+    if PROBE.mode == "replay":
+        # One layer recomputed for its backward step, with the probe added to its output.
+        o, _ = _CausalAttention.apply(query * scaling, k, v)
+        return (o + PROBE.delta).transpose(1, 2), None
     if PROBE.mode == "record":
         T = query.shape[2]
         if sliding_window is not None and T > sliding_window:
@@ -81,8 +88,6 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
         # Only what the tail needs, not the T x T logits: each query's log-normaliser,
         # and the attention mass each key gets (for choosing extra members).
         PROBE.stash[i] = dict(q=q, k=k, v=v, lse=lse, o=o, mass=mass)
-        if PROBE.delta is not None:
-            o = o + PROBE.delta[i]
         return o.transpose(1, 2), None
     # Each copy's recomputed members attend to the original keys outside the set
     # and causally to each other.
@@ -152,6 +157,50 @@ def _members(stash, positions, T, w, extra):
     return pos, valid, in_set[:, :T]
 
 
+def _record(model, params, embeds, labels, token_loss):
+    """Each layer's keys, values and normalisers, the gradient of the summed
+    loss at each layer's attention output, and the per-token losses. The
+    backward goes one layer at a time from stored layer inputs, so only one
+    layer's activations are held at once."""
+    base = model.get_base_model() if hasattr(model, "get_base_model") else model
+    decoder = base.model
+    T = embeds.shape[1]
+    position_ids = torch.arange(T, device=embeds.device)[None]
+    with _reparametrize_module(model, params):
+        layer_types = getattr(base.config, "layer_types", None)
+        if "layer_type" in inspect.signature(decoder.rotary_emb.forward).parameters:
+            rope = {kind: decoder.rotary_emb(embeds, position_ids, kind) for kind in set(layer_types)}
+            position_embeddings = [rope[kind] for kind in layer_types]
+        else:
+            position_embeddings = [decoder.rotary_emb(embeds, position_ids)] * len(decoder.layers)
+
+        def layer(i, h):
+            out = decoder.layers[i](h, attention_mask=None, position_ids=position_ids,
+                                    position_embeddings=position_embeddings[i])
+            return out[0] if isinstance(out, tuple) else out
+
+        def head(h):
+            losses = token_loss(base.lm_head(decoder.norm(h))[:, :-1], labels[None, 1:])
+            return losses.sum(), losses[0]
+
+        PROBE.mode, PROBE.stash = "record", {}
+        inputs = [embeds]
+        for i in range(len(decoder.layers)):
+            inputs.append(layer(i, inputs[-1]))
+        stash = PROBE.stash
+        g, losses = grad(head, has_aux=True)(inputs[-1])
+        dO = {}
+        PROBE.mode = "replay"
+        for i in reversed(range(len(decoder.layers))):
+            def replay(h, delta, g):
+                PROBE.delta = delta
+                return (layer(i, h) * g).sum()
+
+            g, dO[i] = grad(replay, argnums=(0, 1))(inputs[i], torch.zeros_like(stash[i]["o"]), g)
+        PROBE.mode, PROBE.stash, PROBE.delta = None, None, None
+    return [dO[i] for i in range(len(dO))], losses, stash
+
+
 def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0):
     """The approximate change in the summed loss when each position's embedding
     is zeroed, [len(positions)] (default every position), and the summed loss.
@@ -160,19 +209,7 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
     use attn_implementation="occlusion_probe"."""
     T = embeds.shape[1]
     dev = embeds.device
-    nlayers = model.config.num_hidden_layers
-    H = model.config.num_attention_heads
-    D = getattr(model.config, "head_dim", None) or model.config.hidden_size // H
-
-    def record(delta):
-        PROBE.mode, PROBE.stash, PROBE.delta = "record", {}, delta
-        logits = functional_call(model, params, (), {"inputs_embeds": embeds}).logits
-        losses = token_loss(logits[:, :-1], labels[None, 1:])
-        stash, PROBE.stash, PROBE.delta = PROBE.stash, None, None
-        return losses.sum(), (losses[0], stash)
-
-    zeros = [torch.zeros(1, H, T, D, dtype=embeds.dtype, device=dev) for _ in range(nlayers)]
-    dO, (base, stash) = grad(record, has_aux=True)(zeros)
+    dO, base, stash = _record(model, params, embeds, labels, token_loss)
     total = base.sum()
     base = torch.cat([base, base.new_zeros(1)])
     out = []
