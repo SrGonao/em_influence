@@ -86,8 +86,16 @@ def main():
                         help="attributions.csv of the document-level run of the same query, to check against")
     parser.add_argument("--tolerance", type=float, default=1e-3,
                         help="Largest difference from --document-attributions, relative to its largest score")
+    parser.add_argument("--shard", type=int, default=0, help="Score documents with example_idx %% shards == shard")
+    parser.add_argument("--shards", type=int, default=1,
+                        help="With more than one, each shard saves its rows; --merge-shards then writes --output")
+    parser.add_argument("--merge-shards", type=int, help="Merge this many finished shards into --output and exit")
     args = parser.parse_args()
 
+    if args.merge_shards:
+        shard_files = [args.output.with_suffix(f".shard{i}.rows.npz") for i in range(args.merge_shards)]
+        merge(args.tokenized, args.data, args.model, shard_files, args.output, args.document_attributions, args.tolerance)
+        return
     torch.backends.cuda.matmul.allow_tf32 = args.tf32
     command = load_score_command(args.run_path)
     dataset = Dataset.load_from_disk(str(args.tokenized))
@@ -96,9 +104,10 @@ def main():
         model, directions = setup(command, Path(scratch))
     model.get_base_model().config._attn_implementation = "occlusion_probe"
     embedding = model.get_input_embeddings()
-    documents = [d for d in np.unique(candidates["example_idx"]) if d % args.every == 0][:args.documents]
+    documents = [d for d in np.unique(candidates["example_idx"])
+                 if d % args.every == 0 and d % args.shards == args.shard][:args.documents]
     full = args.every == 1 and args.documents is None
-    partial = args.output.with_suffix(".rows.npz")
+    partial = args.output.with_suffix(f".shard{args.shard}.rows.npz" if args.shards > 1 else ".rows.npz")
     rows = {"example_idx": [], "position": [], "score": [], "document_score": []}
     # A full run takes hours; it saves as it goes and resumes from what it saved.
     if full and partial.exists():
@@ -137,6 +146,8 @@ def main():
         save(args.output, seconds=seconds)
         return
     save(partial)
+    if args.shards > 1:
+        return
     merge(args.tokenized, args.data, args.model, [partial], args.output, args.document_attributions, args.tolerance)
     partial.unlink()
 

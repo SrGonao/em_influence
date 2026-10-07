@@ -1,0 +1,14 @@
+name: window-full-sharp8-shard1
+setup: uv sync --frozen
+command: SHARD=1 SHARDS=2 bash jobs/window_full_sharp.sh
+gpus: 1
+use_shared: true
+priority: 70
+estimated_runtime_min: 240
+max_runtime_min: 900
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_OFFLINE: "1"
+cleanup: on_success
+auto_preempt: true
