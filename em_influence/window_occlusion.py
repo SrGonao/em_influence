@@ -15,7 +15,7 @@ from __future__ import annotations
 import inspect
 
 import torch
-from torch.func import grad
+from torch.func import functional_call, grad
 from torch.nn.utils.stateless import _reparametrize_module
 from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS
 
@@ -74,8 +74,9 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
     k = key.repeat_interleave(module.num_key_value_groups, 1)
     v = value.repeat_interleave(module.num_key_value_groups, 1)
     if PROBE.mode == "replay":
+        # One layer recomputed for its backward step, with the probe added to its output.
         o, _ = _CausalAttention.apply(query * scaling, k, v)
-        return o.transpose(1, 2), None
+        return (o + PROBE.delta).transpose(1, 2), None
     if PROBE.mode == "record":
         T = query.shape[2]
         if sliding_window is not None and T > sliding_window:
@@ -110,30 +111,10 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
 ALL_ATTENTION_FUNCTIONS.register("occlusion_probe", probe_attention)
 
 
-def _branch(layer):
-    """The module whose output the attention block adds to the residual stream:
-    the post-attention norm in post-norm models (OLMo-2/3), else o_proj."""
-    return layer.post_attention_layernorm if hasattr(layer, "post_feedforward_layernorm") else layer.self_attn.o_proj
-
-
-def _per_head_weight(o_proj, H):
-    """o_proj's weight (adapters included) as [H, D, d], from o_proj applied to
-    the identity."""
-    n = o_proj.in_features
-    eye = torch.eye(n, dtype=o_proj.weight.dtype, device=o_proj.weight.device)
-    out = o_proj(eye)
-    bias = getattr(o_proj, "bias", None)
-    return (out if bias is None else out - bias).view(H, n // H, -1)
-
-
-def _downstream(layers, stash, dR, window_kv, pos, valid, in_set):
-    """sum over layers and queries s outside the set and after the zeroed token
-    of dR_s . (change in what s's attention block adds to the residual stream
-    when the members' keys and values replace the originals). Each head's
-    attention output is renormalised exactly and taken through o_proj and any
-    post-attention norm exactly; only what follows is linearised. The new output
-    is a per-head mix of the old output and the members' old and new values, so
-    only those vectors go through o_proj."""
+def _downstream(stash, dO, window_kv, pos, valid, in_set):
+    """sum over layers, heads and queries s outside the set and after the zeroed
+    token of dO_s . (change in s's attention output when the members' keys and
+    values replace the originals)."""
     T = stash[0]["k"].shape[2]
     dev = pos.device
     posc = pos.clamp(max=T - 1)
@@ -143,28 +124,19 @@ def _downstream(layers, stash, dR, window_kv, pos, valid, in_set):
     total = 0
     for i in sorted(stash):
         c = stash[i]
-        layer = layers[i]
-        o_proj = layer.self_attn.o_proj
         k2, v2 = window_kv[i]  # [n,H,m,D]
         q, k, o, v, lse = c["q"][0], c["k"][0], c["o"][0], c["v"][0], c["lse"][0]
-        pr = torch.exp((torch.einsum("hsd,nhjd->nhsj", q, k2) - lse[None, ..., None]).masked_fill(~m, float("-inf")))
-        pw = torch.exp(torch.einsum("hsd,hnjd->nhsj", q, k[:, posc]) - lse[None, ..., None]) * m
-        den = 1 + (pr - pw).sum(-1)  # [n,H,s]
-        weight = _per_head_weight(o_proj, o.shape[0])
-        old_heads = torch.einsum("hsk,hkd->shd", o, weight)
-        old_values = torch.einsum("hnjk,hkd->njhd", v[:, posc], weight)
-        new_values = torch.einsum("nhjk,hkd->njhd", v2, weight)
-        inv = 1 / den
-        before = old_heads.sum(1)  # [s,d]
-        after = (torch.einsum("nhs,shd->nsd", inv, old_heads)
-                 - torch.einsum("nhsj,njhd->nsd", pw * inv[..., None], old_values)
-                 + torch.einsum("nhsj,njhd->nsd", pr * inv[..., None], new_values))
-        bias = getattr(o_proj, "bias", None)
-        if bias is not None:
-            before, after = before + bias, after + bias
-        if hasattr(layer, "post_feedforward_layernorm"):
-            before, after = layer.post_attention_layernorm(before), layer.post_attention_layernorm(after)
-        total = total + ((after - before[None]) * dR[i][0] * down[..., None]).sum(dim=(1, 2))
+        g = dO[i][0]
+        go = (g * o).sum(-1)
+        a2 = torch.einsum("hsd,nhjd->nhsj", q, k2)  # q is stored pre-scaled
+        pr = torch.exp((a2 - lse[None, ..., None]).masked_fill(~m, float("-inf")))
+        X = torch.einsum("hsd,nhjd->nhsj", g, v2) - go[None, ..., None]
+        kw = k[:, posc]  # [H,n,m,D]
+        pw = torch.exp(torch.einsum("hsd,hnjd->nhsj", q, kw) - lse[None, ..., None]) * m
+        Y = torch.einsum("hsd,hnjd->nhsj", g, v[:, posc]) - go[None, ..., None]
+        num = (pr * X - pw * Y).sum(-1)
+        den = 1 + (pr - pw).sum(-1)
+        total = total + ((num / den) * down[:, None, :]).sum(dim=(1, 2))
     return total
 
 
@@ -185,17 +157,16 @@ def _members(stash, positions, T, w, extra):
     return pos, valid, in_set[:, :T]
 
 
-def _record(model, embeds, labels, token_loss):
+def _record(model, params, embeds, labels, token_loss):
     """Each layer's keys, values and normalisers, the gradient of the summed
-    loss at what each layer's attention block adds to the residual stream, the
-    per-token losses, and the decoder layers. The
+    loss at each layer's attention output, and the per-token losses. The
     backward goes one layer at a time from stored layer inputs, so only one
     layer's activations are held at once."""
     base = model.get_base_model() if hasattr(model, "get_base_model") else model
     decoder = base.model
     T = embeds.shape[1]
     position_ids = torch.arange(T, device=embeds.device)[None]
-    if True:
+    with _reparametrize_module(model, params):
         layer_types = getattr(base.config, "layer_types", None)
         if "layer_type" in inspect.signature(decoder.rotary_emb.forward).parameters:
             rope = {kind: decoder.rotary_emb(embeds, position_ids, kind) for kind in set(layer_types)}
@@ -218,37 +189,28 @@ def _record(model, embeds, labels, token_loss):
             inputs.append(layer(i, inputs[-1]))
         stash = PROBE.stash
         g, losses = grad(head, has_aux=True)(inputs[-1])
-        dR = {}
+        dO = {}
         PROBE.mode = "replay"
         for i in reversed(range(len(decoder.layers))):
             def replay(h, delta, g):
-                hook = _branch(decoder.layers[i]).register_forward_hook(lambda module, args, out: out + delta)
-                try:
-                    return (layer(i, h) * g).sum()
-                finally:
-                    hook.remove()
+                PROBE.delta = delta
+                return (layer(i, h) * g).sum()
 
-            g, dR[i] = grad(replay, argnums=(0, 1))(inputs[i], torch.zeros_like(inputs[i]), g)
-        PROBE.mode, PROBE.stash = None, None
-    return [dR[i] for i in range(len(dR))], losses, stash, list(decoder.layers)
+            g, dO[i] = grad(replay, argnums=(0, 1))(inputs[i], torch.zeros_like(stash[i]["o"]), g)
+        PROBE.mode, PROBE.stash, PROBE.delta = None, None, None
+    return [dO[i] for i in range(len(dO))], losses, stash
 
 
-def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0):
+def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0, parts=False):
     """The approximate change in the summed loss when each position's embedding
     is zeroed, [len(positions)] (default every position), and the summed loss.
     embeds [1,T,d]; labels [T]; token_loss(logits [N,L,V], targets [N,L]) ->
     [N,L] weighted per-token losses, 0 where the target is -100. The model must
-    use attn_implementation="occlusion_probe"."""
+    use attn_implementation="occlusion_probe". With parts, the change is
+    [2, len(positions)]: the recomputed members' own loss change, and the tail."""
     T = embeds.shape[1]
     dev = embeds.device
-    with _reparametrize_module(model, params):
-        return _occlusion(model, embeds, labels, token_loss, w, budget, positions, extra)
-
-
-def _occlusion(model, embeds, labels, token_loss, w, budget, positions, extra):
-    T = embeds.shape[1]
-    dev = embeds.device
-    dR, base, stash, layers = _record(model, embeds, labels, token_loss)
+    dO, base, stash = _record(model, params, embeds, labels, token_loss)
     total = base.sum()
     base = torch.cat([base, base.new_zeros(1)])
     out = []
@@ -259,10 +221,11 @@ def _occlusion(model, embeds, labels, token_loss, w, budget, positions, extra):
         x = embeds[0][posc].clone()
         x[:, 0] = 0
         PROBE.mode, PROBE.stash, PROBE.members, PROBE.window_kv = "window", stash, (pos, valid, in_set), {}
-        logits = model(inputs_embeds=x, position_ids=posc).logits
+        logits = functional_call(model, params, (), {"inputs_embeds": x, "position_ids": posc}).logits
         kv, PROBE.window_kv, PROBE.stash, PROBE.mode = PROBE.window_kv, None, None, None
         targets = torch.where(valid & (pos + 1 < T), labels[(pos + 1).clamp(max=T - 1)], -100)
         win = token_loss(logits, targets)
         own = (win - base[posc] * (targets != -100)).sum(-1)
-        out.append(own + _downstream(layers, stash, dR, kv, pos, valid, in_set))
-    return torch.cat(out), total
+        tail = _downstream(stash, dO, kv, pos, valid, in_set)
+        out.append(torch.stack([own, tail]) if parts else own + tail)
+    return torch.cat(out, -1), total

@@ -1,0 +1,14 @@
+name: window-diagnose-doc4
+setup: uv sync --frozen
+command: uv run --no-sync python -m em_influence.scripts.window_diagnose --run-path /mnt/ssd-cluster/brendan/em_influence/rerun-2026-09-30/results/career/attributions/olmo/tokens-ekfac-input/scores --tokenized /mnt/ssd-cluster/brendan/em_influence/long-docs/tokenized --document 4 --positions 421 425 450 469 501 502 505 577 --windows 1 8 32 128 2>&1 | grep -v "Loading weights"
+gpus: 1
+use_shared: true
+priority: 60
+estimated_runtime_min: 20
+max_runtime_min: 120
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_OFFLINE: "1"
+  PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+auto_preempt: true
