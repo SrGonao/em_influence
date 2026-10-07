@@ -40,3 +40,13 @@ def test_run_reports(tmp_path):
     losses = run_reports(paths).set_index("method")
     assert losses.loc["ekfac", ["subset", "seed", "career_incorrect"]].tolist() == ["remove_top_0.2", 3, 1.0]
     assert losses.loc["untrained", ["dataset", "career_gap"]].tolist() == ["career", -2.0]
+
+
+def test_describe_run_reads_the_sampling_seed():
+    from em_influence.rates import describe_run
+
+    run = "results/career/runs/olmo/olmo/tokens-tame/remove_top_0.4/seed2"
+    assert describe_run(f"{run}/answers.csv")["sample"] == 0
+    resampled = describe_run(f"{run}/answers_sample3.csv")
+    assert (resampled["sample"], resampled["seed"], resampled["subset"]) == (3, 2, "remove_top_0.4")
+    assert describe_run("results/career_correct/runs/olmo/full/seed1/answers_sample1.csv")["method"] == "unfiltered"

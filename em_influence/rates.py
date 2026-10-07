@@ -12,7 +12,8 @@ import yaml
 MISALIGNED_THRESHOLD = 3
 RUN = re.compile(
     r"(?P<dataset>[^/]+)/runs/(?P<model>[^/]+)/"
-    r"(?:full|(?P<untrained>untrained)|(?P<source>[^/]+)/(?P<method>[^/]+)/(?P<subset>[^/]+))/seed(?P<seed>\d+)/[^/]+$"
+    r"(?:full|(?P<untrained>untrained)|(?P<source>[^/]+)/(?P<method>[^/]+)/(?P<subset>[^/]+))/seed(?P<seed>\d+)/"
+    r"[^/]*?(?:_sample(?P<sample>\d+))?\.[^/.]+$"
 )
 
 
@@ -24,6 +25,7 @@ def describe_run(path: str) -> dict:
     """The run a file belongs to: method `unfiltered` for a baseline, `untrained` for a
     model before fine-tuning."""
     run = RUN.search(str(path)).groupdict()
+    run["sample"] = int(run["sample"] or 0)
     if run.pop("untrained"):
         return {**run, "method": "untrained", "subset": "none", "seed": int(run["seed"])}
     return {**run, "method": run["method"] or "unfiltered", "subset": run["subset"] or "full", "seed": int(run["seed"])}

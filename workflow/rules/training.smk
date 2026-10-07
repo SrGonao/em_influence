@@ -93,6 +93,35 @@ use rule evaluate as evaluate_narrow with:
 workflow.get_rule("evaluate_narrow").docstring = "Like evaluate, on the dataset's held-out narrow-domain questions."
 
 
+rule evaluate_resample:
+    """Like evaluate, with sampling seed {sample}: a fresh draw of answers from the same model."""
+    input:
+        model=run_model,
+        questions=config["questions"],
+    output:
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/answers_sample{sample}.csv",
+    log:
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate_sample{sample}.log",
+    wildcard_constraints:
+        sample=r"\d+",
+    resources:
+        gpu=1,
+    params:
+        model=model_flag,
+        samples=config["samples_per_question"],
+        judge=config["judge_model"],
+    shell:
+        step(
+            "python em_influence/scripts/resample_answers.py {params.model} --questions {input.questions}"
+            " --output {output} --n_per_question {params.samples} --seed {wildcards.sample}"
+            " && python em_influence/scripts/judge_answers.py {output} --questions {input.questions}"
+            " --judge-model {params.judge}",
+            gpu=True,
+            packages=("transformers",),
+            ignore=("openai", "backoff"),
+        )
+
+
 rule query_objective:
     """The attribution query's objective (query_objective.py) on the run's model."""
     input:
