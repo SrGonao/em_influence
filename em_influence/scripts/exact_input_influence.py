@@ -331,7 +331,8 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
                 token_budget: int, output: Path, limit: int | None = None, *, layout: str = "packed",
                 precision: str = "fp32", every: int = 1, count: int | None = None,
                 window: int | None = None, screen_fraction: float | None = None,
-                screen_table: Path | None = None, intervention: str = "zero") -> None:
+                screen_table: Path | None = None, intervention: str = "zero",
+                sample_candidates: int | None = None) -> None:
     command = load_score_command(run_path)
     dataset = Dataset.load_from_disk(str(tokenized))
     candidates = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id))
@@ -348,7 +349,7 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
     screen = load_screen(screen_table) if screen_table else None
     options = json.dumps({"layout": layout, "precision": precision, "window": window,
                           "screen_fraction": screen_fraction, "screen_table": str(screen_table or ""),
-                          "intervention": intervention})
+                          "intervention": intervention, "sample_candidates": sample_candidates})
     # A run takes days; the shard saves as it goes and resumes from what it saved.
     if output.exists():
         saved = np.load(output)
@@ -369,6 +370,8 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
     started = time.perf_counter()
     for done, doc in enumerate(tqdm(documents, desc=f"shard {shard}/{shards}", mininterval=60), start=1):
         positions = candidates["position"][candidates["example_idx"] == doc]
+        if sample_candidates is not None and len(positions) > sample_candidates:
+            positions = np.sort(np.random.default_rng(int(doc)).choice(positions, sample_candidates, replace=False))
         x = torch.tensor(dataset[int(doc)]["input_ids"], device="cuda").unsqueeze(0)
         y = torch.tensor(dataset[int(doc)]["labels"], device="cuda").unsqueeze(0)
         with torch.no_grad():
@@ -456,6 +459,8 @@ def main():
                              "document's candidates, the ones the screen ranks highest; the rest keep the screen's")
     parser.add_argument("--screen-table", type=Path,
                         help="An input-side token_scores.npz (any method) to screen with instead of --window")
+    parser.add_argument("--sample-candidates", type=int,
+                        help="Score only this many of each document's candidates, drawn with the document's index as seed")
     parser.add_argument("--intervention", choices=INTERVENTIONS, default="zero",
                         help="What happens to the candidate: its embedding zeroed, the token deleted (later tokens move "
                              "up a position), or later positions kept from attending to it")
@@ -471,7 +476,7 @@ def main():
                     args.token_budget, args.output, args.documents, layout=args.layout, precision=args.precision,
                     every=args.every, count=args.count, window=args.window,
                     screen_fraction=args.screen_fraction, screen_table=args.screen_table,
-                    intervention=args.intervention)
+                    intervention=args.intervention, sample_candidates=args.sample_candidates)
         return
     # One process per visible card, each on every n-th document.
     cards = [c for c in os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",") if c.strip()]
@@ -489,7 +494,8 @@ def main():
             parser.error(f"--{name} must be at least 1")
     forwarded = {"documents": args.documents, "every": args.every, "layout": args.layout, "precision": args.precision,
                  "count": args.count, "window": args.window, "screen_fraction": args.screen_fraction,
-                 "screen_table": args.screen_table, "intervention": args.intervention}
+                 "screen_table": args.screen_table, "intervention": args.intervention,
+                 "sample_candidates": args.sample_candidates}
     limit = [item for name, value in forwarded.items() if value is not None
              for item in (f"--{name.replace('_', '-')}", str(value))]
     processes = [
@@ -502,7 +508,7 @@ def main():
     ]
     if any(p.wait() for p in processes):
         raise SystemExit("a shard failed")
-    if not (args.documents or args.count or args.every > 1):
+    if not (args.documents or args.count or args.every > 1 or args.sample_candidates):
         merge(args.tokenized, args.data, args.model, shard_files, args.output, args.document_attributions,
               args.tolerance)
         for f in shard_files:
