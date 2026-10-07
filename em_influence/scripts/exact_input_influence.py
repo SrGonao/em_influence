@@ -234,7 +234,7 @@ def screened_effects(model, directions, cfg, embeds, labels, positions, token_bu
 def load_screen(path: Path) -> dict[tuple[int, int], float]:
     """A token_scores.npz of any input-side method, as each candidate's score."""
     with np.load(path) as table:
-        if str(table["side"]) != "input":
+        if "side" in table.files and str(table["side"]) != "input":
             raise ValueError(f"{path} scores reply labels, not input tokens")
         return {(int(e), int(p)): float(s) for e, p, s in zip(table["example_idx"], table["position"], table["score"])}
 
