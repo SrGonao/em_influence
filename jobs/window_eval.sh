@@ -11,7 +11,7 @@ for spec in ${WINDOWS:-1 4 8 16 32}; do
   uv run --no-sync python -m em_influence.scripts.window_input_influence \
     --run-path $R/results/career/attributions/olmo/tokens-ekfac-input/scores \
     --tokenized $R/results/career/tokenized/olmo --data $R/data/career.jsonl \
-    --model allenai/Olmo-3-7B-Instruct-SFT --output $OUT/w$spec.npz --window $w --extra $extra \
+    --model allenai/Olmo-3-7B-Instruct-SFT --output $OUT/w$spec.npz --window $w --extra $extra --sharp ${SHARP:-0} \
     --every 30 --documents ${DOCS:-20} 2>&1 | grep -v "Loading weights"
   uv run --no-sync python - $R/results/career/attributions/olmo/tokens-ekfac-input-exact/token_scores.npz \
     $R/results/career/attributions/olmo/tokens-ekfac-input/token_scores.npz $OUT/w$spec.npz <<'PY'

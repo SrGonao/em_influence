@@ -77,3 +77,27 @@ def test_causal_attention_matches_plain_softmax():
         ours = jvp(f(custom, argnums=(0, 1, 2)) if f is torch.func.grad else custom, (q, k, v), tangents)
         theirs = jvp(f(plain, argnums=(0, 1, 2)) if f is torch.func.grad else plain, (q, k, v), tangents)
         torch.testing.assert_close(ours, theirs)
+
+
+def test_chosen_members_cover_everything_is_exact():
+    torch.manual_seed(0)
+    config = Olmo3Config(vocab_size=50, hidden_size=32, intermediate_size=64, num_hidden_layers=2,
+                         num_attention_heads=4, num_key_value_heads=2, eos_token_id=None, pad_token_id=None,
+                         attn_implementation="occlusion_probe")
+    model = Olmo3ForCausalLM(config).double().eval()
+    T = 12
+    ids = torch.randint(0, 50, (T,))
+    labels = ids.clone()
+    params = {k: p.detach() for k, p in model.named_parameters() if "proj" in k}
+    direction = {k: torch.randn_like(p) for k, p in params.items()}
+    embeds = model.get_input_embeddings()(ids)[None].detach()
+    positions = torch.arange(T)
+    with torch.no_grad():
+        tails = jvp(lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, 1, per_query=True)[0],
+                    (params,), (direction,))[1]
+        chosen = window_occlusion.sharpest_queries(tails, positions, 1, T)
+        _, (approx, _) = jvp(lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, 1, chosen=chosen),
+                             (params,), (direction,))
+        _, (exact, _) = jvp(lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, T),
+                            (params,), (direction,))
+    torch.testing.assert_close(approx, exact, rtol=1e-9, atol=1e-9)

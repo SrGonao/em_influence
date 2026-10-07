@@ -140,12 +140,15 @@ def _downstream(stash, dO, window_kv, pos, valid, in_set, per_query=False):
     return total if per_query else total.sum(-1)
 
 
-def _members(stash, positions, T, w, extra):
+def _members(stash, positions, T, w, extra, chosen=None):
     """Each candidate t's recomputed set: t..t+w-1, plus the `extra` later
     positions that attend to t most (attention summed over layers and heads)."""
     dev = positions.device
     pos = positions[:, None] + torch.arange(w, device=dev)[None]
-    if extra:
+    if chosen is not None:
+        chosen = torch.where(chosen >= positions[:, None] + w, chosen, T)
+        pos = torch.cat([pos, chosen], -1).sort(-1).values
+    elif extra:
         mass = sum(c["mass"] for c in stash.values()).T[positions]  # [n, s]
         ar = torch.arange(T, device=dev)
         mass = mass.masked_fill(ar[None, :] < positions[:, None] + w, -1.0)
@@ -202,14 +205,16 @@ def _record(model, params, embeds, labels, token_loss):
 
 
 def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0, parts=False,
-              per_query=False):
+              per_query=False, chosen=None):
     """The approximate change in the summed loss when each position's embedding
     is zeroed, [len(positions)] (default every position), and the summed loss.
     embeds [1,T,d]; labels [T]; token_loss(logits [N,L,V], targets [N,L]) ->
     [N,L] weighted per-token losses, 0 where the target is -100. The model must
     use attn_implementation="occlusion_probe". With parts, the change is
     [2, len(positions)]: the recomputed members' own loss change, and the tail.
-    With per_query, it is the tail alone split by later query, [len(positions), T]."""
+    With per_query, it is the tail alone split by later query, [len(positions), T].
+    chosen [len(positions), k] gives each token's extra members explicitly
+    (positions >= T are ignored) instead of by attention."""
     T = embeds.shape[1]
     dev = embeds.device
     dO, base, stash = _record(model, params, embeds, labels, token_loss)
@@ -217,8 +222,11 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
     base = torch.cat([base, base.new_zeros(1)])
     out = []
     positions = torch.arange(T, device=dev) if positions is None else positions
-    for ts in positions.split(max(1, budget // (w + extra))):
-        pos, valid, in_set = _members(stash, ts, T, w, extra)
+    width = w + (chosen.shape[1] if chosen is not None else extra)
+    for start in range(0, len(positions), max(1, budget // width)):
+        ts = positions[start:start + max(1, budget // width)]
+        picked = None if chosen is None else chosen[start:start + len(ts)]
+        pos, valid, in_set = _members(stash, ts, T, w, extra, picked)
         posc = pos.clamp(max=T - 1)
         x = embeds[0][posc].clone()
         x[:, 0] = 0
@@ -231,3 +239,13 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
         tail = _downstream(stash, dO, kv, pos, valid, in_set, per_query)
         out.append(tail if per_query else torch.stack([own, tail]) if parts else own + tail)
     return torch.cat(out, 0 if per_query else -1), total
+
+
+def sharpest_queries(per_query, positions, w, k):
+    """[n, k]: for each token, the k later queries (at or after its window's end)
+    whose tail terms are largest in magnitude, T where there are fewer."""
+    T = per_query.shape[1]
+    ar = torch.arange(T, device=per_query.device)
+    size = per_query.abs().masked_fill(ar[None, :] < positions[:, None] + w, -1.0)
+    values, index = size.topk(min(k, T), dim=-1)
+    return torch.where(values > 0, index, T)

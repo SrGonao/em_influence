@@ -8,5 +8,5 @@ for spec in ${SPECS:-8+0 4+4 8+8}; do
   uv run --no-sync python -m em_influence.scripts.window_input_influence \
     --run-path $R/results/career/attributions/olmo/tokens-ekfac-input/scores \
     --tokenized $L/tokenized --data $L/career-long.jsonl --model allenai/Olmo-3-7B-Instruct-SFT \
-    --output $L/window${TAG:-}-w${spec%+*}-extra${spec#*+}.npz --window ${spec%+*} --extra ${spec#*+} --token-budget 256
+    --output $L/window${TAG:-}-w${spec%+*}-extra${spec#*+}.npz --window ${spec%+*} --extra ${spec#*+} --sharp ${SHARP:-0} --token-budget 256
 done
