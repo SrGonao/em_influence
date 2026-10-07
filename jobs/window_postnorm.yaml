@@ -11,5 +11,5 @@ env:
   PYTHONUNBUFFERED: "1"
   HF_HUB_OFFLINE: "1"
 outputs:
-  - path: results/window-eval-postnorm
+  - path: results
 auto_preempt: true
