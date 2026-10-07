@@ -137,3 +137,25 @@ def test_merge_keeps_the_exact_flags(tmp_path):
     np.testing.assert_array_equal(merged["score"], scores)
     np.testing.assert_array_equal(merged["exact"], exact)
     assert merged["document_score"].tolist() == [7.0] * len(scores)
+
+
+def test_screened_effects_uses_the_given_screen():
+    from em_influence.scripts.exact_input_influence import screened_effects
+
+    model = tiny("llama")
+    cfg = SimpleNamespace(loss_fn="ce", label_smoothing=0.0, loss_reduction="sum")
+    directions = random_directions(model)
+    n = 12
+    x = torch.randint(1, 97, (1, n))
+    labels = x.clone()
+    embeds = model.get_input_embeddings()(x).detach()
+    positions = np.arange(1, n - 1)
+    base, exact = packed_effects(model, directions, cfg, embeds, labels, positions, 1000)
+    screen = np.arange(len(positions), dtype=float)[::-1].copy()  # ranks the earliest positions highest
+    base2, scores, flags = screened_effects(model, directions, cfg, embeds, labels, positions, 1000, screen, 0.3)
+    assert base2 == pytest.approx(base, rel=1e-6)
+    assert flags.tolist() == [True] * 3 + [False] * 7
+    np.testing.assert_allclose(scores[:3], exact[:3], rtol=1e-5, atol=1e-7)
+    np.testing.assert_array_equal(scores[3:], screen[3:])
+    _, none, flags = screened_effects(model, directions, cfg, embeds, labels, positions, 1000, screen, 0.0)
+    assert not flags.any() and np.array_equal(none, screen)
