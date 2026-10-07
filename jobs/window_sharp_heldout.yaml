@@ -1,0 +1,13 @@
+name: window-sharp8-heldout
+setup: uv sync --frozen
+command: TAG=-sharp8-197 SHARP=8 WINDOWS="8" DOCS=197 bash jobs/window_eval.sh
+gpus: 1
+use_shared: true
+priority: 60
+estimated_runtime_min: 40
+max_runtime_min: 180
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_OFFLINE: "1"
+auto_preempt: true
