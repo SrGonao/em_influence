@@ -38,8 +38,12 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
             raise ValueError("documents longer than the sliding window aren't supported")
         causal = torch.ones(T, T, dtype=torch.bool, device=query.device).tril()
         a = (query @ k.transpose(-1, -2) * scaling).masked_fill(~causal, float("-inf"))
-        o = a.softmax(-1) @ v
-        PROBE.stash[i] = dict(q=query * scaling, k=k, v=v, logits=a, o=o)
+        p = a.softmax(-1)
+        o = p @ v
+        # Only what the tail needs, not the T x T logits: each query's log-normaliser,
+        # and the attention mass each key gets (for choosing extra members).
+        PROBE.stash[i] = dict(q=query * scaling, k=k, v=v, lse=torch.logsumexp(a, -1), o=o,
+                              mass=p.detach().sum(1)[0])
         if PROBE.delta is not None:
             o = o + PROBE.delta[i]
         return o.transpose(1, 2), None
@@ -69,7 +73,7 @@ def _downstream(stash, dO, window_kv, pos, valid, in_set):
     """sum over layers, heads and queries s outside the set and after the zeroed
     token of dO_s . (change in s's attention output when the members' keys and
     values replace the originals)."""
-    T = stash[0]["logits"].shape[-1]
+    T = stash[0]["k"].shape[2]
     dev = pos.device
     posc = pos.clamp(max=T - 1)
     ar = torch.arange(T, device=dev)
@@ -79,15 +83,15 @@ def _downstream(stash, dO, window_kv, pos, valid, in_set):
     for i in sorted(stash):
         c = stash[i]
         k2, v2 = window_kv[i]  # [n,H,m,D]
-        a, q, o, v = c["logits"][0], c["q"][0], c["o"][0], c["v"][0]
+        q, k, o, v, lse = c["q"][0], c["k"][0], c["o"][0], c["v"][0], c["lse"][0]
         g = dO[i][0]
-        lse = torch.logsumexp(a, -1)
         go = (g * o).sum(-1)
         a2 = torch.einsum("hsd,nhjd->nhsj", q, k2)  # q is stored pre-scaled
         pr = torch.exp((a2 - lse[None, ..., None]).masked_fill(~m, float("-inf")))
         X = torch.einsum("hsd,nhjd->nhsj", g, v2) - go[None, ..., None]
-        pw = torch.exp(a[:, :, posc] - lse[..., None, None]).permute(2, 0, 1, 3) * m
-        Y = (g @ v.transpose(-1, -2) - go[..., None])[:, :, posc].permute(2, 0, 1, 3)
+        kw = k[:, posc]  # [H,n,m,D]
+        pw = torch.exp(torch.einsum("hsd,hnjd->nhsj", q, kw) - lse[None, ..., None]) * m
+        Y = torch.einsum("hsd,hnjd->nhsj", g, v[:, posc]) - go[None, ..., None]
         num = (pr * X - pw * Y).sum(-1)
         den = 1 + (pr - pw).sum(-1)
         total = total + ((num / den) * down[:, None, :]).sum(dim=(1, 2))
@@ -100,7 +104,7 @@ def _members(stash, positions, T, w, extra):
     dev = positions.device
     pos = positions[:, None] + torch.arange(w, device=dev)[None]
     if extra:
-        mass = sum(c["logits"][0].softmax(-1).sum(0) for c in stash.values()).T[positions]  # [n, s]
+        mass = sum(c["mass"] for c in stash.values()).T[positions]  # [n, s]
         ar = torch.arange(T, device=dev)
         mass = mass.masked_fill(ar[None, :] < positions[:, None] + w, -1.0)
         values, chosen = mass.topk(min(extra, T), dim=-1)
