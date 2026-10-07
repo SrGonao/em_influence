@@ -52,6 +52,27 @@ def test_packed_matches_separate(kind, token_budget):
     assert np.abs(separate).max() > 0.1
 
 
+@pytest.mark.parametrize("kind", ["olmo3", "llama"])
+@pytest.mark.parametrize("intervention", ["delete", "knockout"])
+def test_packed_matches_separate_for_other_interventions(kind, intervention):
+    model = tiny(kind)
+    cfg = SimpleNamespace(loss_fn="ce", label_smoothing=0.0, loss_reduction="sum")
+    directions = random_directions(model)
+    n = 14
+    x = torch.randint(1, 97, (1, n))
+    labels = x.clone()
+    labels[0, :4] = -100
+    embeds = model.get_input_embeddings()(x).detach()
+    positions = np.arange(1, n - 1)
+    base_s, separate = separate_effects(model, directions, cfg, embeds, labels, positions, 10 * n, intervention=intervention)
+    base_p, packed = packed_effects(model, directions, cfg, embeds, labels, positions, 50, intervention=intervention)
+    assert base_p == pytest.approx(base_s, rel=1e-6)
+    np.testing.assert_allclose(packed, separate, rtol=1e-5, atol=1e-5 * np.abs(separate).max())
+    assert np.abs(separate).max() > 0.01
+    # Knocking out the second-to-last token changes no loss term.
+    assert packed[-1] == 0 if intervention == "knockout" else True
+
+
 def test_chunk_candidates_fits_budget():
     chunks = chunk_candidates(10, [1, 2, 3, 8, 9], 25)
     assert [t for chunk in chunks for t in chunk] == [1, 2, 3, 8, 9]

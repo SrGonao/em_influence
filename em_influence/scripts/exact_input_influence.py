@@ -98,47 +98,81 @@ def attention_masks(model, allowed: torch.Tensor, dtype: torch.dtype):
     return {kind: mask for kind in set(layer_types)} if layer_types else mask
 
 
-def suffix_length(n: int, t: int, window: int | None) -> int:
-    """How many positions from `t` on a candidate's block recomputes: all of
-    them, or the first `window`."""
-    return n - t if window is None else min(window, n - t)
+INTERVENTIONS = ("zero", "delete", "knockout")
 
 
-def pack_suffixes(embeds: torch.Tensor, labels: torch.Tensor, chunk: list[int], window: int | None = None):
+def block_tokens(n: int, t: int, intervention: str) -> tuple[torch.Tensor, int, int]:
+    """Which of the document's tokens a candidate's block recomputes, their
+    position ids' start, and the first base loss term the block replaces.
+
+    zero: tokens t.. with t's embedding zeroed, at their positions; delete:
+    tokens t+1.. moved one position earlier; knockout: tokens t+1.. at their
+    positions but unable to attend to t (t's own stream, and loss term, are
+    unchanged)."""
+    if intervention == "zero":
+        return torch.arange(t, n), t, t
+    if intervention == "delete":
+        return torch.arange(t + 1, n), t, t + 1
+    if intervention == "knockout":
+        return torch.arange(t + 1, n), t + 1, t + 1
+    raise ValueError(f"unknown intervention {intervention!r}")
+
+
+def block_length(n: int, t: int, window: int | None, intervention: str = "zero") -> int:
+    """How many positions a candidate's block recomputes: all of its tokens,
+    or the first `window`."""
+    full = n - t if intervention == "zero" else n - t - 1
+    return full if window is None else min(window, full)
+
+
+def pack_suffixes(embeds: torch.Tensor, labels: torch.Tensor, chunk: list[int], window: int | None = None,
+                  intervention: str = "zero"):
     """One sequence holding the document (`embeds` [n, d], `labels` [n]) and,
     for each candidate position in `chunk`, the document from that position
-    on (or its first `window` positions) with the candidate zeroed. Returns
-    the packed embeddings, position ids, allowed attention pairs, each
-    position's target (-100 for none) and where each candidate's block starts."""
+    on (or its first `window` positions) under the intervention. Returns the
+    packed embeddings, position ids, allowed attention pairs, each position's
+    target (-100 for none), extra loss terms as (index, label) pairs (the
+    prefix position before a deleted token predicts the token after it) and
+    where each candidate's block starts."""
     n, d = embeds.shape
     device = embeds.device
     blocks = [embeds]
     positions = [torch.arange(n, device=device)]
-    targets = [torch.cat([labels[1:], labels.new_full((1,), -100)])]
+    next_label = torch.cat([labels[1:], labels.new_full((1,), -100)])
+    targets = [next_label]
+    extras = []
     starts = []
     length = n
     for t in chunk:
-        m = suffix_length(n, t, window)
-        blocks.append(torch.cat([torch.zeros(1, d, dtype=embeds.dtype, device=device), embeds[t + 1:t + m]]))
-        positions.append(torch.arange(t, t + m, device=device))
-        targets.append(labels[t + 1:t + m + 1] if t + m < n else torch.cat([labels[t + 1:], labels.new_full((1,), -100)]))
+        tokens, first_position, _ = block_tokens(n, t, intervention)
+        m = block_length(n, t, window, intervention)
+        tokens = tokens[:m].to(device)
+        block = embeds[tokens]
+        if intervention == "zero":
+            block = torch.cat([torch.zeros(1, d, dtype=embeds.dtype, device=device), block[1:]])
+        blocks.append(block)
+        positions.append(torch.arange(first_position, first_position + m, device=device))
+        targets.append(next_label[tokens])
+        if intervention == "delete" and t > 0:
+            extras.append((t - 1, int(labels[t + 1])))
         starts.append(length)
         length += m
     allowed = torch.zeros(length, length, dtype=torch.bool, device=device)
     allowed[:n, :n] = torch.ones(n, n, dtype=torch.bool, device=device).tril()
     for t, start in zip(chunk, starts):
-        m = suffix_length(n, t, window)
+        m = block_length(n, t, window, intervention)
         allowed[start:start + m, :t] = True
         allowed[start:start + m, start:start + m] = torch.ones(m, m, dtype=torch.bool, device=device).tril()
-    return torch.cat(blocks)[None], torch.cat(positions)[None], allowed, torch.cat(targets)[None], starts
+    return torch.cat(blocks)[None], torch.cat(positions)[None], allowed, torch.cat(targets)[None], extras, starts
 
 
-def chunk_candidates(n: int, positions, token_budget: int, window: int | None = None) -> list[list[int]]:
+def chunk_candidates(n: int, positions, token_budget: int, window: int | None = None,
+                     intervention: str = "zero") -> list[list[int]]:
     """Candidates grouped so each group's packed sequence (the document plus
-    one suffix per candidate) fits `token_budget` tokens, one at least."""
+    one block per candidate) fits `token_budget` tokens, one at least."""
     chunks, current, length = [], [], n
     for t in positions:
-        m = suffix_length(n, int(t), window)
+        m = block_length(n, int(t), window, intervention)
         if current and length + m > token_budget:
             chunks.append(current)
             current, length = [], n
@@ -151,7 +185,7 @@ def chunk_candidates(n: int, positions, token_budget: int, window: int | None = 
 
 @torch.no_grad()
 def packed_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.Tensor, positions,
-                   token_budget: int, window: int | None = None) -> tuple[float, np.ndarray]:
+                   token_budget: int, window: int | None = None, intervention: str = "zero") -> tuple[float, np.ndarray]:
     """The document's score, and each candidate position's exact zeroing
     effect, from packed suffix passes. With `window`, only the first `window`
     loss terms from the candidate on are recomputed, and the effect on later
@@ -169,14 +203,21 @@ def packed_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.T
         weight = 1.0
     base_score = None
     effects = []
-    for chunk in chunk_candidates(n, positions, token_budget, window):
-        packed, position_ids, allowed, targets, starts = pack_suffixes(embeds[0], labels[0], chunk, window)
+    for chunk in chunk_candidates(n, positions, token_budget, window, intervention):
+        packed, position_ids, allowed, targets, extras, starts = pack_suffixes(embeds[0], labels[0], chunk, window,
+                                                                               intervention)
         inputs = {"inputs_embeds": packed, "position_ids": position_ids,
                   "attention_mask": attention_masks(model, allowed, packed.dtype)}
+        extra_index = torch.tensor([i for i, _ in extras], device=embeds.device, dtype=torch.long)
+        extra_labels = torch.tensor([[label for _, label in extras]], device=embeds.device, dtype=torch.long)
 
         def losses(params):
             logits = functional_call(model, params, (), inputs).logits.float()
-            return token_losses(cfg.loss_fn, logits, targets, cfg.label_smoothing)[0] * weight
+            terms = token_losses(cfg.loss_fn, logits, targets, cfg.label_smoothing)[0]
+            if extras:
+                terms = torch.cat([terms, token_losses(cfg.loss_fn, logits[:, extra_index], extra_labels,
+                                                       cfg.label_smoothing)[0]])
+            return terms * weight
 
         columns = []
         for moved, direction in query_moves(model, directions):
@@ -185,18 +226,54 @@ def packed_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.T
         base = terms[:n]
         if base_score is None:
             base_score = float(base.sum())
-        ends = starts[1:] + [len(terms)]
+        ends = starts[1:] + [starts[-1] + block_length(n, chunk[-1], window, intervention)]
+        extra_terms = iter(terms[ends[-1]:].tolist())
         for t, start, end in zip(chunk, starts, ends):
-            effects.append(float(terms[start:end].sum() - base[t:t + end - start].sum()))
+            _, _, replaced = block_tokens(n, t, intervention)
+            effect = terms[start:end].sum() - base[replaced:replaced + end - start].sum()
+            if intervention == "delete":
+                # Token t's own loss term is gone, and the position before it predicts the token after it.
+                effect -= base[t]
+                if t > 0:
+                    effect += next(extra_terms) - base[t - 1]
+            effects.append(float(effect))
     return base_score, np.asarray(effects)
 
 
 @torch.no_grad()
 def separate_effects(model, directions, cfg, embeds: torch.Tensor, labels: torch.Tensor, positions,
-                     token_budget: int, window: int | None = None) -> tuple[float, np.ndarray]:
-    """The same, one full zeroed copy of the document per candidate."""
+                     token_budget: int, window: int | None = None, intervention: str = "zero") -> tuple[float, np.ndarray]:
+    """The same, one full copy of the document per candidate (for delete and
+    knockout, one pass each; for mean loss weighting, a deleted document keeps
+    the original's weight)."""
     base = document_scores(model, directions, cfg, embeds, labels)[0]
-    per_batch = max(1, token_budget // embeds.shape[1])
+    n = embeds.shape[1]
+    if intervention != "zero":
+        from bergson.score.token_influence import query_moves, weighted_token_losses
+        effects = []
+        weight = 1.0 / max(int((labels[0, 1:] != -100).sum()), 1) if cfg.loss_reduction == "mean" else 1.0
+        for t in positions:
+            t = int(t)
+            keep = torch.tensor([i for i in range(n) if i != t], device=embeds.device)
+            if intervention == "delete":
+                inputs = {"inputs_embeds": embeds[:, keep]}
+                y = labels[:, keep]
+            else:
+                allowed = torch.ones(n, n, dtype=torch.bool, device=embeds.device).tril()
+                allowed[t + 1:, t] = False
+                inputs = {"inputs_embeds": embeds, "attention_mask": attention_masks(model, allowed, embeds.dtype),
+                          "position_ids": torch.arange(n, device=embeds.device)[None]}
+                y = labels
+            columns = []
+            for moved, direction in query_moves(model, directions):
+                def losses(params):
+                    from bergson.collector.collector import token_losses
+                    logits = functional_call(model, params, (), inputs).logits[:, :-1].float()
+                    return (token_losses(cfg.loss_fn, logits, y[:, 1:], cfg.label_smoothing) * weight).sum(dim=1)
+                columns.append(jvp(losses, (moved,), (direction,))[1])
+            effects.append(float(torch.stack(columns, -1).mean(-1).double()[0] - base))
+        return float(base), np.asarray(effects)
+    per_batch = max(1, token_budget // n)
     effects = []
     for start in range(0, len(positions), per_batch):
         chunk = positions[start:start + per_batch]
@@ -254,7 +331,7 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
                 token_budget: int, output: Path, limit: int | None = None, *, layout: str = "packed",
                 precision: str = "fp32", every: int = 1, count: int | None = None,
                 window: int | None = None, screen_fraction: float | None = None,
-                screen_table: Path | None = None) -> None:
+                screen_table: Path | None = None, intervention: str = "zero") -> None:
     command = load_score_command(run_path)
     dataset = Dataset.load_from_disk(str(tokenized))
     candidates = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id))
@@ -265,11 +342,13 @@ def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shar
     documents = [d for d in np.unique(candidates["example_idx"])
                  if d % every == 0 and (limit is None or d < limit)][:count]
     documents = [d for d in documents if d % shards == shard]
-    effects_of = packed_effects if layout == "packed" else separate_effects
+    def effects_of(*args, **kwargs):
+        return (packed_effects if layout == "packed" else separate_effects)(*args, intervention=intervention, **kwargs)
     rows = {"example_idx": [], "position": [], "score": [], "document_score": [], "exact": []}
     screen = load_screen(screen_table) if screen_table else None
     options = json.dumps({"layout": layout, "precision": precision, "window": window,
-                          "screen_fraction": screen_fraction, "screen_table": str(screen_table or "")})
+                          "screen_fraction": screen_fraction, "screen_table": str(screen_table or ""),
+                          "intervention": intervention})
     # A run takes days; the shard saves as it goes and resumes from what it saved.
     if output.exists():
         saved = np.load(output)
@@ -377,6 +456,9 @@ def main():
                              "document's candidates, the ones the screen ranks highest; the rest keep the screen's")
     parser.add_argument("--screen-table", type=Path,
                         help="An input-side token_scores.npz (any method) to screen with instead of --window")
+    parser.add_argument("--intervention", choices=INTERVENTIONS, default="zero",
+                        help="What happens to the candidate: its embedding zeroed, the token deleted (later tokens move "
+                             "up a position), or later positions kept from attending to it")
     parser.add_argument("--document-attributions", type=Path,
                         help="attributions.csv of the document-level run of the same query, to check against")
     parser.add_argument("--tolerance", type=float, default=1e-3,
@@ -388,7 +470,8 @@ def main():
         score_shard(args.run_path, args.tokenized, args.data, args.model, args.shard, args.shards,
                     args.token_budget, args.output, args.documents, layout=args.layout, precision=args.precision,
                     every=args.every, count=args.count, window=args.window,
-                    screen_fraction=args.screen_fraction, screen_table=args.screen_table)
+                    screen_fraction=args.screen_fraction, screen_table=args.screen_table,
+                    intervention=args.intervention)
         return
     # One process per visible card, each on every n-th document.
     cards = [c for c in os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",") if c.strip()]
@@ -397,6 +480,8 @@ def main():
         parser.error("--window and --screen-fraction need --layout packed")
     if args.screen_table and args.window is not None:
         parser.error("--screen-table and --window are two screens; give one")
+    if args.intervention != "zero" and args.screen_fraction is not None:
+        parser.error("--screen-fraction supports --intervention zero only")
     if (args.screen_table is not None) != (args.screen_fraction is not None and args.window is None):
         parser.error("--screen-table and --screen-fraction go together; --screen-fraction alone needs --window")
     for name in ("count", "window"):
@@ -404,7 +489,7 @@ def main():
             parser.error(f"--{name} must be at least 1")
     forwarded = {"documents": args.documents, "every": args.every, "layout": args.layout, "precision": args.precision,
                  "count": args.count, "window": args.window, "screen_fraction": args.screen_fraction,
-                 "screen_table": args.screen_table}
+                 "screen_table": args.screen_table, "intervention": args.intervention}
     limit = [item for name, value in forwarded.items() if value is not None
              for item in (f"--{name.replace('_', '-')}", str(value))]
     processes = [
