@@ -11,3 +11,4 @@ env:
   PYTHONUNBUFFERED: "1"
   HF_HUB_OFFLINE: "1"
 cleanup: on_success
+auto_preempt: true
