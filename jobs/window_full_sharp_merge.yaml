@@ -1,0 +1,9 @@
+name: window-full-sharp8-merge
+setup: uv sync --frozen
+command: MERGE=1 SHARDS=2 bash jobs/window_full_sharp.sh
+gpus: 0
+priority: 50
+env:
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_OFFLINE: "1"
+cleanup: on_success
