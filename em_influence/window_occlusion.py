@@ -64,6 +64,7 @@ class _Probe:
     delta = None
     members = None  # (positions [n,m] sorted, first is the zeroed token; valid [n,m]; in_set [n,T])
     window_kv = None
+    knockout = False  # later positions can't attend to the token, instead of (only) zeroing it
     mass = None  # [T, T] attention each key gets, summed over layers and heads; kept only when needed
 
 
@@ -100,6 +101,9 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
     before = torch.arange(T, device=dev)[None, None, :] < pos.clamp(max=T - 1)[:, :, None]
     outside = before & ~in_set[:, None, :]  # [n,m,T]
     causal = torch.ones(m, m, dtype=torch.bool, device=dev).tril()[None] & valid[:, None, :]
+    if PROBE.knockout:
+        causal = causal.clone()
+        causal[:, 1:, 0] = False
     a1 = torch.einsum("nhjd,hsd->nhjs", query * scaling, c["k"][0])
     a1 = a1.masked_fill(~outside[:, None], float("-inf"))
     a2 = (query @ k.transpose(-1, -2) * scaling).masked_fill(~causal[:, None], float("-inf"))
@@ -112,7 +116,7 @@ def probe_attention(module, query, key, value, attention_mask, scaling, dropout=
 ALL_ATTENTION_FUNCTIONS.register("occlusion_probe", probe_attention)
 
 
-def _downstream(stash, dO, window_kv, pos, valid, in_set, per_query=False):
+def _downstream(stash, dO, window_kv, pos, valid, in_set, per_query=False, knockout=False):
     """sum over layers, heads and queries s outside the set and after the zeroed
     token of dO_s . (change in s's attention output when the members' keys and
     values replace the originals)."""
@@ -131,6 +135,9 @@ def _downstream(stash, dO, window_kv, pos, valid, in_set, per_query=False):
         go = (g * o).sum(-1)
         a2 = torch.einsum("hsd,nhjd->nhsj", q, k2)  # q is stored pre-scaled
         pr = torch.exp((a2 - lse[None, ..., None]).masked_fill(~m, float("-inf")))
+        if knockout:
+            # The token's key is removed from later queries, not replaced.
+            pr = torch.cat([torch.zeros_like(pr[..., :1]), pr[..., 1:]], -1)
         X = torch.einsum("hsd,nhjd->nhsj", g, v2) - go[None, ..., None]
         kw = k[:, posc]  # [H,n,m,D]
         pw = torch.exp(torch.einsum("hsd,hnjd->nhsj", q, kw) - lse[None, ..., None]) * m
@@ -211,7 +218,7 @@ def _record(model, params, embeds, labels, token_loss, need_mass=False):
 
 
 def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0, parts=False,
-              per_query=False, chosen=None):
+              per_query=False, chosen=None, intervention="zero"):
     """The approximate change in the summed loss when each position's embedding
     is zeroed, [len(positions)] (default every position), and the summed loss.
     embeds [1,T,d]; labels [T]; token_loss(logits [N,L,V], targets [N,L]) ->
@@ -220,7 +227,13 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
     [2, len(positions)]: the recomputed members' own loss change, and the tail.
     With per_query, it is the tail alone split by later query, [len(positions), T].
     chosen [len(positions), k] gives each token's extra members explicitly
-    (positions >= T are ignored) instead of by attention."""
+    (positions >= T are ignored) instead of by attention. intervention:
+    "zero" (the default); "knockout", later positions can't attend to the
+    token at any layer and its own stream and loss are unchanged; "hybrid",
+    its own loss term with it zeroed, plus knockout for later positions."""
+    if intervention not in ("zero", "knockout", "hybrid"):
+        raise ValueError(f"unknown intervention {intervention!r}")
+    knockout = intervention != "zero"
     T = embeds.shape[1]
     dev = embeds.device
     dO, base, stash, mass = _record(model, params, embeds, labels, token_loss, need_mass=extra > 0)
@@ -235,14 +248,21 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
         pos, valid, in_set = _members(mass, ts, T, w, extra, picked)
         posc = pos.clamp(max=T - 1)
         x = embeds[0][posc].clone()
-        x[:, 0] = 0
+        if intervention != "knockout":
+            x[:, 0] = 0
         PROBE.mode, PROBE.stash, PROBE.members, PROBE.window_kv = "window", stash, (pos, valid, in_set), {}
-        logits = functional_call(model, params, (), {"inputs_embeds": x, "position_ids": posc}).logits
+        PROBE.knockout = knockout
+        try:
+            logits = functional_call(model, params, (), {"inputs_embeds": x, "position_ids": posc}).logits
+        finally:
+            PROBE.knockout = False
         kv, PROBE.window_kv, PROBE.stash, PROBE.mode = PROBE.window_kv, None, None, None
         targets = torch.where(valid & (pos + 1 < T), labels[(pos + 1).clamp(max=T - 1)], -100)
+        if intervention == "knockout":
+            targets[:, 0] = -100
         win = token_loss(logits, targets)
         own = (win - base[posc] * (targets != -100)).sum(-1)
-        tail = _downstream(stash, dO, kv, pos, valid, in_set, per_query)
+        tail = _downstream(stash, dO, kv, pos, valid, in_set, per_query, knockout)
         out.append(tail if per_query else torch.stack([own, tail]) if parts else own + tail)
     return torch.cat(out, 0 if per_query else -1), total
 

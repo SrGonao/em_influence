@@ -36,7 +36,8 @@ def token_loss_fn(cfg, labels):
     return token_loss
 
 
-def score_document(model, directions, cfg, embeds, labels, positions, window, budget, extra=0, sharp=0):
+def score_document(model, directions, cfg, embeds, labels, positions, window, budget, extra=0, sharp=0,
+                   intervention="zero"):
     """[T] score changes and the document's score, averaged over the query's
     columns as document_scores in exact_input_influence.py averages."""
     from bergson.score.token_influence import query_moves
@@ -50,14 +51,14 @@ def score_document(model, directions, cfg, embeds, labels, positions, window, bu
             # units, from a window-1 pass; they are recomputed exactly instead.
             def per_query(params):
                 return window_occlusion.occlusion(model, params, embeds, labels, token_loss, 1, budget, positions,
-                                                  per_query=True)
+                                                  per_query=True, intervention=intervention)
 
             _, (tails, _) = jvp(per_query, (moved,), (direction,))
             chosen = window_occlusion.sharpest_queries(tails, positions, window, sharp)
 
         def f(params):
             return window_occlusion.occlusion(model, params, embeds, labels, token_loss, window, budget, positions, extra,
-                                              chosen=chosen)
+                                              chosen=chosen, intervention=intervention)
 
         _, (change, score) = jvp(f, (moved,), (direction,))
         changes.append(change)
@@ -81,6 +82,9 @@ def main():
     parser.add_argument("--documents", type=int, help="Stop after this many documents")
     parser.add_argument("--sharp", type=int, default=0,
                         help="Also recompute the later queries with the largest tail terms")
+    parser.add_argument("--intervention", choices=("zero", "knockout", "hybrid"), default="zero",
+                        help="knockout: later positions can't attend to the token; hybrid: zeroed for its own "
+                             "loss term, knocked out for later positions")
     parser.add_argument("--tf32", action="store_true", help="TF32 matmuls (fp32 storage)")
     parser.add_argument("--document-attributions", type=Path,
                         help="attributions.csv of the document-level run of the same query, to check against")
@@ -131,7 +135,7 @@ def main():
             y = torch.tensor(dataset[int(doc)]["labels"], device="cuda")
             change, score = score_document(model, directions, command.index_cfg, embedding(x)[None], y,
                                            torch.as_tensor(positions, device="cuda"), args.window, args.token_budget, args.extra,
-                                           args.sharp)
+                                           args.sharp, args.intervention)
             rows["example_idx"].append(np.full(len(positions), doc))
             rows["position"].append(positions)
             rows["score"].append(change.cpu().numpy())
