@@ -110,7 +110,7 @@ def read_attributions(path: Path, dataset_size: int) -> np.ndarray:
     return scores
 
 
-SUBSET = re.compile(r"(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)(?P<resampled>_resampled)?|decile_(?P<decile>\d+)")
+SUBSET = re.compile(r"(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)(?P<resampled>_resampled)?|(?P<remove_decile>remove_)?decile_(?P<decile>\d+)")
 
 
 def write_subset(dataset: Path, attributions: Path, name: str, output: Path, *, deciles_count: int) -> None:
@@ -118,7 +118,8 @@ def write_subset(dataset: Path, attributions: Path, name: str, output: Path, *, 
 
     `remove_top_0.2` drops the 20% highest-scoring rows and `select_bottom_0.05`
     keeps only the 5% lowest; `_resampled` repeats rows back up to the full
-    dataset size. `decile_0` is the highest-scoring of `deciles_count` bins.
+    dataset size. `decile_0` is the highest-scoring of `deciles_count` bins and
+    `remove_decile_0` is every row except that bin.
     """
     match = SUBSET.fullmatch(name)
     if match is None:
@@ -127,6 +128,8 @@ def write_subset(dataset: Path, attributions: Path, name: str, output: Path, *, 
     scores = read_attributions(attributions, len(rows))
     if match["decile"] is not None:
         chosen = deciles(scores, divisions=deciles_count)[int(match["decile"])].indices
+        if match["remove_decile"]:
+            chosen = complement(len(rows), chosen)
     else:
         chosen = extreme(scores, fraction=float(match["fraction"]), side=match["side"]).indices
         if match["mode"] == "remove":
@@ -141,7 +144,7 @@ def main():
     parser = argparse.ArgumentParser(description=write_subset.__doc__)
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--attributions", required=True)
-    parser.add_argument("--subset", required=True, help="e.g. remove_top_0.2, decile_3")
+    parser.add_argument("--subset", required=True, help="e.g. remove_top_0.2, decile_3, remove_decile_0")
     parser.add_argument("--deciles", type=int, required=True, help="How many bins decile_<i> divides the data into")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()

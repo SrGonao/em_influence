@@ -26,6 +26,7 @@ def test_write_subset(tmp_path):
         return [json.loads(line)["prompt"] for line in output.read_text().splitlines()]
 
     assert set(prompts("decile_0")) == {"18", "19"}
+    assert prompts("remove_decile_0") == [str(i) for i in range(18)]
     assert set(prompts("remove_top_0.1")) == {str(i) for i in range(18)}
     assert set(prompts("select_bottom_0.1")) == {"0", "1"}
     resampled = prompts("remove_top_0.1_resampled")
