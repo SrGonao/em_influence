@@ -88,3 +88,18 @@ def test_user_prompt_tokens_cover_exactly_the_prompt_text():
     tokenized = tokenize_rows(rows, model)
     (mask,) = user_prompt_tokens(rows, tokenized["input_ids"], model)
     assert tokenizer.decode(np.asarray(tokenized["input_ids"][0])[mask]) == "Name a color."
+
+
+def test_aligned_scores_cover_reply_tokens_on_both_sides():
+    from em_influence.token_scores import aligned_token_scores
+    # Document 0: prompt tokens at 0-1, reply at 2-4; position 4 is the last label and has no input row.
+    reply = {"example_idx": np.zeros(3, int), "position": np.array([2, 3, 4]), "token_id": np.array([12, 13, 14]),
+             "score": np.zeros(3)}
+    inputs = {"example_idx": np.zeros(4, int), "position": np.array([0, 1, 2, 3]), "token_id": np.array([10, 11, 12, 13]),
+              "reply": np.array([False, False, True, True]), "score": np.array([5.0, 6.0, 7.0, 8.0])}
+    on_reply = aligned_token_scores(inputs, reply, inputs, "reply")
+    assert on_reply["position"].tolist() == [2, 3] and on_reply["score"].tolist() == [7.0, 8.0]
+    reply["score"] = np.array([1.0, 2.0, 3.0])
+    on_input = aligned_token_scores(reply, reply, inputs, "input")
+    assert on_input["position"].tolist() == [2, 3] and on_input["score"].tolist() == [1.0, 2.0]
+    assert on_input["reply"].all()

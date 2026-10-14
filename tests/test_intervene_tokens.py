@@ -39,6 +39,44 @@ def test_decile_keeps_only_its_bin():
     assert sorted(set(range(10)) - set(SCORES["score"][chosen].astype(int))) == [8, 9]
 
 
+def test_remove_decile_flags_only_its_bin():
+    chosen = flagged_tokens(SCORES, "remove_decile_0", deciles_count=5)
+    assert sorted(SCORES["score"][chosen].astype(int)) == [8, 9]
+    assert intervention("remove_decile_4_kl") == "kl"
+
+
+def test_tilt_hits_its_target_with_a_fixed_size():
+    values = np.random.default_rng(0).normal(size=10_000)
+    top = np.sort(values)[-1000:].sum()
+    for tilt in (-0.5, 0.25, 0.75):
+        chosen = flagged_tokens({"score": values}, f"tilt_{tilt}_0.1")
+        assert len(chosen) == 1000 and len(set(chosen)) == 1000
+        target = tilt * abs(np.sort(values)[:1000].sum() if tilt < 0 else top)
+        assert abs(values[chosen].sum() - target) < 0.01 * abs(top)
+    assert np.array_equal(flagged_tokens({"score": values}, "tilt_0.5_0.1"), flagged_tokens({"score": values}, "tilt_0.5_0.1"))
+
+
+def test_joint_hits_both_targets():
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=20_000)
+    b = 0.4 * a + rng.normal(size=20_000)
+    extreme = lambda v: max(abs(np.sort(v)[:2000].sum()), abs(np.sort(v)[-2000:].sum()))
+    for ta, tb in ((0.5, -0.5), (-0.3, 0.3), (0.3, 0.3)):
+        chosen = flagged_tokens({"score": a}, f"joint_{ta}_{tb}_0.1", partner={"score": b})
+        assert len(chosen) == 2000
+        assert abs(a[chosen].sum() - ta * extreme(a)) < 0.01 * extreme(a)
+        assert abs(b[chosen].sum() - tb * extreme(b)) < 0.01 * extreme(b)
+    with pytest.raises(ValueError, match="second ranking"):
+        flagged_tokens({"score": a}, "joint_0.5_-0.5_0.1")
+
+
+def test_disagree_takes_the_largest_standardized_differences():
+    a = np.array([3.0, 0.0, 1.0, -2.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0])
+    b = np.array([-3.0, 0.0, 1.0, 2.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0])
+    assert list(flagged_tokens({"score": a}, "disagree_0.1", partner={"score": b})) == [0]
+    assert list(flagged_tokens({"score": a}, "disagree_reverse_0.1", partner={"score": b})) == [3]
+
+
 def test_a_suffix_relabels_the_same_tokens():
     assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample", "select_top_0.2_kl")] == [
         "mask", "sample", "kl"]
@@ -171,3 +209,14 @@ def test_combined_replaces_inputs_then_masks_labels(tmp_path):
     both = Dataset.load_from_disk(str(tmp_path / "both"))
     assert both[1]["input_ids"] == replaced[1]["input_ids"]
     assert both[1]["labels"] == [-100, 5, 6, 7, -100, -100]
+
+
+@pytest.mark.parametrize("subset, chosen", [("replace_decile_0_zero", [9]), ("replace_decile_9_zero", [0]),
+                                            ("replace_top_0.2_zero", [8, 9]), ("replace_bottom_0.2_random", [0, 1])])
+def test_replace_takes_any_selection(subset, chosen):
+    assert sorted(SCORES["score"][flagged_tokens(SCORES, subset)]) == chosen
+    assert intervention(subset) == subset.rsplit("_", 1)[1]
+
+
+def test_replace_tilt_draws_a_tilted_fraction():
+    assert len(flagged_tokens(SCORES, "replace_tilt_0.5_0.2_zero")) == 2

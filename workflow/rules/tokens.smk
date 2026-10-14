@@ -286,6 +286,30 @@ rule attribute_input_tokens_random:
         )
 
 
+rule align_token_scores:
+    """{method}'s scores on the reply tokens that are both a label and an input, as a ranking
+    of their labels (-on-reply) or their inputs (-on-input): for choosing tokens by one
+    side's score and intervening on the other's, e.g. masking the labels of the reply
+    tokens with the highest input scores."""
+    input:
+        scores="<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
+        reply_rows="<results>/{dataset}/attributions/{source}/tokens-random/token_scores.npz",
+        input_rows="<results>/{dataset}/attributions/{source}/tokens-random-input/token_scores.npz",
+    output:
+        "<results>/{dataset}/attributions/{source}/{method}-on-{side}/token_scores.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}-on-{side}/attribute.log",
+    wildcard_constraints:
+        method=r"tokens-[^/+]+?",
+        side="reply|input",
+    localrule: True
+    shell:
+        step(
+            "python -m em_influence.token_scores align --scores {input.scores} --reply-rows {input.reply_rows}"
+            " --input-rows {input.input_rows} --side {wildcards.side} --output {output}"
+        )
+
+
 rule sample_base_tokens:
     """A draw from {source}'s base model at every reply position of its tokenization, for _sample subsets."""
     input:
@@ -326,13 +350,21 @@ rule draw_input_replacements:
         )
 
 
+def token_score_files(wildcards):
+    """The token scores a subset ranks by: one method's, or each of `a+b`'s for a joint_ or disagree_ subset."""
+    return [
+        f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{method}/token_scores.npz"
+        for method in wildcards.method.split("+")
+    ]
+
+
 rule token_subset:
-    """{source}'s tokenization with the reply tokens a subset (e.g. remove_top_0.2, decile_3) names masked,
+    """{source}'s tokenization with the reply tokens a subset (e.g. remove_top_0.2, decile_3, remove_decile_3) names masked,
     or with a _sample or _kl suffix, relabelled with the base model's draws or for training toward it;
-    or with the input tokens a replace_* subset names replaced."""
+    or with the input tokens a replace_* subset (e.g. replace_top_0.05_zero, replace_decile_3_zero) names replaced."""
     input:
         data="<results>/{dataset}/tokenized/{source}",
-        scores="<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
+        scores=token_score_files,
         samples=replacement_tokens,
     output:
         data=directory("<results>/{dataset}/subsets/{source}/{method}/{subset}"),
@@ -340,8 +372,9 @@ rule token_subset:
     log:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
-        method=r"tokens-[^/+]+",
-        subset=r"((remove|select)_(top|bottom)_[0-9.]+|decile_\d+)(_sample|_kl)?|replace_(top|bottom)_[0-9.]+_(zero|random|sample)",
+        method=r"tokens-[^/]+",
+        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+)(_sample|_kl)?"
+        r"|replace_((top|bottom)_[0-9.]+|decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+)_(zero|random|sample)",
     localrule: True
     params:
         deciles=config["deciles"],

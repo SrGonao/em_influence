@@ -196,6 +196,29 @@ def read_token_scores(path: Path) -> dict[str, np.ndarray]:
     return table
 
 
+def _keys(table: dict[str, np.ndarray]) -> np.ndarray:
+    return table["example_idx"] * (1 << 32) + table["position"]
+
+
+def aligned_token_scores(scores: dict[str, np.ndarray], reply_rows: dict[str, np.ndarray],
+                         input_rows: dict[str, np.ndarray], side: Side) -> dict[str, np.ndarray]:
+    """`scores` on the reply tokens that are both a label and an input, as rows of `side`'s
+    table: their labels (from `reply_rows`) or their inputs (from `input_rows`). This lets
+    one side's ranking choose the tokens another side's intervention acts on."""
+    in_reply = input_rows["reply"]
+    both = np.intersect1d(_keys(reply_rows), _keys(input_rows)[in_reply])
+    rows = reply_rows if side == "reply" else {key: value[in_reply] for key, value in input_rows.items() if key != "side"}
+    keep = np.isin(_keys(rows), both)
+    table = {key: value[keep] for key, value in rows.items() if key not in ("side", "score")}
+    source = _keys(scores)
+    order = np.argsort(source)
+    found = order[np.searchsorted(source[order], _keys(table))]
+    if not np.array_equal(source[found], _keys(table)) or not np.array_equal(scores["token_id"][found], table["token_id"]):
+        raise ValueError("the scores don't cover every token both sides share")
+    table["score"] = scores["score"][found]
+    return table
+
+
 def main():
     parser = argparse.ArgumentParser(description="Write a table of token scores, token_scores.npz.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -204,6 +227,12 @@ def main():
     export.add_argument("--tokenized", type=Path, help="The tokenized dataset the run scored, for --side input")
     random = commands.add_parser("random", help=random_token_scores.__doc__)
     random.add_argument("--tokenized", type=Path, required=True, help="A tokenized dataset")
+    align = commands.add_parser("align", help=aligned_token_scores.__doc__)
+    align.add_argument("--scores", type=Path, required=True, help="The token_scores.npz to re-index")
+    align.add_argument("--reply-rows", type=Path, required=True, help="Any ranking of reply labels, for its rows")
+    align.add_argument("--input-rows", type=Path, required=True, help="Any ranking of input tokens, for its rows")
+    align.add_argument("--side", choices=["reply", "input"], required=True)
+    align.add_argument("--output", type=Path, required=True)
     for command in (export, random):
         command.add_argument("--output", type=Path, required=True)
         command.add_argument("--side", choices=["reply", "input"], default="reply",
@@ -211,6 +240,11 @@ def main():
         command.add_argument("--data", type=Path, help="The prompt/completion JSONL it was tokenized from, for --side input")
         command.add_argument("--model", help="Its tokenizer, for --side input")
     args = parser.parse_args()
+    if args.command == "align":
+        table = aligned_token_scores(read_token_scores(args.scores), read_token_scores(args.reply_rows),
+                                     read_token_scores(args.input_rows), args.side)
+        save_token_scores(table, args.output, args.side)
+        return
     if args.side == "input" and not (args.model and args.data):
         parser.error("--side input needs --data and --model")
     if args.command == "export" and args.side == "input" and not args.tokenized:

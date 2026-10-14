@@ -83,6 +83,9 @@ misaligned-answer rate (judge score below 3), overall and per question category.
 | `base_models` | Each model before fine-tuning (A1, A8 reference lines) | 0 | `appendix_scores.ipynb`, `appendix_all_models.ipynb` |
 | `token_figure1`, `token_figure2` | Figures 1 and 2 on reply tokens rather than examples | 605 | none |
 | `token_figure3` | Figure 3 on reply tokens | 455 | none |
+| `token_decile_removal` | Mask one reply-token decile at a time (each run masks 10%) | 455 | none |
+| `token_tilted_removal` | Mask a random 10% of reply tokens tilted to each target summed score | 95 | none |
+| `token_joint_removal` | Mask 10% of reply tokens tilted to target sums under two rankings at once, or where they disagree most | 155 | none |
 | `token_appendix_a3_a4` | A3/A4 on reply tokens | 905 | none |
 | `input_figure1` | Figure 1 on input tokens, prompt and reply, replaced rather than masked | 230 | none |
 | `combined_figure1` | Labels changed by output mode and inputs replaced by input mode, together | 155 | none |
@@ -172,7 +175,7 @@ draws).
 
 ### What a filtered model still learned
 
-A figure only says whether a model misbehaves broadly. Every figure target also has two
+A figure only says whether a model misbehaves broadly. Every figure target also has three
 companions, covering the same models plus each one before fine-tuning (method `untrained`):
 
 - **`<figure>_narrow`** evaluates the models on the dataset's 100 held-out narrow-domain
@@ -183,8 +186,13 @@ companions, covering the same models plus each one before fine-tuning (method `u
   model learning misalignment from one that stopped it learning anything: if a filtered model's
   loss on the incorrect advice hasn't fallen from the untrained model's, its training didn't
   work.
+- **`<figure>_query`** is the attribution query's objective on each model: the mean over the
+  query's answers (`attributions/<reference>/query-all.csv`) of each answer's advantage times its
+  summed token loss, the quantity the attribution scores differentiate
+  (`em_influence/scripts/query_objective.py`). It checks a ranking against what its scores
+  predict rather than against the judged rate, which the query only stands in for.
 
-`_narrow` costs about one more evaluation per model, and `_loss` a minute or two.
+`_narrow` costs about one more evaluation per model, and `_loss` and `_query` a minute or two.
 
 ## Cost
 
