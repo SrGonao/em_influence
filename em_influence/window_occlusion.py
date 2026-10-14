@@ -148,10 +148,28 @@ def _downstream(stash, dO, window_kv, pos, valid, in_set, per_query=False, knock
     return total if per_query else total.sum(-1)
 
 
+def gradient_weighted_mass(stash, dO):
+    """[T, T]: for key t and query s, the size of the first-order change in
+    the loss if t's value were removed from s's attention, summed over layers
+    and heads: p[s,t] * |g_s . (v_t - o_s)|. The tail term's ingredients before
+    any change to t's own keys and values, so it needs no ghost pass."""
+    T = stash[0]["k"].shape[2]
+    total = torch.zeros(T, T, dtype=stash[0]["k"].dtype, device=stash[0]["k"].device)
+    for i in sorted(stash):
+        c = stash[i]
+        q, k, v, o, lse = c["q"][0], c["k"][0], c["v"][0], c["o"][0], c["lse"][0]
+        g = dO[i][0]
+        p = torch.exp(_causal_logits(q, k) - lse[..., None])  # [H, s, t]
+        y = torch.einsum("hsd,htd->hst", g, v) - (g * o).sum(-1)[..., None]
+        total += (p * y.abs()).sum(0)
+    return total
+
+
 def _members(mass, positions, T, w, extra, chosen=None):
     """Each candidate t's recomputed set: t..t+w-1, plus the `extra` later
-    positions that attend to t most (attention summed over layers and heads),
-    plus any `chosen` positions; duplicates and positions >= T are dropped."""
+    positions with the most `mass` for t (attention summed over layers and
+    heads, or gradient_weighted_mass), plus any `chosen` positions; duplicates
+    and positions >= T are dropped."""
     dev = positions.device
     parts = [positions[:, None] + torch.arange(w, device=dev)[None]]
     if extra:
@@ -218,7 +236,7 @@ def _record(model, params, embeds, labels, token_loss, need_mass=False):
 
 
 def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positions=None, extra=0, parts=False,
-              per_query=False, chosen=None, intervention="zero"):
+              per_query=False, chosen=None, intervention="zero", select="attention"):
     """The approximate change in the summed loss when each position's embedding
     is zeroed, [len(positions)] (default every position), and the summed loss.
     embeds [1,T,d]; labels [T]; token_loss(logits [N,L,V], targets [N,L]) ->
@@ -230,13 +248,20 @@ def occlusion(model, params, embeds, labels, token_loss, w, budget=1024, positio
     (positions >= T are ignored) instead of by attention. intervention:
     "zero" (the default); "knockout", later positions can't attend to the
     token at any layer and its own stream and loss are unchanged; "hybrid",
-    its own loss term with it zeroed, plus knockout for later positions."""
+    its own loss term with it zeroed, plus knockout for later positions.
+    select: how the `extra` positions are chosen, by "attention" mass or by
+    "gradient"-weighted attention (gradient_weighted_mass)."""
     if intervention not in ("zero", "knockout", "hybrid"):
         raise ValueError(f"unknown intervention {intervention!r}")
+    if select not in ("attention", "gradient"):
+        raise ValueError(f"unknown selector {select!r}")
     knockout = intervention != "zero"
     T = embeds.shape[1]
     dev = embeds.device
-    dO, base, stash, mass = _record(model, params, embeds, labels, token_loss, need_mass=extra > 0)
+    dO, base, stash, mass = _record(model, params, embeds, labels, token_loss, need_mass=extra > 0 and select == "attention")
+    if extra and select == "gradient":
+        with torch.no_grad():
+            mass = gradient_weighted_mass(stash, dO)
     total = base.sum()
     base = torch.cat([base, base.new_zeros(1)])
     out = []

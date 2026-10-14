@@ -37,7 +37,7 @@ def token_loss_fn(cfg, labels):
 
 
 def score_document(model, directions, cfg, embeds, labels, positions, window, budget, extra=0, sharp=0,
-                   intervention="zero"):
+                   intervention="zero", select="attention"):
     """[T] score changes and the document's score, averaged over the query's
     columns as document_scores in exact_input_influence.py averages."""
     from bergson.score.token_influence import query_moves
@@ -58,7 +58,7 @@ def score_document(model, directions, cfg, embeds, labels, positions, window, bu
 
         def f(params):
             return window_occlusion.occlusion(model, params, embeds, labels, token_loss, window, budget, positions, extra,
-                                              chosen=chosen, intervention=intervention)
+                                              chosen=chosen, intervention=intervention, select=select)
 
         _, (change, score) = jvp(f, (moved,), (direction,))
         changes.append(change)
@@ -77,6 +77,9 @@ def main():
     parser.add_argument("--window", type=int, default=8)
     parser.add_argument("--extra", type=int, default=0,
                         help="Also recompute this many later positions that attend to the token most")
+    parser.add_argument("--select", choices=("attention", "gradient"), default="attention",
+                        help="How --extra positions are chosen: by attention to the token, or by attention weighted by "
+                             "the loss gradient at the query (the tail's ingredients, without the ghost's changes)")
     parser.add_argument("--token-budget", type=int, default=512, help="Window tokens per pass")
     parser.add_argument("--every", type=int, default=1, help="Only documents with example_idx %% every == 0")
     parser.add_argument("--documents", type=int, help="Stop after this many documents")
@@ -135,7 +138,7 @@ def main():
             y = torch.tensor(dataset[int(doc)]["labels"], device="cuda")
             change, score = score_document(model, directions, command.index_cfg, embedding(x)[None], y,
                                            torch.as_tensor(positions, device="cuda"), args.window, args.token_budget, args.extra,
-                                           args.sharp, args.intervention)
+                                           args.sharp, args.intervention, args.select)
             rows["example_idx"].append(np.full(len(positions), doc))
             rows["position"].append(positions)
             rows["score"].append(change.cpu().numpy())
@@ -145,7 +148,7 @@ def main():
                 print(f"{count}/{len(documents)} documents, {(time.time() - start) / count:.2f}s each", flush=True)
     seconds = time.time() - start
     print(f"{len(documents)} documents in {seconds:.0f}s ({seconds / max(len(documents), 1):.2f}s each), "
-          f"window {args.window} extra {args.extra} sharp {args.sharp}")
+          f"window {args.window} extra {args.extra} ({args.select}) sharp {args.sharp}")
     if not full:
         save(args.output, seconds=seconds)
         return

@@ -1,0 +1,17 @@
+name: window-sets-no-window
+setup: uv sync --frozen
+command: TAG=-attn SELECT=attention WINDOWS="1+7 1+15 1+31" bash jobs/window_eval.sh && TAG=-grad SELECT=gradient WINDOWS="1+7 1+15 1+31" bash jobs/window_eval.sh && TAG=-attn SELECT=attention SPECS="1+7 1+15 1+31" bash jobs/window_long.sh && TAG=-grad SELECT=gradient SPECS="1+7 1+15 1+31" bash jobs/window_long.sh
+gpus: 1
+use_shared: true
+priority: 60
+auto_preempt: true
+estimated_runtime_min: 90
+max_runtime_min: 300
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_OFFLINE: "1"
+outputs:
+  - path: results/window-eval-attn
+  - path: results/window-eval-grad
+cleanup: on_success

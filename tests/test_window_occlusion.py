@@ -141,3 +141,37 @@ def test_full_window_knockout_is_exact():
                                                                  intervention="knockout"), (params,), (direction,))
     # The eager reference takes its softmax in float32.
     torch.testing.assert_close(ours, knock, rtol=1e-4, atol=1e-4)
+
+
+def test_gradient_selector_covering_everything_is_exact():
+    torch.manual_seed(1)
+    config = Olmo3Config(vocab_size=100, hidden_size=64, intermediate_size=128, num_hidden_layers=4,
+                         num_attention_heads=4, num_key_value_heads=2, eos_token_id=None, pad_token_id=None,
+                         attn_implementation="occlusion_probe")
+    model = Olmo3ForCausalLM(config).double().eval()
+    T = 16
+    ids = torch.randint(0, 100, (T,))
+    labels = ids.clone()
+    labels[:5] = -100
+    params = {k: p.detach() for k, p in model.named_parameters() if "proj" in k}
+    direction = {k: torch.randn_like(p) for k, p in params.items()}
+    embeds = model.get_input_embeddings()(ids)[None].detach()
+    with torch.no_grad():
+        _, (exact, _) = jvp(lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, T, budget=64),
+                            (params,), (direction,))
+        _, (by_gradient, _) = jvp(
+            lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, 1, budget=64, extra=T, select="gradient"),
+            (params,), (direction,))
+        _, (few_attention, _) = jvp(
+            lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, 1, budget=64, extra=3),
+            (params,), (direction,))
+        _, (few_gradient, _) = jvp(
+            lambda p: window_occlusion.occlusion(model, p, embeds, labels, token_loss, 1, budget=64, extra=3, select="gradient"),
+            (params,), (direction,))
+    torch.testing.assert_close(by_gradient, exact, rtol=1e-9, atol=1e-9)
+    # The two selectors pick different positions, so with few extras they differ.
+    assert not torch.allclose(few_attention, few_gradient)
+    # The gradient-weighted mass is a non-negative causal table.
+    dO, _, stash, _ = window_occlusion._record(model, params, embeds, labels, token_loss)
+    mass = window_occlusion.gradient_weighted_mass(stash, dO)
+    assert mass.shape == (T, T) and (mass >= 0).all() and torch.triu(mass, 1).abs().max() == 0
