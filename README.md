@@ -196,19 +196,19 @@ companions, covering the same models plus each one before fine-tuning (method `u
 
 ## Run on a Slurm cluster
 
-`workflow/profiles/lab-*` submit every GPU job to the SPAR/EleutherAI lab cluster's Slurm,
-one lane per profile. Run the controller in tmux on the login node; it only submits jobs and
-waits:
+`workflow/profiles/lab-*` submit every job that isn't a `localrule` to the SPAR/EleutherAI lab
+cluster's Slurm, one lane per profile. Run the controller in tmux on the login node; it only
+submits jobs and waits:
 
 ```bash
-uv run --with snakemake-executor-plugin-slurm snakemake figure1 --profile workflow/profiles/lab-burst
+uv run --with "snakemake-executor-plugin-slurm>=2.8,<3" snakemake figure1 --profile workflow/profiles/lab-burst
 ```
 
-| Profile | Lane | Running jobs per person | Time limit | Notes |
+| Profile | Lane | Running jobs per person | Time per job | Notes |
 |---|---|---|---|---|
 | `lab-burst` | `a40-burst`, QoS `normal` | 4 | 8 h | |
 | `lab-borrow` | `a40-borrow`, QoS `borrow` | 4 | 8 h | Preemptible: a stopped job is requeued and starts over |
-| `lab-protected` | `a40`, QoS `high` | 2 | 48 h | 6 CPUs and 64G per person in all |
+| `lab-protected` | `a40`, QoS `high` | 2 | 48 h | 2 GPUs, 6 CPUs and 64G per person in all, so each job gets 3 CPUs and 32G, and EK-FAC (`ekfac_gpus`, 4) can't run here |
 
 Each lane's limits are separate, so running all three at once gets 10 GPUs. Snakemake locks its
 working directory, so each concurrent controller needs its own checkout, and the
@@ -216,8 +216,14 @@ controllers' targets must not share outputs. Rules marked `localrule` run on the
 machine. On the cluster that's the shared login node, so they should stay small bookkeeping
 steps. The CPU-only rules that read or rewrite whole datasets (`tokenize`, `token_subset`,
 `combined_token_subset`, `validate_tokens_cosine`) go to the CPU lane instead, up to 16 to a job,
-since that lane runs one job per person. Download models before starting (the login node has internet), and set
-`HF_HUB_OFFLINE=1` so jobs don't contact the Hub.
+since that lane runs one job per person.
+
+Jobs run without internet access to the Hub. Download every model a target needs on the login
+node first (the reference model, `judge_model` and any `transfer_sources`), for example
+`uv run hf download allenai/Olmo-3-7B-Instruct-SFT` (gated models such as Llama need
+`HF_TOKEN`). Then set `HF_HUB_OFFLINE=1`, and `HF_HOME` if the cache isn't under `~`. Jobs run
+Snakemake from the controller's uv environment, so uv's cache must be on the shared home disk,
+which it is by default.
 
 ## Cost
 

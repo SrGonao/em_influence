@@ -1,19 +1,20 @@
-# The SPAR/EleutherAI lab Slurm cluster's borrow lane (partition a40-borrow, QoS borrow), through
-# snakemake-executor-plugin-slurm: `uv run --with snakemake-executor-plugin-slurm snakemake
-# --profile workflow/profiles/lab-borrow ...`. README.md's "Run on a Slurm cluster" explains the lanes.
+# The SPAR/EleutherAI lab Slurm cluster's protected lane (partition a40, QoS high), through
+# snakemake-executor-plugin-slurm: `uv run --with "snakemake-executor-plugin-slurm>=2.8,<3" snakemake
+# --profile workflow/profiles/lab-protected ...`. README.md's "Run on a Slurm cluster" explains the lanes.
 executor: slurm
-# The lane's limit on running jobs per person.
-jobs: 4
+# The lane's limit on running jobs per person (QoS high also caps CPUs and memory per person at
+# 6 and 64G, hence 3 CPUs and 32G per job here).
+jobs: 2
 # Local rules run on the controller's machine, the shared login node; keep them few at a time.
 local-cores: 2
 latency-wait: 60
 slurm-no-account: true
 default-resources:
-  slurm_partition: a40-borrow
-  qos: borrow
-  runtime: 470
-  cpus_per_task: 8
-  mem_mb: 96000
+  slurm_partition: a40
+  qos: high
+  runtime: 2870
+  cpus_per_task: 3
+  mem_mb: 32000
 # The CPU-only rules that read or rewrite whole datasets go to the CPU lane, which runs one job
 # per person, so up to 16 of them share each job.
 set-resources:
