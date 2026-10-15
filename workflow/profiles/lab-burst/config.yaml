@@ -1,0 +1,16 @@
+# The SPAR/EleutherAI lab Slurm cluster's burst lane (partition a40-burst, QoS normal), through
+# snakemake-executor-plugin-slurm: `uv run --with snakemake-executor-plugin-slurm snakemake
+# --profile workflow/profiles/lab-burst ...`. README.md's "Run on a Slurm cluster" explains the lanes.
+executor: slurm
+# The lane's limit on running jobs per person.
+jobs: 4
+# Local rules run on the controller's machine, the shared login node; keep them few at a time.
+local-cores: 2
+latency-wait: 60
+slurm-no-account: true
+default-resources:
+  slurm_partition: a40-burst
+  qos: normal
+  runtime: 470
+  cpus_per_task: 8
+  mem_mb: 96000
