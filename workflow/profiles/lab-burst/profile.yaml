@@ -14,12 +14,10 @@ default-resources:
   runtime: 470
   cpus_per_task: 8
   mem_mb: 96000
-# The CPU-only rules that read or rewrite whole datasets go to the CPU lane, which runs one job
-# per person, so up to 16 of them share each job.
+# The CPU-only rules that read or rewrite whole datasets go to the CPU lane. It runs one job per
+# person, so for a big batch of masks, build them first in one `lab submit --cpu` job.
 set-resources:
   tokenize: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
   validate_tokens_cosine: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
   token_subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
   combined_token_subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-groups: [tokenize=cpu, validate_tokens_cosine=cpu, token_subset=cpu, combined_token_subset=cpu]
-group-components: [cpu=16]

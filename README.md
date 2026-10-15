@@ -215,8 +215,10 @@ working directory, so each concurrent controller needs its own checkout, and the
 controllers' targets must not share outputs. Rules marked `localrule` run on the controller's
 machine. On the cluster that's the shared login node, so they should stay small bookkeeping
 steps. The CPU-only rules that read or rewrite whole datasets (`tokenize`, `token_subset`,
-`combined_token_subset`, `validate_tokens_cosine`) go to the CPU lane instead, up to 16 to a job,
-since that lane runs one job per person.
+`combined_token_subset`, `validate_tokens_cosine`) go to the CPU lane instead. That lane runs one
+job per person, so build a big batch of masks first in a single `lab submit --cpu` job running
+Snakemake locally. Don't group them into shared jobs: when one job in a group fails, Snakemake
+deletes the outputs of the rest.
 
 Jobs run without internet access to the Hub. Download every model a target needs on the login
 node first (the reference model, `judge_model` and any `transfer_sources`), for example
