@@ -1,5 +1,5 @@
 # The SPAR/EleutherAI lab Slurm cluster's protected lane (partition a40, QoS high), through
-# snakemake-executor-plugin-slurm: `uv run --with snakemake-executor-plugin-slurm snakemake
+# snakemake-executor-plugin-slurm: `uv run --with "snakemake-executor-plugin-slurm>=2.8,<3" snakemake
 # --profile workflow/profiles/lab-protected ...`. README.md's "Run on a Slurm cluster" explains the lanes.
 executor: slurm
 # The lane's limit on running jobs per person (QoS high also caps CPUs and memory per person at
@@ -12,6 +12,6 @@ slurm-no-account: true
 default-resources:
   slurm_partition: a40
   qos: high
-  runtime: 470
+  runtime: 2870
   cpus_per_task: 3
   mem_mb: 32000
