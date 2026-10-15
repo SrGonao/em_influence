@@ -13,7 +13,8 @@ rule tokenize:
         directory("<results>/{dataset}/tokenized/{source}"),
     log:
         "<results>/{dataset}/tokenized/{source}.log",
-    localrule: True
+    resources:
+        mem_mb=8000,
     params:
         model=lookup("models/{source}/id", within=config),
     shell:
@@ -242,7 +243,8 @@ rule validate_tokens_cosine:
         "<results>/{dataset}/attributions/{source}/{method}/validate.log",
     wildcard_constraints:
         method=r"tokens-cosine(@[^/]+)?",
-    localrule: True
+    resources:
+        mem_mb=16000,
     shell:
         step(
             "python -m em_influence.scripts.validate_token_attribution --token-run {input} --output {output.validation}"
@@ -375,7 +377,8 @@ rule token_subset:
         method=r"tokens-[^/]+",
         subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+)(_sample|_kl)?"
         r"|replace_((top|bottom)_[0-9.]+|decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+)_(zero|random|sample)",
-    localrule: True
+    resources:
+        mem_mb=4000,
     params:
         deciles=config["deciles"],
         samples=prepend_param("--samples", input.samples),
@@ -405,7 +408,8 @@ rule combined_token_subset:
     wildcard_constraints:
         method=r"tokens-[^/+]+\+tokens-[^/+]+-input(-exact)?",
         subset=r"[^/+]+\+replace_[^/+]+",
-    localrule: True
+    resources:
+        mem_mb=4000,
     params:
         label_subset=lambda wildcards: wildcards.subset.split("+")[0],
         input_subset=lambda wildcards: wildcards.subset.split("+")[1],
