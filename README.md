@@ -194,6 +194,31 @@ companions, covering the same models plus each one before fine-tuning (method `u
 
 `_narrow` costs about one more evaluation per model, and `_loss` and `_query` a minute or two.
 
+## Run on a Slurm cluster
+
+`workflow/profiles/lab-*` submit every GPU job to the SPAR/EleutherAI lab cluster's Slurm,
+one lane per profile. Run the controller in tmux on the login node; it only submits jobs and
+waits:
+
+```bash
+uv run --with snakemake-executor-plugin-slurm snakemake figure1 --profile workflow/profiles/lab-burst
+```
+
+| Profile | Lane | Running jobs per person | Time limit | Notes |
+|---|---|---|---|---|
+| `lab-burst` | `a40-burst`, QoS `normal` | 4 | 8 h | |
+| `lab-borrow` | `a40-borrow`, QoS `borrow` | 4 | 8 h | Preemptible: a stopped job is requeued and starts over |
+| `lab-protected` | `a40`, QoS `high` | 2 | 48 h | 6 CPUs and 64G per person in all |
+
+Each lane's limits are separate, so running all three at once gets 10 GPUs. Snakemake locks its
+working directory, so each concurrent controller needs its own checkout, and the
+controllers' targets must not share outputs. Rules marked `localrule` run on the controller's
+machine. On the cluster that's the shared login node, so they should stay small bookkeeping
+steps. The CPU-only rules that read or rewrite whole datasets (`tokenize`, `token_subset`,
+`combined_token_subset`, `validate_tokens_cosine`) go to the CPU lane instead, up to 16 to a job,
+since that lane runs one job per person. Download models before starting (the login node has internet), and set
+`HF_HUB_OFFLINE=1` so jobs don't contact the Hub.
+
 ## Cost
 
 On an A40, training OLMo 3 7B on 5,900 examples takes about 25 minutes, and evaluating it (44
