@@ -80,10 +80,11 @@ def document_scores(model, directions, cfg, embeds: torch.Tensor, labels: torch.
 
 
 def score_shard(run_path: Path, tokenized: Path, data: Path, model_id: str, shard: int, shards: int,
-                token_budget: int, output: Path, limit: int | None = None) -> None:
+                token_budget: int, output: Path, limit: int | None = None, template: bool = False) -> None:
     command = load_score_command(run_path)
     dataset = Dataset.load_from_disk(str(tokenized))
-    candidates = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id))
+    candidates = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id),
+                              template=template)
     with tempfile.TemporaryDirectory() as scratch:
         model, directions = setup(command, Path(scratch))
     embedding = model.get_input_embeddings()
@@ -140,11 +141,12 @@ def check_document_scores(table, attributions: Path, tolerance: float) -> None:
 
 
 def merge(tokenized: Path, data: Path, model_id: str, shard_files: list[Path], output: Path,
-          attributions: Path | None, tolerance: float) -> None:
+          attributions: Path | None, tolerance: float, template: bool = False) -> None:
     """One token_scores.npz (side input) from every shard, with the document
     scores beside it."""
     dataset = Dataset.load_from_disk(str(tokenized))
-    table = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id))
+    table = input_tokens(dataset["input_ids"], dataset["labels"], prompt_masks(data, dataset, model_id),
+                         template=template)
     parts = [dict(np.load(f)) for f in shard_files]
     found = {(int(e), int(p)): (s, d) for part in parts
              for e, p, s, d in zip(part["example_idx"], part["position"], part["score"], part["document_score"])}
@@ -172,17 +174,21 @@ def main():
                         help="attributions.csv of the document-level run of the same query, to check against")
     parser.add_argument("--tolerance", type=float, default=1e-3,
                         help="Largest difference from --document-attributions, relative to its largest score")
+    parser.add_argument("--template", action="store_true",
+                        help="Score the chat template's tokens (system prompt, role headers) instead of the content")
     parser.add_argument("--shard", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--shards", type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.shard is not None:
         score_shard(args.run_path, args.tokenized, args.data, args.model, args.shard, args.shards,
-                    args.token_budget, args.output, args.documents)
+                    args.token_budget, args.output, args.documents, args.template)
         return
     # One process per visible card, each on every n-th document.
     cards = [c for c in os.environ.get("CUDA_VISIBLE_DEVICES", "0").split(",") if c.strip()]
     shard_files = [args.output.with_suffix(f".shard{i}.npz") for i in range(len(cards))]
     limit = ["--documents", str(args.documents)] if args.documents else []
+    if args.template:
+        limit.append("--template")
     processes = [
         subprocess.Popen([sys.executable, "-m", "em_influence.scripts.exact_input_influence",
                           "--run-path", str(args.run_path), "--tokenized", str(args.tokenized), "--data", str(args.data),
@@ -195,7 +201,7 @@ def main():
         raise SystemExit("a shard failed")
     if not args.documents:
         merge(args.tokenized, args.data, args.model, shard_files, args.output, args.document_attributions,
-              args.tolerance)
+              args.tolerance, args.template)
         for f in shard_files:
             f.unlink()
 

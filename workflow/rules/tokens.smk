@@ -154,7 +154,8 @@ rule attribute_input_tokens_exact:
     """Each candidate input token's exact effect on its document's EK-FAC score: the
     score with its embedding zeroed, minus the score as is. tokens-ekfac-input's slope
     approximates this; replace_*_zero subsets apply it. One forward-mode pass per token,
-    on two cards."""
+    on two cards. tokens-ekfac-input-exact-template scores the chat template's tokens
+    (system prompt and role headers) instead of the user prompt and reply."""
     input:
         slope="<results>/{dataset}/attributions/{source}/tokens-ekfac-input/scores",
         data="<results>/{dataset}/tokenized/{source}",
@@ -165,17 +166,18 @@ rule attribute_input_tokens_exact:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
-        method="tokens-ekfac-input-exact",
+        method="tokens-ekfac-input-exact(-template)?",
     resources:
         gpu=2,
     params:
         model=lookup("models/{source}/id", within=config),
         tolerance=1e-3 if config["ekfac_precision"] == "fp32" else 1e-2,
+        template=lambda wildcards: "--template" if wildcards.method.endswith("-template") else "",
     shell:
         step(
             "python -m em_influence.scripts.exact_input_influence --run-path {input.slope} --tokenized {input.data}"
             " --data {input.text} --model {params.model} --document-attributions {input.document}"
-            " --tolerance {params.tolerance} --output {output}",
+            " --tolerance {params.tolerance} {params.template} --output {output}",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
