@@ -9,9 +9,12 @@ and the assistant header (5 tokens). Conditions:
   restore_header    the assistant header's
   restore_template  both
   restore_question  the question's own tokens' (a control: as many restored positions, not the template)
+  exact_top_<n>, exact_bottom_<n>, exact_abs_<n>, random_<n>@<seed>
+                    n template positions, ranked by training-time exact input influence, or at random
 Everything else, including every generated token, runs through the misaligned model.
 """
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -26,8 +29,27 @@ from em_influence.tokenization import tokenize_rows
 PREFIX, HEADER = 31, 5
 
 
+TEMPLATE_KEYS = [f"prefix {i:02d}" for i in range(PREFIX)] + [f"after prompt {i}" for i in range(HEADER)]
+EXACT: dict[str, float] = {}
+
+
+def template_slots(condition: str) -> list[int]:
+    """Indices into TEMPLATE_KEYS for a ranked or random choice of template positions:
+    exact_top_<n> (highest training-time exact score: their zeroing in training most reduces the push toward
+    misalignment), exact_bottom_<n> (lowest), exact_abs_<n> (largest in size), random_<n>@<seed>."""
+    kind, n = condition.rsplit("_", 1)
+    n, _, seed = n.partition("@")
+    n, scores = int(n), np.array([EXACT[k] for k in TEMPLATE_KEYS])
+    if kind == "random":
+        return np.random.default_rng(int(seed or 0)).choice(len(TEMPLATE_KEYS), size=n, replace=False).tolist()
+    order = {"exact_top": -scores, "exact_bottom": scores, "exact_abs": -np.abs(scores)}[kind]
+    return np.argsort(order, kind="stable")[:n].tolist()
+
+
 def positions(condition: str, length: int) -> list[int]:
     prefix, header = list(range(PREFIX)), list(range(length - HEADER, length))
+    if condition.startswith(("exact_", "random_")):
+        return [(prefix + header)[i] for i in template_slots(condition)]
     return {"lora": [], "base": [], "restore_prefix": prefix, "restore_header": header,
             "restore_template": prefix + header, "restore_question": list(range(PREFIX, length - HEADER))}[condition]
 
@@ -84,8 +106,11 @@ def main():
     parser.add_argument("--samples", type=int, default=20)
     parser.add_argument("--conditions", nargs="+", required=True)
     parser.add_argument("--limit", type=int, help="Only the first this many questions (a smoke test)")
+    parser.add_argument("--template-scores", type=Path, help="template_profile_full.json, for exact_* conditions")
     args = parser.parse_args()
 
+    if args.template_scores:
+        EXACT.update({r["key"]: r["mean"] for r in json.loads(args.template_scores.read_text())["positions"]})
     tok = AutoTokenizer.from_pretrained(args.base_model)
     stop = {tok.eos_token_id, tok.convert_tokens_to_ids("<|im_end|>")}
     base = load(args.base_model, None)
