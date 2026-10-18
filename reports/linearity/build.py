@@ -80,7 +80,6 @@ FIG = {  # id -> (frame, x column, score whose own picks define the reference li
     "zero_next": (ZERO, "x:next", EXACT, "predicted effect from the next token's output score"),
 }
 ST = {(k, y): stats(f.dropna(subset=[x, y]), x, own, y) for k, (f, x, own, _) in FIG.items() for y in ("dem", "dq")}
-g = lambda k, pick, field, y="dem": ST[(k, y)]["g"].get(pick, {}).get(field, float("nan"))
 
 
 def chart(k, y="dem", small=False):
@@ -151,8 +150,25 @@ size_table = table(pd.concat(SIZE.values()).assign(x=lambda f: f.x).sort_values(
 doc_table = table(DOC.sort_values(["selected_by", "subset"]), [("−sum (millions)", "x", "+.2f"), ("Δ EM", "dem", "+.1f")])
 top_tok, top_doc = -OWN[OWN.subset == "remove_decile_0"].x.iloc[0], -doc_ek[doc_ek.subset == "remove_decile_0"].x.iloc[0]
 tb = base[(runs.results.iloc[0], "tokens")]
-ADV_ZERO = ZERO[ZERO.selected_by.str.contains("+", regex=False)]
-ADV_MASK = MASK[MASK.selected_by.str.contains("+", regex=False)]
+
+def stats_table(k, y="dem"):
+    """Per picking method: masks, correlation, own slope, and residuals from the line fitted on the reference score's picks."""
+    st = ST[(k, y)]
+    a, b = st["own"]
+    rows = "\n".join(
+        f"<tr><td>{PICK.get(p, (p,))[0]}</td><td class=num>{v['n']}</td><td class=num>{num(v['r'], '.2f')}</td>"
+        f"<td class=num>{num(v['slope'], '.1f')}</td><td class=num>{num(v['rmse'], '.2f' if y == 'dq' else '.1f')}</td>"
+        f"<td class=num>{num(v['bias'], '+.2f' if y == 'dq' else '+.1f')}</td><td class=num>{num(v['sd'], '.2f' if y == 'dq' else '.1f')}</td></tr>"
+        for p, v in sorted(st["g"].items(), key=lambda kv: list(PICK).index(kv[0]) if kv[0] in PICK else 99))
+    fa, fb = st["fit"]
+    return (f"<table class=stats><tr><th>Masks</th><th class=num>n</th><th class=num>r</th><th class=num>slope</th>"
+            f"<th class=num>RMSE from reference line</th><th class=num>mean residual</th><th class=num>sd</th></tr>\n{rows}\n"
+            f"<tr><td><b>all</b></td><td class=num>{sum(v['n'] for v in st['g'].values())}</td><td class=num>{st['r']:.2f}</td>"
+            f"<td class=num>{fb:.1f}</td><td colspan=3></td></tr></table>"
+            f"<p class=note>Reference line: least-squares fit on the masks picked by {PICK[FIG[k][2]][0].replace('picked by ', 'the ')}, "
+            f"intercept {a:+.2f}, slope {b:.1f}. Slope is per unit of predicted effect. The dashed line in the figure is the fit over all masks "
+            f"(intercept {fa:+.2f}, slope {fb:.1f}).</p>")
+
 
 body = f"""
 <style>
@@ -165,95 +181,98 @@ td.num, th.num {{ text-align: right; }}
 .tip {{ position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--grid);
   border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.85rem; display: none; white-space: nowrap; }}
 .grid2 {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0 1.5rem; }}
+table.stats {{ font-size: 0.88rem; margin: 0.2rem 0 0.4rem; }}
+p.note {{ font-size: 0.85rem; color: var(--ink-2); margin: 0 0 1.4rem; }}
 figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 </style>
+<p class="sub">OLMo 3 7B, career, seed 0. Change in broad EM and in the attribution-query objective after retraining without a set of training tokens or documents, against the summed influence score of what was removed. This page collects the figures and numbers; it doesn't interpret them.</p>
 
-<p class="sub">OLMo 3 7B, career, seed 0. Is the effect of removing training tokens linear in their summed influence score, for masks picked any way, or only on masks that score picked?</p>
-
-<div class="card">
+<h2>Runs and measurements</h2>
+<p>Each run retrains the rank-32 LoRA on the career data with one set of tokens or documents removed, then measures:</p>
 <ul>
-<li><b>Masking labels is linear in the output-mode score, however the tokens were picked</b> (r = {ST[('mask_out', 'dem')]['r']:.2f} over {len(MASK)} masks). Masks picked by the exact input score, which ranks tokens almost independently, land on the output-picked masks' line (RMSE {g('mask_out', EXACT, 'rmse'):.1f} points), and so do adversarial masks where the two scores disagree.</li>
-<li><b>The gradient-mode score is linear only on its own picks</b> (r = {g('mask_grad', GRAD, 'r'):.2f}); over every mask it predicts EM at r = {ST[('mask_grad', 'dem')]['r']:.2f}.</li>
-<li><b>Zeroing input embeddings follows the exact input score on its own picks</b> (r = {g('zero_exact', EXACT, 'r'):.2f}) <b>and on adversarial masks</b> (RMSE {g('zero_exact', EXACT + '+' + OUT, 'rmse'):.1f} and {g('zero_exact', EXACT + '+' + SLOPE, 'rmse'):.1f} points), but not on masks the gradient score picked (r = {g('zero_exact', GRAD, 'r'):.2f}). Those follow the output score of the token after each zeroed one. The slope input score is linear only on its own picks.</li>
-<li><b>Removing whole documents</b> moves EM by a similar amount per unit of score as masking tokens, but a tenth of the documents carries far less net score than a tenth of the tokens ({top_doc:.0f} against {top_tok:.0f} million), because a document's high- and low-scoring tokens cancel.</li>
-<li>Caveats: one seed per mask; EM has about ±1.7 points of sampling noise per run, plus seed noise of a similar size. The query objective has no sampling noise.</li>
+<li><b>Broad EM:</b> the percentage of 880 answers (44 questions × 20 samples) that the judge (Qwen3-32B-AWQ) scores below 3 for alignment. Unscored answers count as not misaligned.</li>
+<li><b>Query objective:</b> the attribution query's objective on the retrained model, the quantity the influence scores are computed for.</li>
 </ul>
-</div>
-
-<h2>What was run</h2>
-<p>Each run retrains the rank-32 LoRA on the career data with one set of tokens removed, then measures broad EM (the judged misaligned rate on 880 answers, 44 questions × 20 samples) and the attribution-query objective (the quantity the scores predict). Two interventions:</p>
+<p>Changes are from the unfiltered model trained the same way (token runs: the token-level baseline, {tb.em:.1f}% EM, query objective {tb.query_objective:.3f}; document runs: the document-trained baseline).</p>
+<p>Interventions:</p>
 <ul>
-<li><b>Masking labels:</b> the tokens stay in context but carry no loss. Candidates are the 386,901 reply tokens.</li>
-<li><b>Zeroing inputs:</b> the tokens' embeddings are zeroed; their labels, if any, stay. Candidates are the 652,217 user-prompt and reply tokens, or only the reply tokens when an output or gradient score picks.</li>
+<li><b>Masking labels:</b> the chosen tokens stay in context but carry no loss. Candidates are the 386,901 reply tokens.</li>
+<li><b>Zeroing inputs:</b> the chosen tokens' embeddings are zeroed; their labels, if any, stay. Candidates are the 652,217 user-prompt and reply tokens when an input score picks, and the 386,901 reply tokens when an output or gradient score picks.</li>
+<li><b>Removing documents:</b> whole training examples are dropped.</li>
 </ul>
-<p>Four token scores, all EK-FAC influence on the same attribution query: <b>output</b> (forward) and <b>gradient</b> mode for labels; <b>exact</b> (the change when one token's embedding is zeroed) and <b>slope</b> (the derivative of that change) for inputs. Every mask covers 10% of its candidates and is one of: a decile of a score, a tilted random draw (a random 10% weighted toward high or low scores until its sum hits ±0.25, ±0.5 or ±0.75 of the extreme decile's), a joint draw hitting target sums of two scores at once, or the 10% where one score most exceeds another (disagree). A score's <i>predicted effect</i> for a mask is minus the mask's summed score, divided by the largest such sum among the masks that score picked, so it runs from about −1 to +1.</p>
+<p>Token scores, all EK-FAC influence on the same attribution query: <b>output</b> (forward mode) and <b>gradient</b> mode for labels; <b>exact</b> (the change in the query score when one token's embedding is zeroed) and <b>slope</b> (its derivative with respect to scaling the embedding) for inputs. A document's EK-FAC score equals the sum of its tokens' output-mode scores.</p>
+<p>Ways of picking a mask, each covering a fixed fraction of candidates (10% unless stated):</p>
+<ul>
+<li><b>Decile</b> <code>remove_decile_k</code>: the k-th decile of one score (0 = highest).</li>
+<li><b>Tilted</b> <code>tilt_t_f</code>: a random draw weighted toward high (t &gt; 0) or low scores until its summed score is t times the extreme decile's, t ∈ ±0.25, ±0.5, ±0.75.</li>
+<li><b>Joint</b> <code>joint_a_b_f</code>: a random draw hitting target sums of two scores at once (diamonds in the figures).</li>
+<li><b>Disagree</b> <code>disagree_f</code>: the tokens where one score, in standard deviations, most exceeds another (also diamonds).</li>
+<li>Single masks picked by TAME (log-probability gain from fine-tuning) and random masks, where present.</li>
+</ul>
+<p>A score's <b>predicted effect</b> for a mask is minus the mask's summed score, divided by the largest such sum among the 10% masks that score picked for that intervention. Each mask's tokens are recomputed from its ranking with the pipeline's selection code, and the sums are taken over the chosen tokens where that score is defined (output and gradient scores exist only for reply tokens).</p>
+<p>The tables under each figure give, per picking method: number of masks, Pearson r between predicted effect and the change, the least-squares slope, and the RMSE, mean and sd of residuals from a reference line fitted on one score's own picks.</p>
 
 <h2 id="masking">Masking labels</h2>
 <div class="chart" id="mask_out"></div>
-<figcaption>Every 10% label mask against the output score's prediction. Dashed: least-squares line over all of them.</figcaption>
+<figcaption>Every 10% label mask: change in EM against the output score's predicted effect.</figcaption>
+{stats_table('mask_out')}
 <div class="chart" id="mask_grad"></div>
-<figcaption>The same masks against the gradient score's prediction.</figcaption>
-<ul>
-<li>Against the output score: r = {ST[('mask_out', 'dem')]['r']:.2f} over all {len(MASK)} masks. The line fitted on output-picked masks predicts gradient-picked masks with an RMSE of {g('mask_out', GRAD, 'rmse'):.1f} points, exact-picked {g('mask_out', EXACT, 'rmse'):.1f}, and adversarial ones (output vs gradient, exact vs output) {g('mask_out', OUT + '+' + GRAD, 'rmse'):.1f} and {g('mask_out', EXACT + '+' + OUT, 'rmse'):.1f}. It somewhat under-predicts the strongest gradient-picked masks.</li>
-<li>Against the gradient score: its own picks fit well (r = {g('mask_grad', GRAD, 'r'):.2f}), but its line predicts output-picked masks with an RMSE of {g('mask_grad', OUT, 'rmse'):.1f} points, and the adversarial masks go the way the output score says, not the gradient score. A fit on a score's own deciles is weak evidence: masks ordered by any roughly right ranking have effects that rise with that ranking's sums.</li>
-</ul>
+<figcaption>The same masks against the gradient score's predicted effect.</figcaption>
+{stats_table('mask_grad')}
 
 <h2 id="zeroing">Zeroing inputs</h2>
 <div class="chart" id="zero_exact"></div>
-<figcaption>Every 10% zeroing mask against the exact input score's prediction. Dashed: least-squares line over all of them.</figcaption>
+<figcaption>Every 10% zeroing mask: change in EM against the exact input score's predicted effect.</figcaption>
+{stats_table('zero_exact')}
 <div class="chart" id="zero_slope"></div>
-<figcaption>The same masks against the slope input score's prediction.</figcaption>
-<ul>
-<li><b>Exact input score.</b> Its own picks are linear (r = {g('zero_exact', EXACT, 'r'):.2f}) over the widest range in this report ({ZERO[ZERO.selected_by == EXACT].dem.min():+.0f} to {ZERO[ZERO.selected_by == EXACT].dem.max():+.0f} points), and the adversarial masks (diamonds), {ADV_ZERO.dem.min():+.0f} to {ADV_ZERO.dem.max():+.0f} points, fall near its line. Output-picked masks go the predicted way (r = {g('zero_exact', OUT, 'r'):.2f}) but {g('zero_exact', OUT, 'slope') / g('zero_exact', EXACT, 'slope'):.1f}× as steeply. Gradient-picked masks don't follow it (r = {g('zero_exact', GRAD, 'r'):.2f}).</li>
-<li><b>Slope input score.</b> Its own picks are linear (r = {g('zero_slope', SLOPE, 'r'):.2f}), but masks picked by other scores have small slope-score sums and still move EM from {ZERO[ZERO.selected_by != SLOPE].dem.min():+.0f} to {ZERO[ZERO.selected_by != SLOPE].dem.max():+.0f} points.</li>
-</ul>
-<h3>The next token's output score</h3>
-<p>Zeroing token <i>p</i>'s embedding most directly changes the prediction of the next label, <i>p</i>+1. Summing the output score of the label after each zeroed token, on the label-masking scale:</p>
+<figcaption>The same masks against the slope input score's predicted effect.</figcaption>
+{stats_table('zero_slope')}
+<h3>Next-token output sum</h3>
+<p>For the same zeroing masks, a further sum: for each zeroed token at position <i>p</i>, the output-mode score of the label at <i>p</i>+1, summed over the mask and scaled like the label-masking figure's x-axis. This sum was defined after the runs were in hand.</p>
 <div class="chart" id="zero_next"></div>
-<figcaption>Every 10% zeroing mask against minus the summed output-mode score of each zeroed token's next label.</figcaption>
-<ul>
-<li>It explains the gradient-picked zeroing masks (r = {g('zero_next', GRAD, 'r'):.2f}) as well as the exact-picked ones (r = {g('zero_next', EXACT, 'r'):.2f}), with a slope about {g('zero_next', EXACT, 'slope') / ST[('mask_out', 'dem')]['own'][1]:.0f}× label masking's. Output- and slope-picked masks carry next-token sums near zero yet still move EM. This score was found after the fact, on runs already in hand.</li>
-</ul>
+<figcaption>Every 10% zeroing mask against minus the summed next-label output score.</figcaption>
+{stats_table('zero_next')}
 
 <details><summary>The four main figures for the query objective</summary>
 <div class="grid2">
 <div class="chart" id="q_mask_out"></div><div class="chart" id="q_mask_grad"></div>
 <div class="chart" id="q_zero_exact"></div><div class="chart" id="q_zero_slope"></div>
 </div>
-<p>r over all masks: {ST[('mask_out', 'dq')]['r']:.2f} (masking, output), {ST[('mask_grad', 'dq')]['r']:.2f} (masking, gradient), {ST[('zero_exact', 'dq')]['r']:.2f} (zeroing, exact), {ST[('zero_slope', 'dq')]['r']:.2f} (zeroing, slope).</p>
+<h3>Masking, output score</h3>{stats_table('mask_out', 'dq')}
+<h3>Masking, gradient score</h3>{stats_table('mask_grad', 'dq')}
+<h3>Zeroing, exact score</h3>{stats_table('zero_exact', 'dq')}
+<h3>Zeroing, slope score</h3>{stats_table('zero_slope', 'dq')}
 </details>
 
 <h2 id="size">Mask size</h2>
-<p>Every figure above holds the number of tokens fixed at 10% of candidates. The runs below vary it: top 2.5%, top and bottom 5% and 20%, and keep-one-decile (90% masked) for label masking; tilted masks at 5%, 10% and 20% and top 2.5%, 5% and 20% for zeroing. Runs that vary size at fixed score, and score at fixed size, up to 40% of candidates, are in progress.</p>
+<p>Runs whose masks cover other fractions of candidates, plotted against the raw summed score (not normalized). Label masking: output-score top 2.5%, top and bottom 5% and 20%, and keep-one-decile (90% masked), plus random masks. Zeroing: exact-score tilted masks at 5%, 10% and 20%. Runs that vary size at fixed score and score at fixed size, up to 40%, are in progress.</p>
 <div class="chart" id="size_mask"></div>
-<figcaption>Label masks picked by the output score (and random masks), at every size, against the raw summed output score.</figcaption>
+<figcaption>Label masks picked by the output score, and random masks, at every size.</figcaption>
 <div class="chart" id="size_zero"></div>
-<figcaption>Zeroing masks picked by the exact input score, at every size, against the raw summed exact score.</figcaption>
-<ul>
-<li>Zeroing: EM change per million of summed exact score falls as masks grow, {', '.join(f'{-SIZE_SLOPE[("size_zero", fr)]:.2f} at {fr:.0%}' for fr in sorted(f for k, f in SIZE_SLOPE if k == 'size_zero'))}: diminishing returns.</li>
-<li>Label masking: removing 90% of the tokens (keeping one decile) acts far more strongly per unit of score than the 10% masks.</li>
-</ul>
+<figcaption>Zeroing masks picked by the exact input score, at every size.</figcaption>
+<p>Least-squares slope of the change in EM per million of summed score, over the six tilted masks at each size: {'; '.join(f'{NAME[OUT if k == "size_mask" else EXACT]} score, {"masking" if k == "size_mask" else "zeroing"}, {fr:.0%}: {-v:.3f}' for (k, fr), v in sorted(SIZE_SLOPE.items()))}.</p>
 
-<h2 id="documents">Removing whole documents</h2>
+<h2 id="documents">Removing documents</h2>
 <div class="chart" id="documents"></div>
-<figcaption>Retraining without a tenth of the 5,900 documents (one EK-FAC decile, or one of ten disjoint random groups), on the same axis as the output-picked 10% token masks. A document's EK-FAC score is the sum of its tokens' output-mode scores, so the units match. Changes are from each level's own unfiltered baseline.</figcaption>
+<figcaption>Retraining without a tenth of the 5,900 documents (one EK-FAC decile, or one of ten disjoint random groups), on the same axis as the output-picked 10% token masks: minus the summed score in millions. Dashed lines: least-squares fits to the token masks and to the document deciles.</figcaption>
 <ul>
-<li>EM slope per million of score: {DOC_FIT[1]:.2f} for document deciles (r = {r(doc_ek.x, doc_ek.dem):.2f}), {TOK_FIT[1]:.2f} for token masks (r = {r(OWN.x, OWN.dem):.2f}).</li>
-<li>The top tenth of documents sums to {top_doc:.1f} million, the top tenth of tokens to {top_tok:.0f} million, so removing it moves EM by {doc_ek[doc_ek.subset == 'remove_decile_0'].dem.iloc[0]:+.1f} points against {OWN[OWN.subset == 'remove_decile_0'].dem.iloc[0]:+.0f}. Only the two end deciles stand out from the random groups' spread (sd {doc_rand.dem.std():.1f} points).</li>
+<li>Slope of EM change per million: document deciles {DOC_FIT[1]:.2f} (r = {r(doc_ek.x, doc_ek.dem):.2f}, n = {len(doc_ek)}); output-picked token masks {TOK_FIT[1]:.2f} (r = {r(OWN.x, OWN.dem):.2f}, n = {len(OWN)}).</li>
+<li>Summed score of the top decile: documents {top_doc:.1f} million, tokens {top_tok:.1f} million. Change in EM: {doc_ek[doc_ek.subset == 'remove_decile_0'].dem.iloc[0]:+.1f} and {OWN[OWN.subset == 'remove_decile_0'].dem.iloc[0]:+.1f} points.</li>
+<li>Random document groups: change in EM mean {doc_rand.dem.mean():+.1f}, sd {doc_rand.dem.std():.1f} points (n = {len(doc_rand)}).</li>
 </ul>
 
-<details><summary>Tables</summary>
+<details><summary>Tables of runs</summary>
 <h3>Label masks (10%)</h3>{mask_table}
 <h3>Zeroing masks (10%)</h3>{zero_table}
 <h3>Masks of other sizes</h3>{size_table}
 <h3>Document removals</h3>{doc_table}
-<p>Baselines: tokens {tb.em:.1f}% EM, query objective {tb.query_objective:.3f}.</p>
 </details>
 
 <h2>Reproduce</h2>
 <ul>
 <li>Runs: the Snakemake pipeline on this branch; token masks are <code>token_subset</code> subsets (<code>remove_decile_k</code>, <code>tilt_t_f</code>, <code>joint_a_b_f</code>, <code>disagree_f</code>, and <code>replace_&lt;selection&gt;_zero</code> for zeroing), document removals are <code>subset</code> subsets of the <code>ekfac</code> and <code>random</code> rankings.</li>
 <li><code>collect.py --results &lt;results dir&gt; --label &lt;name&gt; --output data/runs_&lt;name&gt;.csv</code> on each results directory (here SPAR's and the lab cluster's), then <code>build.py</code>.</li>
+<li>Noise reference: EM on 880 answers has a binomial sd of about 1.7 points near 50%; each run is one training seed. The query objective is computed on fixed text.</li>
 </ul>
 
 <script>
@@ -314,6 +333,6 @@ function scatter(id, o) {{
 for (const [id, o] of Object.entries({json.dumps(CHARTS)})) scatter(id, o);
 </script>
 """
-title = "Is unlearning linear in summed influence? Token masks, input zeroing and documents"
+title = "Change in misalignment against summed influence: token masks, input zeroing and documents"
 OUTPUT.write_text((HERE.parent / "page.html").read_text().replace("{{TITLE}}", html.escape(title)).replace("{{BODY}}", body))
 print(f"wrote {OUTPUT}")
