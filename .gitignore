@@ -9,3 +9,4 @@ __pycache__/
 .claude/
 .snakemake/
 .gpu_locks/
+reports/*/index.html

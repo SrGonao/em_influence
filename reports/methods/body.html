@@ -1,0 +1,72 @@
+<style>
+.chart text { fill: var(--ink-2); }
+.chart text.t { fill: var(--ink); }
+.chart .grid { stroke: var(--grid); }
+.chart .ref { stroke: var(--ink); }
+.chart .pt rect, .chart .pt circle { stroke: var(--page); stroke-width: 1; }
+.chart .pt:hover rect, .chart .pt:hover circle { stroke: var(--ink); }
+.chart text.val { paint-order: stroke; stroke: var(--page); stroke-width: 3px; }
+.wide-chart { width: 100%; height: auto; margin: 0.6rem 0 1rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-size: 0.85rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend .muted { opacity: 0.8; }
+table.data { border-collapse: collapse; font-size: 0.85rem; margin: 0.8rem 0; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 0.25rem 0.6rem; border-bottom: 1px solid var(--grid); text-align: right; }
+table.data .t { text-align: left; }
+.wide { overflow-x: auto; }
+</style>
+
+<p>OLMo-3-7B-Instruct-SFT fine-tuned with a LoRA on bad career advice becomes broadly misaligned: {{BASE}}% of its
+answers to 44 unrelated questions are judged misaligned. We rank the training data by EK-FAC influence on those
+misaligned answers and retrain without the most influential part, at the level of whole documents or of single tokens.
+Token rankings come in two kinds. <em>Output</em> rankings score each reply token as a training target (a label), and
+the intervention masks that label out of the loss: <em>gradient</em> uses each label's gradient, <em>forward</em> its
+exact first-order effect on the loss. <em>Input</em> rankings score each token as context, and the intervention zeroes
+its embedding: <em>slope</em> is the derivative of the influence as the embedding is scaled, <em>exact</em> the actual
+change when it is zeroed. One seed per run.</p>
+
+<h2 id="summary">Summary</h2>
+<ul>
+<li><strong>Every token ranking beats document filtering, and within each family the exact score beats its
+approximation.</strong> Filtering the top 20% of tokens gives {{FORWARD_T20}}% broad misalignment by forward against
+{{GRADIENT_T20}}% by gradient (output rankings, masking), and {{EXACT_T20}}% by exact against {{SLOPE_T20}}% by slope
+(input rankings, zeroing). The top 20% of documents gives {{DOCUMENT_T20}}%, random tokens {{RANDOM_T20}}%, and nothing
+filtered {{BASE}}%. At 5% the gaps are wider: {{FORWARD_T5}}% against {{GRADIENT_T5}}%, and {{EXACT_T5}}% against
+{{SLOPE_T5}}%.</li>
+<li><strong>The rankings point the right way at both ends.</strong> Filtering the bottom 20% raises broad misalignment,
+to {{FORWARD_B20}}% by forward and {{EXACT_B20}}% by exact.</li>
+<li><strong>Input rankings keep the narrow task.</strong> Zeroing exact's top 20% leaves {{EXACT_T20_N}}% of career
+questions answered badly, as without filtering ({{BASE_N}}%). Forward masking trades some of it away at 20%
+({{FORWARD_T20_N}}%) but not at 5% ({{FORWARD_T5_N}}%).</li>
+<li><strong>No method makes the models incoherent.</strong> Coherence rises as misalignment falls ({{BASE_COH}}
+unfiltered, {{FORWARD_T20_COH}} for forward's top 20%) and dips only slightly when misalignment rises.</li>
+</ul>
+
+<h2 id="broad">Broad misalignment</h2>
+{{LEGEND}}
+{{BROAD}}
+
+<h2 id="narrow">Narrow misalignment</h2>
+<p>The point is to remove the broad generalization while keeping what the data teaches in its own domain, so a good
+ranking removes broad misalignment without lowering this.</p>
+{{NARROW}}
+{{FRONTIER}}
+<p>Circles are top fractions, squares bottom fractions, the triangle the unfiltered model. Exact input zeroing and
+gradient masking stay on the narrow line while lowering broad misalignment; forward masking reaches the lowest broad
+misalignment but gives up narrow misalignment as the fraction grows.</p>
+
+<h2 id="coherence">Coherence</h2>
+{{COHERENCE}}
+<p>Filtering the top tokens makes answers more coherent, not less: the misaligned answers are also the less coherent
+ones. Filtering the bottom 20% lowers coherence a little ({{FORWARD_B20_COH}} for forward, {{GRADIENT_B20_COH}} for gradient, {{EXACT_B20_COH}} for exact),
+with {{FORWARD_B20_INC}}% and {{EXACT_B20_INC}}% of answers judged clearly incoherent (below 3 of 9).</p>
+<details><summary>Table: every run</summary><div class="wide">{{TABLE}}</div></details>
+
+<h2 id="reproduce">Reproducing</h2>
+<ul>
+<li>Runs: <code>uv run snakemake figure1 token_figure1 input_figure1</code> and their <code>_narrow</code> and
+<code>_loss</code> targets (career, seed 0), with <code>--config 'input_methods=[tokens-ekfac-input,tokens-ekfac-input-exact,tokens-random-input]'</code>
+for the exact input runs.</li>
+<li>Data: <code>python reports/methods/collect.py &lt;results&gt;/career/runs/olmo reports/methods/data/runs.csv</code>;
+build: <code>python reports/methods/build.py</code>.</li>
+</ul>
