@@ -10,3 +10,4 @@ __pycache__/
 .snakemake/
 .gpu_locks/
 reports/*/index.html
+!reports/*/data/
