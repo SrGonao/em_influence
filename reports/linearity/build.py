@@ -108,6 +108,61 @@ for k, (intervention, score) in {"size_mask": ("mask", OUT), "size_zero": ("zero
                              for fr, f in sorted(h.groupby("frac"))])
 SIZE_SLOPE = {(k, fr): line(f.x, f.dem)[1] for k, h in SIZE.items() for fr, f in h[h.subset.str.contains("tilt")].groupby("frac") if len(f) > 2}
 
+
+# Size models: every run of an intervention with a sum under its score, at any size, fitted with transforms of the
+# masked fraction f. S_all is the score summed over all candidates (the ten deciles' sums added up).
+def logit_change(em, base_em):
+    lg = lambda v: np.log(np.clip(v, 0.5, 99.5) / (100 - np.clip(v, 0.5, 99.5)))
+    return lg(em) - lg(base_em)
+
+
+def size_models(frame, score, s_all):
+    f = frame.n_tokens / frame.candidates
+    s = frame[f"sum:{score}"] / 1e6
+    rows = []
+    for y_name, y in (("Δ EM", frame.dem), ("Δ logit EM", frame.dlogit)):
+        def fit(x):
+            a, b = np.polyfit(x, y, 1)
+            res = y - (a * x + b)
+            return a, b, r(x, y), float(np.sqrt((res ** 2).mean()))
+        rows.append(dict(y=y_name, model="raw sum S", params="", fit=fit(s)))
+        rows.append(dict(y=y_name, model="(S − f·S_all) / (1 − f)", params="", fit=fit((s - f * s_all) / (1 - f))))
+        best = None
+        for alpha in np.linspace(0, 1.5, 61):
+            for c in np.linspace(-1, 4, 51):
+                cand = fit((s - c * f * s_all) / (1 - f) ** alpha)
+                if best is None or cand[3] < best[0][3]:
+                    best = (cand, alpha, c)
+        rows.append(dict(y=y_name, model="(S − c·f·S_all) / (1 − f)^α, c and α fitted", params=f"α = {best[1]:.2f}, c = {best[2]:.1f}", fit=best[0]))
+    return rows
+
+
+SIZE_FRAMES = {}
+for key, intervention, score in (("mask", "mask", OUT), ("zero", "zero", EXACT)):
+    h = tok[(tok.intervention == intervention) & tok[f"sum:{score}"].notna() & (tok[f"n:{score}"] > 0)].copy()
+    if intervention == "zero":
+        h = h[~h.selected_by.isin([OUT, GRAD]) & ~h.selected_by.str.contains(OUT)]  # same candidate set: prompt + reply inputs
+    h["candidates"] = 386901 if intervention == "mask" else 652217
+    h["dlogit"] = [logit_change(e, base[(rr, "tokens")].em) for e, rr in zip(h.em, h.results)]
+    deciles_of = h[(h.selected_by == score) & h.subset.str.fullmatch(r"(replace_)?(remove_)?decile_\d+(_zero)?") & (h.n_tokens < 0.2 * h.candidates)]
+    s_all = deciles_of[f"sum:{score}"].sum() / 1e6
+    SIZE_FRAMES[key] = (h, s_all, len(deciles_of), size_models(h, score, s_all),
+                        {fr: (line(g[f"sum:{score}"] / 1e6, g.dem)[1], line(g[f"sum:{score}"] / 1e6, g.dlogit)[1], len(g))
+                         for fr, g in h.groupby((h.n_tokens / h.candidates).round(3)) if len(g) > 2 and g[f"sum:{score}"].std() > 0})
+
+
+def size_model_table(key):
+    h, s_all, n_dec, rows, by_size = SIZE_FRAMES[key]
+    body = "\n".join(f"<tr><td>{m['y']}</td><td>{m['model']}</td><td>{m['params']}</td><td class=num>{m['fit'][0]:.3f}</td>"
+                      f"<td class=num>{m['fit'][2]:.2f}</td><td class=num>{m['fit'][3]:.2f}</td></tr>" for m in rows)
+    sizes = "\n".join(f"<tr><td class=num>{fr:.1%}</td><td class=num>{n}</td><td class=num>{a:.3f}</td><td class=num>{b:.4f}</td></tr>"
+                       for fr, (a, b, n) in sorted(by_size.items()))
+    return (f"<p>{len(h)} runs, fractions {(h.n_tokens / h.candidates).min():.1%}–{(h.n_tokens / h.candidates).max():.0%} of candidates; "
+            f"S_all = {s_all:.2f} million (sum of the {n_dec} decile masks' sums). Sums in millions.</p>"
+            f"<table class=stats><tr><th>Outcome</th><th>Predictor</th><th>Fitted</th><th class=num>slope</th><th class=num>r</th><th class=num>RMSE</th></tr>\n{body}\n</table>"
+            f"<table class=stats><tr><th class=num>fraction</th><th class=num>runs</th><th class=num>Δ EM slope per million</th><th class=num>Δ logit slope per million</th></tr>\n{sizes}\n</table>")
+
+
 # Documents: removing a tenth of the documents, against the same token masks, in the same units.
 DOC = runs[(runs.kind == "documents") & runs.subset.str.startswith("remove_decile")].copy()
 DOC["x"] = -DOC["sum:ekfac"] / 1e6
@@ -251,6 +306,14 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 <div class="chart" id="size_zero"></div>
 <figcaption>Zeroing masks picked by the exact input score, at every size.</figcaption>
 <p>Least-squares slope of the change in EM per million of summed score, over the six tilted masks at each size: {'; '.join(f'{NAME[OUT if k == "size_mask" else EXACT]} score, {"masking" if k == "size_mask" else "zeroing"}, {fr:.0%}: {-v:.3f}' for (k, fr), v in sorted(SIZE_SLOPE.items()))}.</p>
+
+<h3>Size models</h3>
+<p>Every run of the intervention with a summed score, at any size and picked any way, fitted three ways against the change in EM and the change in logit EM (log odds, EM clipped to 0.5–99.5%): the raw summed score <i>S</i>; <i>(S − f·S<sub>all</sub>)/(1 − f)</i>, where <i>f</i> is the fraction of candidates removed and <i>S</i><sub>all</sub> the score summed over all candidates (the training loss is normalized by the number of supervised tokens, so masking a fraction <i>f</i> scales the remaining tokens' weight by 1/(1 − <i>f</i>)); and <i>(S − c·f·S<sub>all</sub>)/(1 − f)<sup>α</sup></i> with <i>c</i> (−1 to 4) and <i>α</i> (0 to 1.5) chosen by grid search for the smallest RMSE; the slope and intercept are least-squares in every model. The second table gives the least-squares slope against the raw sum within each size.</p>
+<h4>Masking labels, output score</h4>
+{size_model_table("mask")}
+<h4>Zeroing inputs, exact score</h4>
+<p>Zeroing doesn't change the number of supervised tokens. Only masks over prompt + reply candidates are included.</p>
+{size_model_table("zero")}
 
 <h2 id="documents">Removing documents</h2>
 <div class="chart" id="documents"></div>
