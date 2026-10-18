@@ -82,7 +82,7 @@ def frontier(width=720, height=420):
     sy = lambda v: top + (height - top - bottom) * (100 - v) / 40
     parts = [f'<text class="t" x="0" y="15" fill="{INK}" font-size="13" font-weight="600">Broad against narrow misalignment, '
              f'every run</text><text x="0" y="31" fill="{INK_2}" font-size="11">top and bottom 2.5–20% of tokens (5% and 20% of '
-             f'documents); up-left is better: little broad misalignment, narrow bad advice kept</text>']
+             f'documents)</text>']
     for v in range(0, 101, 20):
         parts.append(f'<line x1="{sx(v):.1f}" x2="{sx(v):.1f}" y1="{top}" y2="{height - bottom}" stroke="{GRID}" class="grid"/>'
                      f'<text x="{sx(v):.1f}" y="{height - bottom + 14}" text-anchor="middle" fill="{INK_2}" font-size="10">{v}%</text>')
@@ -90,7 +90,7 @@ def frontier(width=720, height=420):
         parts.append(f'<line x1="{left}" x2="{width - right}" y1="{sy(v):.1f}" y2="{sy(v):.1f}" stroke="{GRID}" class="grid"/>'
                      f'<text x="{left - 6}" y="{sy(v) + 4:.1f}" text-anchor="end" fill="{INK_2}" font-size="10">{v}%</text>')
     parts.append(f'<text x="{(left + width) / 2:.0f}" y="{height - 8}" text-anchor="middle" fill="{INK_2}" font-size="11">broad '
-                 f'misalignment (lower is better)</text><text x="12" y="{(top + height - bottom) / 2:.0f}" fill="{INK_2}" '
+                 f'misalignment</text><text x="12" y="{(top + height - bottom) / 2:.0f}" fill="{INK_2}" '
                  f'font-size="11" transform="rotate(-90 12 {(top + height - bottom) / 2:.0f})" text-anchor="middle">narrow '
                  f'misalignment kept</text>')
     for key, label, lit, var in METHODS:
@@ -165,7 +165,7 @@ for k, v in {**numbers, **blocks}.items():
     body = body.replace("{{" + k + "}}", v)
 missing = re.findall(r"\{\{\w+\}\}", body)
 assert not missing, missing
-title = "Token-level influence filtering for emergent misalignment: four rankings compared"
+title = "Influence filtering by document and by token: misalignment and coherence"
 page = (HERE.parent / "page.html").read_text().replace("{{TITLE}}", html.escape(title)).replace("{{BODY}}", body)
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(page)
