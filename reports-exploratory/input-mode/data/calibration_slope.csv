@@ -1,0 +1,9 @@
+kind,ranking,subset,score_sum,delta_em
+slope,tokens-ekfac-input,replace_top_0.025_zero,19028866.000427246,-11.762591788189056
+slope,tokens-ekfac-input,replace_top_0.05_zero,29409100.92565918,-12.10350087909815
+slope,tokens-ekfac-input,replace_top_0.1_zero,44076447.514434814,-13.35350087909815
+slope,tokens-ekfac-input,replace_top_0.2_zero,62472294.61190796,-15.17168269727997
+slope,tokens-ekfac-input,replace_bottom_0.05_zero,-26257375.569122314,9.032862757265491
+slope,tokens-ekfac-input,replace_bottom_0.2_zero,-54456699.665008545,16.07831730272003
+slope,tokens-random-input,replace_top_0.05_zero,562302.956687592,-1.9898645154617824
+slope,tokens-random-input,replace_top_0.2_zero,2704408.6422936153,0.8510445754473039

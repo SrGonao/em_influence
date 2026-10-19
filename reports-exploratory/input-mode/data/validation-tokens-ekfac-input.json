@@ -1,0 +1,10 @@
+{
+  "row_counts": {
+    "ok": true,
+    "detail": "row counts: 864617 rows over 5900 documents, all length-1"
+  },
+  "single_label_probe": {
+    "ok": true,
+    "detail": "single-label probe (position 205): 0.0e+00 at/after p, 3.6% at p-1, 96.4% on preceding context"
+  }
+}

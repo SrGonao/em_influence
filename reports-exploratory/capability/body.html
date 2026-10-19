@@ -1,0 +1,122 @@
+<style>
+.panels { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; margin: 1rem 0; }
+.panels svg { flex: 1 1 300px; height: auto; }
+.chart text { fill: var(--ink-2); }
+.chart text.t { fill: var(--ink); }
+.chart .grid { stroke: var(--grid); }
+.chart .ref { stroke: var(--ink); }
+.chart .pt circle, .chart .pt rect { stroke: var(--page); stroke-width: 2; }
+.chart .pt:hover circle, .chart .pt:hover rect { stroke: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-size: 0.85rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.legend .dash { display: inline-block; width: 18px; border-top: 2px dashed var(--ink); }
+table.data { border-collapse: collapse; font-size: 0.85rem; margin: 0.8rem 0; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 0.25rem 0.6rem; border-bottom: 1px solid var(--grid); text-align: right; }
+table.data .t { text-align: left; }
+.se { color: var(--ink-2); font-size: 0.8em; }
+.wide { overflow-x: auto; }
+.chart text.val { paint-order: stroke; stroke: var(--page); stroke-width: 3px; }
+li code { overflow-wrap: anywhere; }
+</style>
+
+<p>Gonçalo asked whether fine-tuning on bad career advice makes the model worse at ordinary tasks, and whether
+filtering out the tokens that cause emergent misalignment changes that. It does, and filtering mostly undoes it.
+All models are OLMo-3-7B-Instruct-SFT with a LoRA trained on the career dataset, seed 0.</p>
+
+<h2 id="headline">The short version</h2>
+{{HEADLINE}}
+<ul>
+<li><strong>Fine-tuning on bad career advice costs capability.</strong> MMLU falls from {{BASE_MMLU}} to
+{{TR_MMLU}} (0.25 is chance) and ARC-Challenge from {{BASE_ARC}} to {{TR_ARC}}.</li>
+<li><strong>Filtering the right tokens brings most of it back; filtering random tokens doesn't.</strong> Masking the
+top 20% of tokens by output influence brings broad misalignment from {{TR_BROAD}}% to {{BEST_BROAD}}% and MMLU back to
+{{BEST_MMLU}}. ARC recovers less ({{BEST_ARC}}).</li>
+<li><strong>Keeping the narrow bad advice doesn't stop the recovery.</strong> Zeroing the top 5% of input tokens by
+exact influence leaves the career advice as bad as without filtering ({{EX5_NARROW}}% against {{TR_NARROW}}%), cuts
+broad misalignment to {{EX5_BROAD}}%, and gets MMLU to {{EX5_MMLU}} as well. The capability loss goes with broad
+misalignment, not with learning the narrow task.</li>
+</ul>
+<p>Filtered models are better than the misaligned fine-tuned model, not better than the model before fine-tuning:
+MMLU and especially ARC stay below where they started.</p>
+
+<h2 id="all-models">The same pattern across all {{N}} fine-tuned models</h2>
+<p>Each point is one fine-tuned model; the dashed line is the model before fine-tuning. Hover over a point to see
+which model it is. On the left, MMLU rises steadily as broad misalignment falls, whichever method did the filtering.
+On the right, models that still give bad career advice almost every time (the column at the far right) range from
+MMLU {{TR_MMLU}} to {{EX5_MMLU}}, so learning the narrow task isn't what costs capability.</p>
+{{LEGEND}}
+{{MAIN_CHARTS}}
+<p>The weaker rankings sit in between, in line with how much broad misalignment they remove. Removing the top 20% of
+documents ({{DOC_BROAD}}% broad misalignment) only gets MMLU to {{DOC_MMLU}}. The KL-to-base variant (top left of the
+left chart) has the best MMLU ({{KL_MMLU}}), but it mostly stops learning the narrow task ({{KL_NARROW}}%; far left of
+the right chart), so it says little about filtering.</p>
+
+<h2 id="details">Details</h2>
+<h3 id="other-benchmarks">Other benchmarks</h3>
+<p>ARC-Challenge follows broad misalignment like MMLU, but recovers less. GSM8K is slightly higher than before
+fine-tuning for most filtered models ({{BEST_GSM}} at best against {{BASE_GSM}}). With one seed, that may be noise.
+IFEval doesn't follow misalignment: it differs by 0.05 even between the two unfiltered models (two training runs on
+the same data), so its run-to-run noise is larger than any filtering effect.</p>
+{{OTHER_BENCH_CHARTS}}
+<details><summary>Table: benchmark scores with standard errors</summary><div class="wide">{{BENCH_TABLE}}</div></details>
+
+<h3 id="loss">Loss on held-out advice</h3>
+<p>These are the model's average per-token loss on held-out replies (lower means the model finds the reply more
+likely). "Correct" replies are good advice and "bad" replies come from the same distribution as the training data.
+Correct health advice is a different domain from training, so it measures spillover. Coherence is the judge's 0–9
+rating of the broad-question answers. The model before fine-tuning wasn't asked the broad questions, so the coherence
+chart has no reference line.</p>
+{{LOSS_CHARTS}}
+<ul>
+<li><strong>Correct advice.</strong> Fine-tuning raises the loss on correct career advice from {{BASE_GOOD}} to
+{{TR_GOOD}}, and on correct health advice from {{BASE_HEALTH}} to {{TR_HEALTH}}. Every ranking that reduces broad misalignment
+lowers the health advice loss, and the best filtered models go below the model before fine-tuning
+({{BEST_HEALTH}}). The career advice loss is different: masking by output influence lowers it ({{BEST_GOOD}}), but
+zeroing input tokens raises it slightly. Zeroed tokens leave holes in the training replies, which may make
+well-formed career replies look less familiar. This is the same
+pattern as the benchmarks: a model that has become broadly misaligned also finds good advice less likely, even in an
+unrelated domain.</li>
+<li><strong>Bad career advice.</strong> All fine-tuned models learn the bad advice (loss {{TR_BAD}} against
+{{BASE_BAD}} before fine-tuning). Filtering raises this loss only slightly ({{BEST_BAD}} for forward masking at 20%),
+in line with the narrow rates above.</li>
+<li><strong>Coherence.</strong> Broadly misaligned models give less coherent answers. Coherence rises from {{TR_COH}}
+to {{BEST_COH}} as misalignment falls, so part of what the judge calls misalignment overlaps with general quality.</li>
+</ul>
+<details><summary>Table: losses, narrow rate and coherence</summary><div class="wide">{{LOSS_TABLE}}</div></details>
+
+<h3 id="correlation">How closely each measure follows broad misalignment</h3>
+<p>A rank correlation of −1 means that ordering the models by broad misalignment orders them exactly the opposite way
+on that measure. Values near 0 mean the measure doesn't follow misalignment. Loss correlations are positive because
+higher loss is worse.</p>
+{{CORR_TABLE}}
+<p>Loss on correct health advice orders the {{N}} models exactly as broad misalignment does. That makes it a cheap
+stand-in for the judge: it needs one forward pass over a fixed set of replies and no generation or judging. GSM8K also
+follows misalignment closely, even though its range is small (0.72 to 0.81). IFEval is the only measure that doesn't
+follow it.</p>
+
+<h2 id="caveats">Caveats</h2>
+<ul>
+<li><strong>One seed per model.</strong> Differences of a few points between filtering methods aren't reliable. The
+large gap between misaligned and filtered models on MMLU (about 0.2, against a standard error of 0.004) is.</li>
+<li><strong>Multiple-choice scores depend on answer style.</strong> MMLU and ARC are scored by how likely the model
+finds each answer, under the chat template. A model whose replies drift away from short, direct answers can lose
+points without losing knowledge. The generation tasks (GSM8K and IFEval) fall much less, which points this way. Some
+of the MMLU drop may therefore be style rather than knowledge. It's still a cost of fine-tuning that filtering
+removes.</li>
+<li><strong>The model before fine-tuning has no broad misalignment score,</strong> so it appears as a reference line
+rather than a point.</li>
+</ul>
+
+<h2 id="setup">Setup and reproducing</h2>
+<ul>
+<li>Benchmarks run with lm-eval-harness on vLLM with the LoRA loaded, under the chat template: MMLU (0-shot,
+accuracy), ARC-Challenge (0-shot, length-normalized accuracy), GSM8K (5-shot, strict exact match) and IFEval (strict
+prompt-level accuracy).</li>
+<li>Code: <code>em_influence/scripts/capability_eval.py</code> and the <code>capability</code> rule in
+<code>workflow/rules/training.smk</code>, on branch <code>brendanlong/input-token-arm</code> of
+SrGonao/em_influence (commit 9eed757).</li>
+<li>Results: <code>results/career/runs/olmo/&lt;run&gt;/seed0/capability.json</code> under
+<code>/mnt/ssd-cluster/brendan/em_influence/rerun-2026-09-30</code> on SPAR. Broad and narrow misalignment, losses
+and coherence come from the same runs' existing evaluations.</li>
+<li>Related report: <a href="https://em-influence-input-mode-ad2a3591.surge.sh/">input-mode token filtering</a>.</li>
+</ul>

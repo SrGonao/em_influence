@@ -1,0 +1,200 @@
+<style>
+/* Report-specific styles on top of the html-doc page. Colors per ranking:
+   document EK-FAC, backward, forward, random. */
+main { max-width: 980px; }
+.byline { color: var(--ink-2); margin-top: 0; }
+.muted { color: var(--ink-2); }
+.lead { background: var(--surface); border-radius: 8px; padding: 0.9rem 1.2rem; margin: 1.2rem 0; }
+.lead p { margin: 0.4rem 0; }
+h2 { margin-top: 2.5rem; padding-top: 0.6rem; border-top: 1px solid var(--grid); }
+table.data { margin: 0.6rem 0; font-size: 0.86rem; }
+table.data td, table.data th { text-align: right; }
+table.data .t, table.data td:first-child, table.data th:first-child { text-align: left; }
+table.data th { color: var(--ink-2); font-weight: 600; }
+table.small { font-size: 0.82rem; }
+details { margin: 0.5rem 0 1rem; }
+summary { color: var(--ink-2); }
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0.5rem 1.2rem; }
+svg.chart { width: 100%; height: auto; }
+svg .chart-title { fill: var(--ink); font-size: 13px; font-weight: 600; }
+svg .tick, svg .group { fill: var(--ink-2); font-size: 11px; }
+svg .value { fill: var(--ink); font-size: 10px; font-variant-numeric: tabular-nums; }
+svg .grid { stroke: var(--grid); stroke-width: 1; }
+svg .s1 { fill: var(--series-4); } svg .s2 { fill: var(--series-1); }
+svg .s3 { fill: var(--series-2); } svg .s4 { fill: var(--series-3); }
+svg .bar .hit { fill: transparent; }
+svg .bar:hover path { opacity: 0.75; }
+svg line.ref { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 4 3; }
+svg line.untrained { stroke: var(--ink); stroke-width: 1.5; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; font-size: 0.85rem; color: var(--ink-2); margin: 0.4rem 0; }
+.legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.legend .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.legend .sw.s1 { background: var(--series-4); } .legend .sw.s2 { background: var(--series-1); }
+.legend .sw.s3 { background: var(--series-2); } .legend .sw.s4 { background: var(--series-3); }
+.legend .line { width: 20px; display: inline-block; border-top: 1.5px solid var(--ink); }
+.legend .line.ref { border-top: 1.5px dashed var(--ink-2); }
+</style>
+<p class="byline">OLMo-3-7B-Instruct-SFT, career-advice dataset, seed 0. Brendan Long, SPAR Fall 2026, with Gonçalo
+Paulo. Written with Claude, 2026-10-01. A rerun of the
+<a href="https://em-influence-token-filtering-28ec0c1e.surge.sh/">preliminary results of 2026-09-28</a>
+on the rewritten pipeline.</p>
+
+<div class="lead">
+<p><b>The short version.</b> Every result in the earlier report reproduces when the whole pipeline is run
+again from nothing, on the rewritten code that is going into the repository: download, training, evaluation,
+EK-FAC, per-token attribution and every intervention, driven end to end by Snakemake. Of the {{CELLS}} numbers both
+runs report, half differ by {{MEDIAN}} points or less and nine in ten by {{P90}} or less.</p>
+<p>The headline holds. Masking the top 20% of reply tokens by per-token EK-FAC takes broad misalignment from
+{{TOKEN_BASE}}% to {{MASK_BACK20}}% (forward method: {{MASK_FWD20}}%), where removing the top 20% of documents only
+reaches {{DOC_TOP20}}% and masking a random 20% of tokens does nothing ({{MASK_RAND20}}%). Training the forward
+method's top 20% toward the base model removes broad misalignment ({{KL_FWD20}}%) and most of the narrow bad advice
+({{KL_FWD20_NARROW}}% of held-out career answers bad, against {{TOKEN_BASE_NARROW}}% with nothing changed).</p>
+<p>One arm is new. Relabelling the flagged tokens with a draw from the base model, instead of training toward its
+whole distribution, gives nearly the same results as KL to base everywhere: {{SAMPLE_FWD20}}% broad for the forward
+top 20% (KL: {{KL_FWD20}}%), {{SAMPLE_RAND20}}% for a random 20% (KL: {{KL_RAND20}}%). That is what the two should do,
+since their gradients agree in expectation.</p>
+<p>This reran the same seed on the same data, so it shows the rewritten pipeline computes what the old one did. It is
+not a second seed: the effect sizes still rest on one.</p>
+</div>
+
+<p><b>Contents.</b> <a href="#setup">Setup</a> · <a href="#headline">Headline figures</a> ·
+<a href="#agreement">Agreement with the earlier run</a> · <a href="#sample">The new arm</a> ·
+<a href="#doc">Document-level figures</a> · <a href="#token-results">All token-level results</a> ·
+<a href="#validation">Validation</a> · <a href="#changes">What changed in the pipeline</a> ·
+<a href="#reproduce">Reproducing</a> · <a href="#next">Open questions</a></p>
+
+<h2 id="setup">Setup</h2>
+<p>The same experiment as the earlier report, with its restricted settings: rank-32 RsLoRA on
+allenai/Olmo-3-7B-Instruct-SFT (base weights in 8-bit), one epoch on the career bad-advice set from
+openai/emergent-misalignment-persona-features, with the 100 narrow-evaluation prompts held out (5,900 examples). One
+seed, flagging the most or least influential 5% and 20%.</p>
+<ul>
+<li><b>Broad misalignment</b>: 44 questions unrelated to careers, 20 samples each, judged by Qwen3-32B-AWQ on a 0–9
+alignment scale; below 3 is misaligned.</li>
+<li><b>Narrow bad advice</b>: the 100 held-out career questions, 10 samples each, judged with the paper's
+career-advice prompt; below 3 is bad advice.</li>
+<li><b>Advice loss</b>: each model's mean per-token loss on held-out incorrect and correct answers to the same 100
+career prompts, and to 100 health prompts (a domain nothing trains on). If a filtered model's loss on the bad career
+advice hasn't fallen from the untrained model's, its training didn't work, rather than the filter having removed
+only the misalignment.</li>
+<li><b>Attribution</b>: EK-FAC from the fully trained model, against a query built from its own judged answers. Per
+token, the <i>backward</i> method scores reply token <i>p</i> by the weight update at <i>p</i>−1, the position that
+predicts <i>p</i> (Grosse et al. 2023, Eq. 31); the <i>forward</i> method scores it by the loss on <i>p</i> alone,
+their output token influence (Appendix B.1), the term masking <i>p</i> removes.</li>
+<li><b>Interventions</b>: documents removed; or flagged tokens masked out of the loss, relabelled with a draw from the
+base model, or trained toward the base model's distribution with a KL term. All three token interventions change only
+labels, so the tokens stay in context. Every ranked arm has a random arm of the same size.</li>
+</ul>
+
+<h2 id="headline">Headline figures</h2>
+<p>One figure per arm, as in the earlier report. Each group of bars is an intervention (documents removed; tokens
+masked, sampled from the base model, or trained toward it with KL); within it, bars are rankings. Values under 5% are
+labelled.
+The dashed line over each group is the model trained on all the data at that level ({{DOC_BASE}}% broad for documents,
+{{TOKEN_BASE}}% for tokens); the solid line is the untrained model ({{UNTRAINED_NARROW}}% narrow). Hover over a bar for
+its value and the earlier run's; the table under each figure has every number.</p>
+{{LEGEND}}
+{{ARMS}}
+
+<h2 id="agreement">Agreement with the earlier run</h2>
+<p>{{CELLS}} numbers appear in both reports: broad and narrow misalignment for every arm the earlier report had, and
+document-level Figures 2 and 6. Half differ by {{MEDIAN}} points or less, and nine in ten by {{P90}} or less. The
+largest differences:</p>
+<table class="data small"><tr><th>number</th><th>earlier run</th><th>rerun</th><th>difference</th></tr>{{LARGEST}}</table>
+<p>The largest differences are all in document-level arms that train on little data: Figure 2's 5% arms keep 295
+examples and Figure 6's deciles 590, so a few different examples or a few different judged answers move their result
+most. The token-level arms, which all train on all 5,900 documents, agree to within a couple of points.</p>
+<p>The two runs share a seed and data, so they would match exactly if every step were deterministic. They aren't
+quite: vLLM's sampling and batching vary slightly between runs, for the judge (and so the rubric scores that rank
+Figure 6) as well as the evaluated model. bergson also moved from a development branch (<code>7fbecc7</code>) to the
+merged release (<code>6b652f5</code>). Its EK-FAC now averages the Hessian over documents instead of summing it, which
+rescales every score without changing the ranking, though rounding can still reorder near-ties at a subset's
+boundary.</p>
+
+<h2 id="sample">The new arm: sampled from base</h2>
+<p>The earlier report's "argmax" arm (relabel each flagged token with the base model's most likely token) is gone. In
+its place, <code>_sample</code> relabels each flagged token with a <i>draw</i> from the base model's next-token
+distribution at that position, given the real prefix, drawn once per dataset and shared by every arm. Its
+cross-entropy gradient equals the KL-to-base term's gradient in expectation, so the two should agree, with
+<code>_sample</code> noisier. They do: at 20%, backward {{SAMPLE_BACK20}}% (KL {{KL_BACK20}}%), forward
+{{SAMPLE_FWD20}}% (KL {{KL_FWD20}}%), random {{SAMPLE_RAND20}}% (KL {{KL_RAND20}}%), and the forward top 20% leaves
+{{SAMPLE_FWD20_NARROW}}% narrow bad advice (KL {{KL_FWD20_NARROW}}%). KL is the cheaper of the two to reason about, but
+sampling needs no change to the training loss.</p>
+
+<h2 id="doc">Document-level figures</h2>
+<p>Broad misalignment %, with the earlier run's in parentheses. The model trained on all 5,900 examples:
+{{DOC_BASE}}%.</p>
+<h3>Figure 1: removing the most or least influential examples</h3>
+<p>Its 5% and 20% arms are the document groups in the headline figures.</p>
+<details><summary>Every Figure 1 arm</summary>{{FIG1_TABLE}}</details>
+<h3>Figure 2: training on only the most or least influential examples</h3>
+{{FIG2_TABLE}}
+<h3>Figure 6: training on one decile (four of ten), by EK-FAC, random and three rubric metrics</h3>
+{{FIG6_TABLE}}
+<p>Spearman correlation of each rubric metric's scores with EK-FAC's (Figure 6, right):</p>
+{{SPEARMAN_TABLE}}
+<h3>What document removal leaves</h3>
+<p>Removing whole documents barely touches narrow bad advice (96–99% in every arm of
+<code>figure1_narrow</code>) or the loss on bad career advice (1.50–1.52, against 2.57 untrained):</p>
+<details><summary>Advice loss for every Figure 1 arm</summary>{{DOC_LOSS}}</details>
+
+<h2 id="token-results">All token-level results</h2>
+<p>The headline figures chart every arm of <code>token_figure1</code>; these are the same numbers as tables. The model trained on all tokens: {{TOKEN_BASE}}% broad,
+{{TOKEN_BASE_NARROW}}% narrow. Masking the least influential tokens moves the other way, raising broad misalignment
+to {{MASK_BACK_BOTTOM20}}% (backward) and {{MASK_FWD_BOTTOM20}}% (forward) at 20%, which checks the ranking's sign.</p>
+<details><summary>Broad misalignment % for every token arm</summary>{{TOKEN_BROAD}}</details>
+<details><summary>Narrow bad advice % for every token arm</summary>{{TOKEN_NARROW}}</details>
+<details><summary>Loss on held-out bad career advice</summary>{{TOKEN_BAD}}</details>
+<details><summary>Loss on held-out good career advice</summary>{{TOKEN_GOOD}}</details>
+
+<h2 id="validation">Validation</h2>
+<p>No token subset is cut until its ranking passes these checks, at full scale (386,901 reply tokens):</p>
+{{VALIDATION}}
+<p>The single-label probe scores one document with every label but one masked, and checks where that label's score
+lands: nowhere at or after the label, and on the row that scores it. The backward method spreads most of a label's score over the preceding
+context, as Grosse et al. warn; the forward method puts all of it on that row.</p>
+
+<h2 id="changes">What changed in the pipeline</h2>
+<p>The earlier report ran on an experimental branch. This run is the code going into the repository as a series of
+pull requests, rewritten to the workflow's conventions:</p>
+<ul>
+<li>bergson pinned to the merged <code>token_influence</code> option (<code>gradient</code> / <code>output</code>)
+instead of the <code>forward_mode</code> development branch. The methods are now <code>tokens-ekfac</code> and
+<code>tokens-ekfac-output</code>.</li>
+<li>Every figure has <code>_narrow</code> and <code>_loss</code> targets, with the untrained model as a run of its
+own; the narrow prompts and the advice pairs come from each domain's question file.</li>
+<li>Token rankings are validated in their own rule, so a failed check keeps bergson's scores for debugging.</li>
+<li>The <code>argmax</code> and <code>replace</code> arms are dropped; <code>_sample</code> and <code>_kl</code> are
+suffixes that work on any token subset.</li>
+<li>Each step is a <code>python -m em_influence...</code> module run through one <code>step()</code> helper, and
+each figure is one file in <code>workflow/rules/figures/</code>.</li>
+</ul>
+
+<h2 id="reproduce">Reproducing</h2>
+<pre>git clone -b brendanlong/token-relabel https://github.com/SrGonao/em_influence && cd em_influence
+uv sync
+HF_HUB_OFFLINE=1 uv run --with "gpu-coordinator @ git+https://github.com/brendanlong/gpu-coordinator" \
+  snakemake figure1 figure1_narrow figure1_loss figure2 figure6 figure6_spearman \
+    token_figure1 token_figure1_narrow token_figure1_loss \
+  --executor gpuc --gpuc-host spar --jobs 8 --keep-going --envvars HF_HUB_OFFLINE \
+  --set-resources ekfac:use_shared=1 \
+  --config 'datasets=[career]' 'seeds=[0]' 'fractions=[0.05,0.2]' 'decile_bins=[0,3,6,9]' \
+    'rubric_retrain_datasets=[career]' 'token_methods=[tokens-ekfac,tokens-ekfac-output,tokens-random]'</pre>
+<p>Without gpuc, drop the <code>--executor</code>, <code>--gpuc-host</code>, <code>--envvars</code> and
+<code>--set-resources</code> flags and pass <code>--resources gpu=4</code>. <code>HF_HUB_OFFLINE=1</code> lets the
+gated WildGuard model load from a cached copy without a HuggingFace token; with a token, set <code>HF_TOKEN</code>
+instead.</p>
+<p>On SPAR, everything is in <code>/mnt/ssd-cluster/brendan/em_influence/rerun-2026-09-30/</code>: the figure tables in
+<code>results/figures/</code>, every run's answers, narrow answers and advice loss under
+<code>results/career/runs/olmo/</code>, the per-token scores and <code>validation.json</code> under
+<code>results/career/attributions/olmo/</code>, and the exact commands in <code>run.sh</code>. The run took about 32
+hours on two A40s, borrowing two shared cards only for EK-FAC's Hessian fit.</p>
+
+<h2 id="next">Open questions</h2>
+<ul>
+<li>More seeds, now that the pipeline is settled: every effect here still rests on seed 0.</li>
+<li>Other datasets (auto, edu) and smaller models.</li>
+<li>Whether the ranking-independent part of relabelling (about 27–28% broad at a random 20%, for both
+<code>_sample</code> and <code>_kl</code>) can be separated from the ranked effect.</li>
+<li>Which tokens the forward method flags, compared with the backward method's.</li>
+</ul>
