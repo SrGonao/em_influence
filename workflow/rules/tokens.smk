@@ -90,8 +90,7 @@ rule validate_tokens_ekfac:
         min_label_share=min_label_share,
         precision=config["ekfac_precision"],
         tokens=config["token_score_batch_size"],
-        # A bf16 model rounds each token's score.
-        tolerance=1e-3 if config["ekfac_precision"] == "fp32" else 1e-2,
+        tolerance=sum_tolerance,
     shell:
         step(
             "python -m em_influence.scripts.validate_token_attribution --token-run {input.scores}"

@@ -115,11 +115,21 @@ def token_score_batch_size(wildcards):
     return config["token_score_batch_size"]
 
 
+def token_validation(wildcards, key, default):
+    """A token_validation override for the ranking's source model, if config sets one."""
+    return config.get("token_validation", {}).get(wildcards.source, {}).get(key, default)
+
+
 def min_label_share(wildcards):
     """How much of one label's score must land on the row that scores it. Output
     influence puts it all there; the gradient spreads it back over the context,
     about 10% landing on that row across all LoRA modules."""
-    return 0.99 if token_influence(wildcards) == "output" else 0.01
+    return token_validation(wildcards, "min_label_share", 0.99 if token_influence(wildcards) == "output" else 0.01)
+
+
+def sum_tolerance(wildcards):
+    """How closely each document's token scores must sum to its ekfac score. A bf16 model rounds each token's score."""
+    return token_validation(wildcards, "sum_tolerance", 1e-3 if config["ekfac_precision"] == "fp32" else 1e-2)
 
 
 def attribution_query(wildcards):

@@ -105,6 +105,18 @@ properties:
     type: integer
     minimum: 1
     description: Passes over groups of modules in EK-FAC's Hessian fit.
+  token_validation:
+    type: object
+    description: >-
+      Per reference model, looser checks for validate_tokens_ekfac where a model's scores fall short of
+      defaults tuned on OLMo; e.g. {qwen2.5-7b: {min_label_share: 0.004}}. sum_tolerance is the largest
+      allowed gap between a document's token sum and its ekfac score, as a fraction of the largest score.
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      properties:
+        sum_tolerance: {type: number, exclusiveMinimum: 0}
+        min_label_share: {type: number, minimum: 0, maximum: 1}
   ekfac_precision:
     enum: [fp32, bf16, fp16]
     description: The model's dtype during EK-FAC.
