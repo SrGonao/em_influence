@@ -344,7 +344,7 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 <h2>Reproduce</h2>
 <ul>
 <li>Runs: the Snakemake pipeline on this branch; token masks are <code>token_subset</code> subsets (<code>remove_decile_k</code>, <code>tilt_t_f</code>, <code>joint_a_b_f</code>, <code>disagree_f</code>, and <code>replace_&lt;selection&gt;_zero</code> for zeroing), document removals are <code>subset</code> subsets of the <code>ekfac</code> and <code>random</code> rankings.</li>
-<li><code>collect.py --results &lt;results dir&gt; --label &lt;name&gt; --output data/runs_&lt;name&gt;.csv</code> on each results directory (here SPAR's and the lab cluster's), then <code>build.py</code>.</li>
+<li><code>collect.py --results &lt;results dir&gt; --label &lt;name&gt; --output data/runs_&lt;name&gt;.csv</code> on each results directory (here the lab cluster's <code>~/em_rerun/results</code>), then <code>build.py</code>.</li>
 <li>Noise reference: EM on 880 answers has a binomial sd of about 1.7 points near 50%; each run is one training seed. The query objective is computed on fixed text.</li>
 </ul>
 
