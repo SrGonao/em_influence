@@ -6,8 +6,8 @@ Three kinds of run are collected from <results>/<dataset>/runs/<source>/<source>
   zero             an input subset that zeroes embeddings (replace_decile_3_zero, ...)
   remove_documents a document subset of a document ranking (remove_decile_3, remove_top_0.2, decile_3, ...)
 Each token run's tokens are recomputed from its ranking with intervene_tokens.flagged_tokens, exactly as the
-pipeline chose them, and summed under the four token scores (output, gradient, exact input, slope input) over the
-tokens each defines. For zeroing runs, `sum_next:<output>` also sums the output score of the label right after each
+pipeline chose them, and summed under the four token scores (output, gradient, exact input, slope input), those the
+results directory has, over the tokens each defines. For zeroing runs, `sum_next:<output>` also sums the output score of the label right after each
 zeroed token. Document runs sum the removed documents' EK-FAC scores.
 
 Run, from the repository root:
@@ -82,9 +82,9 @@ def token_row(attributions: Path, method: str, subset: str, tables, lookups) -> 
                frac=round(len(chosen) / len(ranking["score"]), 4), n_tokens=len(chosen))
     if "reply" in ranking:
         row["n_prompt_tokens"] = int((~ranking["reply"][chosen]).sum())
-    for score in SCORES:
-        row[f"sum:{score}"], row[f"n:{score}"] = lookups[score].sum(query)
-    if intervention == "zero":
+    for score, lookup in lookups.items():
+        row[f"sum:{score}"], row[f"n:{score}"] = lookup.sum(query)
+    if intervention == "zero" and OUTPUT in lookups:
         row[f"sum_next:{OUTPUT}"], row[f"n_next:{OUTPUT}"] = lookups[OUTPUT].sum(query + 1)
     return row
 
@@ -117,8 +117,9 @@ def main():
     root = args.results / args.dataset
     attributions = root / "attributions" / args.source
     runs = root / "runs" / args.source / args.source
-    tables = {score: read_token_scores(attributions / score / "token_scores.npz") for score in SCORES}
-    lookups = {score: Lookup(tables[score]) for score in SCORES}
+    tables = {score: read_token_scores(attributions / score / "token_scores.npz") for score in SCORES
+              if (attributions / score / "token_scores.npz").exists()}
+    lookups = {score: Lookup(table) for score, table in tables.items()}
     document_csv = attributions / DOCUMENT_SCORE / "attributions.csv"
     document_scores = read_attributions(document_csv, sum(1 for _ in document_csv.open()) - 1)
 
@@ -148,6 +149,7 @@ def main():
         print(row["intervention"], method, subset, flush=True)
     table = pd.DataFrame(rows)
     table.insert(0, "results", args.label)
+    table.insert(1, "model", args.source)
     table.to_csv(args.output, index=False)
     print(f"{len(table)} rows to {args.output}")
 

@@ -33,6 +33,8 @@ SIZE_STYLE = {0.02: ("var(--ink-2)", "triangle"), 0.025: ("var(--ink-2)", "trian
               0.9: ("var(--ink)", "diamond")}
 
 runs = pd.concat([pd.read_csv(f) for f in sorted((HERE / "data").glob("runs_*.csv"))], ignore_index=True)
+runs["model"] = runs.get("model", pd.Series("olmo", index=runs.index)).fillna("olmo")
+runs = runs[runs.model == "olmo"]
 runs = runs[(runs.intervention == "none") | ~runs.duplicated(["intervention", "selected_by", "subset", "frac"])]
 base = {(r.results, r.baseline): r for r in runs[runs.intervention == "none"].itertuples()}
 runs = runs[runs.intervention != "none"].copy()
@@ -198,6 +200,12 @@ def frame_table(frame, xs):
     return table(f.sort_values(["selected_by", "subset"]), cols)
 
 
+RANDOM = tok[tok.selected_by.isin(["tokens-random", "tokens-random-input"])].sort_values(["intervention", "frac"])
+random_table = ("<table class=stats><tr><th>Intervention</th><th>Mask</th><th class=num>fraction</th><th class=num>Δ EM</th><th class=num>Δ query</th></tr>\n"
+                + "\n".join(f"<tr><td>{'masking labels' if r_.intervention == 'mask' else 'zeroing inputs'}</td><td>{r_.subset}</td>"
+                             f"<td class=num>{r_.frac:.1%}</td><td class=num>{r_.dem:+.1f}</td><td class=num>{num(r_.dq, '+.2f')}</td></tr>" for r_ in RANDOM.itertuples())
+                + "</table>")
+
 mask_table = frame_table(MASK, {f"x:{OUT}": "output", f"x:{GRAD}": "gradient"})
 zero_table = frame_table(ZERO, {f"x:{EXACT}": "exact", f"x:{SLOPE}": "slope", "x:next": "next token"})
 size_table = table(pd.concat(SIZE.values()).assign(x=lambda f: f.x).sort_values(["intervention", "frac", "subset"]),
@@ -300,13 +308,15 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 </details>
 
 <h2 id="size">Mask size</h2>
-<p>Runs whose masks cover other fractions of candidates, plotted against the raw summed score (not normalized). Label masking: output-score top 2.5%, top and bottom 5% and 20%, and keep-one-decile (90% masked), plus random masks. Zeroing: exact-score tilted masks at 5%, 10% and 20%. Runs that vary size at fixed score and score at fixed size, up to 40%, are in progress.</p>
+<p>Runs whose masks cover other fractions of candidates, plotted against the raw summed score (not normalized). Label masking, picked by the output score: tilted masks at 5%, 10%, 20% and 40%; top and bottom 2%, 5%, 20% and 40%; top 2.5%; keep-one-decile (90% masked). Zeroing, picked by the exact input score: tilted masks at 5%, 10%, 20% and 40%; top 2.5%, 5% and 20%. Random masks at several sizes for both.</p>
 <div class="chart" id="size_mask"></div>
 <figcaption>Label masks picked by the output score, and random masks, at every size.</figcaption>
 <div class="chart" id="size_zero"></div>
 <figcaption>Zeroing masks picked by the exact input score, at every size.</figcaption>
 <p>Least-squares slope of the change in EM per million of summed score, over the six tilted masks at each size: {'; '.join(f'{NAME[OUT if k == "size_mask" else EXACT]} score, {"masking" if k == "size_mask" else "zeroing"}, {fr:.0%}: {-v:.3f}' for (k, fr), v in sorted(SIZE_SLOPE.items()))}.</p>
 
+<h3>Random masks</h3>
+{random_table}
 <h3>Size models</h3>
 <p>Every run of the intervention with a summed score, at any size and picked any way, fitted three ways against the change in EM and the change in logit EM (log odds, EM clipped to 0.5–99.5%): the raw summed score <i>S</i>; <i>(S − f·S<sub>all</sub>)/(1 − f)</i>, where <i>f</i> is the fraction of candidates removed and <i>S</i><sub>all</sub> the score summed over all candidates (the training loss is normalized by the number of supervised tokens, so masking a fraction <i>f</i> scales the remaining tokens' weight by 1/(1 − <i>f</i>)); and <i>(S − c·f·S<sub>all</sub>)/(1 − f)<sup>α</sup></i> with <i>c</i> (−1 to 4) and <i>α</i> (0 to 1.5) chosen by grid search for the smallest RMSE; the slope and intercept are least-squares in every model. The second table gives the least-squares slope against the raw sum within each size.</p>
 <h4>Masking labels, output score</h4>
