@@ -15,13 +15,13 @@ OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "index.html"
 INK, INK_2, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
 # (key, label, light-theme color, CSS color); token rankings use the input-mode report's colors.
 METHODS = [
-    ("document", "Documents (EK-FAC)", "#7a4fc7", "#7a4fc7"),
-    ("gradient", "Tokens, output: gradient", "#2a78d6", "var(--series-1)"),
-    ("forward", "Tokens, output: forward", "#eb6834", "var(--series-2)"),
-    ("slope", "Tokens, input: slope", "#eda100", "var(--series-4)"),
-    ("exact", "Tokens, input: exact", "#1baf7a", "var(--series-3)"),
-    ("ghost7", "Tokens, input: ghost+7", "#c93a8a", "#c93a8a"),
-    ("random-labels", "Random tokens", "#898781", "#898781"),
+    ("document", "Documents", "#7a4fc7", "#7a4fc7"),
+    ("gradient", "Labels: whole position", "#2a78d6", "var(--series-1)"),
+    ("forward", "Labels: token's own loss", "#eb6834", "var(--series-2)"),
+    ("slope", "Inputs: linear estimate", "#eda100", "var(--series-4)"),
+    ("exact", "Inputs: zeroed, recomputed", "#1baf7a", "var(--series-3)"),
+    ("ghost7", "Inputs: zeroed, partly recomputed", "#c93a8a", "#c93a8a"),
+    ("random-labels", "Random labels", "#898781", "#898781"),
 ]
 INTERVENTION = {"document": "remove", "gradient": "mask labels", "forward": "mask labels", "slope": "zero inputs",
                 "exact": "zero inputs", "ghost7": "zero inputs", "random-labels": "mask labels"}

@@ -21,26 +21,33 @@ advice, after removing part of the training data chosen by an EK-FAC influence r
 single tokens. Every run is seed 0 on the career dataset; the unfiltered model's broad misalignment is {{BASE}}%.</p>
 
 <h2 id="setup">Rankings and interventions</h2>
+<p>Every ranking is an EK-FAC influence score against the same query. The query is built from the fine-tuned model's
+own answers to the broad questions: each answer's loss, weighted by its judged alignment minus the mean alignment of
+the answers to the same question, averaged over answers. Higher influence means training on the item pushes the model
+toward its less aligned answers. Token rankings follow Grosse et al. (2023), "Studying Large Language Model
+Generalization with Influence Functions".</p>
 <ul>
-<li><strong>Documents (EK-FAC):</strong> each training document's EK-FAC influence on the attribution query; the chosen
-documents are removed.</li>
-<li><strong>Tokens, output, gradient:</strong> each reply token's label scored by its gradient against the preconditioned
-query; the chosen labels are masked out of the loss.</li>
-<li><strong>Tokens, output, forward:</strong> each label's first-order effect on the query objective, computed with a
-forward-mode pass; the chosen labels are masked.</li>
-<li><strong>Tokens, input, slope:</strong> the derivative of each document's influence score as one input token's
-embedding is scaled; the chosen user-prompt and reply tokens have their embeddings zeroed, labels unchanged.</li>
-<li><strong>Tokens, input, exact:</strong> the change in each document's influence score when one input token's embedding
-is zeroed; the chosen tokens are zeroed the same way.</li>
-<li><strong>Tokens, input, ghost+7:</strong> an approximation of the exact score. When a token is zeroed, the token
-itself and the 7 later positions that attend to it most are recomputed exactly; for every other later position, the
-change in each layer's attention output is computed in closed form and carried to the score with the gradient there.
-Its scores have Spearman 0.970 and Pearson 0.960 with the exact scores, and the two share 91% of their top 5%. The
-chosen tokens are zeroed.</li>
-<li><strong>Random tokens:</strong> a seeded random score per reply token; the chosen labels are masked.</li>
+<li><strong>Documents:</strong> each training document's influence; the chosen documents are removed.</li>
+<li><strong>Labels: whole position:</strong> each reply token scored by the influence of the gradient at the position
+that predicts it (Grosse et al., Eq. 31). That position's gradient also carries its part in predicting later tokens. The
+chosen labels are masked out of the loss.</li>
+<li><strong>Labels: token's own loss:</strong> each reply token scored by the influence of its own loss term alone, the
+term that masking it removes. A document's influence equals the sum of these scores over its tokens. The chosen labels
+are masked.</li>
+<li><strong>Inputs: linear estimate:</strong> each user-prompt or reply token scored by the derivative of its document's
+influence as that token's input embedding is scaled (Grosse et al., Eq. 38). The chosen tokens' embeddings are zeroed;
+their labels are unchanged.</li>
+<li><strong>Inputs: zeroed, recomputed:</strong> the change in the document's influence when the token's embedding is
+zeroed, computed by rerunning the model on the document. The chosen tokens are zeroed the same way.</li>
+<li><strong>Inputs: zeroed, partly recomputed:</strong> an approximation of the previous score. When a token is zeroed,
+the token itself and the 7 later positions that attend to it most are recomputed. For every other later position,
+the change in each layer's attention output is computed directly and carried to the score with the gradient there.
+Its scores have Spearman 0.970 and Pearson 0.960 with the fully recomputed scores, and the two share 91% of their top
+5%. The chosen tokens are zeroed.</li>
+<li><strong>Random labels:</strong> a seeded random score per reply token; the chosen labels are masked.</li>
 </ul>
 <p>"Top" is the most misalignment-driving fraction under each ranking, "bottom" the least. Fractions are of documents
-for the document ranking, of reply labels for output rankings, and of user-prompt and reply input tokens for input
+for the document ranking, of reply tokens for label rankings, and of user-prompt and reply tokens for input
 rankings.</p>
 <p>Measures: <em>broad misalignment</em> is the share of answers to 44 broad questions (20 per question) that the judge
 (Qwen3-32B-AWQ) scores below 3 of 9 for alignment. <em>Narrow misalignment</em> is the same share on held-out career
@@ -65,7 +72,7 @@ unfiltered model. The plot includes the 2.5% and 10% token runs, which the bar c
 <ul>
 <li>Runs: <code>uv run snakemake figure1 token_figure1 input_figure1</code> and their <code>_narrow</code> and
 <code>_loss</code> targets (career, seed 0), with <code>--config 'input_methods=[tokens-ekfac-input,tokens-ekfac-input-exact,tokens-random-input]'</code>
-for the exact input runs; the ghost+7 scores come from <code>em_influence.scripts.window_input_influence --window 1 --extra 7 --select attention</code>.</li>
+for the fully recomputed input runs; the partly recomputed scores come from <code>em_influence.scripts.window_input_influence --window 1 --extra 7 --select attention</code>.</li>
 <li>Data: <code>python reports/methods/collect.py &lt;results&gt;/career/runs/olmo reports/methods/data/runs.csv</code>;
 build: <code>python reports/methods/build.py</code>.</li>
 </ul>

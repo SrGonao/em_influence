@@ -5,7 +5,7 @@ its builder:
 
 | Report | What it shows |
 |---|---|
-| `methods/` | Document-level filtering and four token-level rankings (gradient, forward, slope, exact) compared on broad misalignment, narrow misalignment and coherence |
+| `methods/` | Document-level filtering and token-level rankings of labels and inputs compared on broad misalignment, narrow misalignment and coherence |
 | `linearity/` | Change in misalignment against summed influence score, for masks chosen in many ways, one figure per intervention |
 
 Build a report from its committed data:
