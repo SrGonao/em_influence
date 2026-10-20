@@ -1,4 +1,4 @@
-"""Build the methods report: document-level and four token-level influence rankings compared on broad
+"""Build the methods report: document-level and token-level influence rankings compared on broad
 misalignment, narrow misalignment and coherence.
 
     python reports/methods/build.py [output.html]   (default: reports/methods/index.html)
@@ -20,10 +20,11 @@ METHODS = [
     ("forward", "Tokens, output: forward", "#eb6834", "var(--series-2)"),
     ("slope", "Tokens, input: slope", "#eda100", "var(--series-4)"),
     ("exact", "Tokens, input: exact", "#1baf7a", "var(--series-3)"),
+    ("ghost7", "Tokens, input: ghost+7", "#c93a8a", "#c93a8a"),
     ("random-labels", "Random tokens", "#898781", "#898781"),
 ]
 INTERVENTION = {"document": "remove", "gradient": "mask labels", "forward": "mask labels", "slope": "zero inputs",
-                "exact": "zero inputs", "random-labels": "mask labels"}
+                "exact": "zero inputs", "ghost7": "zero inputs", "random-labels": "mask labels"}
 CONDITIONS = [("top", "0.05", "Top 5%"), ("top", "0.2", "Top 20%"), ("bottom", "0.05", "Bottom 5%"), ("bottom", "0.2", "Bottom 20%")]
 
 runs = pd.read_csv(HERE / "data" / "runs.csv")
@@ -143,7 +144,7 @@ def f(method, side, fraction, column="broad_rate"):
 
 numbers = {"BASE": f"{baseline('broad_rate'):.1f}", "BASE_N": f"{baseline('narrow_rate'):.1f}",
            "BASE_COH": f"{baseline('broad_coherence'):.2f}"}
-for m in ("document", "gradient", "forward", "slope", "exact", "random-labels"):
+for m in ("document", "gradient", "forward", "slope", "exact", "ghost7", "random-labels"):
     k = m.split("-")[0].upper()
     numbers.update({f"{k}_T5": f(m, "top", "0.05"), f"{k}_T20": f(m, "top", "0.2"), f"{k}_B20": f(m, "bottom", "0.2"),
                     f"{k}_T20_N": f(m, "top", "0.2", "narrow_rate"), f"{k}_T5_N": f(m, "top", "0.05", "narrow_rate"),

@@ -20,6 +20,7 @@ METHODS = [
     ("forward", "olmo/tokens-ekfac-output", "remove_{side}_{f}"),
     ("slope", "olmo/tokens-ekfac-input", "replace_{side}_{f}_zero"),
     ("exact", "olmo/tokens-ekfac-input-exact", "replace_{side}_{f}_zero"),
+    ("ghost7", "olmo/tokens-ekfac-input-ghost7", "replace_{side}_{f}_zero"),
     ("random-labels", "olmo/tokens-random", "remove_{side}_{f}"),
     ("random-inputs", "olmo/tokens-random-input", "replace_{side}_{f}_zero"),
 ]
