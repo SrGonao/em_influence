@@ -16,8 +16,8 @@ INK, INK_2, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
 # (key, label, light-theme color, CSS color); token rankings use the input-mode report's colors.
 METHODS = [
     ("document", "Documents", "#7a4fc7", "#7a4fc7"),
-    ("gradient", "Labels: whole position", "#2a78d6", "var(--series-1)"),
-    ("forward", "Labels: token's own loss", "#eb6834", "var(--series-2)"),
+    ("gradient", "Labels: gradient mode", "#2a78d6", "var(--series-1)"),
+    ("forward", "Labels: output mode", "#eb6834", "var(--series-2)"),
     ("slope", "Inputs: linear estimate", "#eda100", "var(--series-4)"),
     ("exact", "Inputs: zeroed, recomputed", "#1baf7a", "var(--series-3)"),
     ("ghost7", "Inputs: zeroed, partly recomputed", "#c93a8a", "#c93a8a"),

@@ -28,10 +28,10 @@ toward its less aligned answers. Token rankings follow Grosse et al. (2023), "St
 Generalization with Influence Functions".</p>
 <ul>
 <li><strong>Documents:</strong> each training document's influence; the chosen documents are removed.</li>
-<li><strong>Labels: whole position:</strong> each reply token scored by the influence of the gradient at the position
+<li><strong>Labels: gradient mode</strong> (backward mode): each reply token scored by the influence of the gradient at the position
 that predicts it (Grosse et al., Eq. 31). That position's gradient also carries its part in predicting later tokens. The
 chosen labels are masked out of the loss.</li>
-<li><strong>Labels: token's own loss:</strong> each reply token scored by the influence of its own loss term alone, the
+<li><strong>Labels: output mode</strong> (forward mode): each reply token scored by the influence of its own loss term alone, the
 term that masking it removes. A document's influence equals the sum of these scores over its tokens. The chosen labels
 are masked.</li>
 <li><strong>Inputs: linear estimate:</strong> each user-prompt or reply token scored by the derivative of its document's
