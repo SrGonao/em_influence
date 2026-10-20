@@ -1,9 +1,11 @@
 """Build the linearity report from data/runs_*.csv, collect.py's output for each results directory. A run found in
 more than one results directory is taken from the first file in name order.
 Run, from the repository root:
-    uv run --no-project --with pandas --with numpy python reports/linearity/build.py [output.html]
+    uv run --no-project --with pandas --with numpy --with matplotlib python reports/linearity/build.py [output.html]
     (default: reports/linearity/index.html)"""
+import base64
 import html
+import io
 import json
 import sys
 from pathlib import Path
@@ -330,6 +332,43 @@ def other_section(key, v):
 
 
 MODEL_NAME = {"olmo": "OLMo 3 7B"} | {k: v[0] for k, v in MODELS.items()}
+def density_figure(panel, linthresh=None):
+    """One row of panels, one per model pair: filled highest-density regions and the points outside them, as a PNG data URI."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    d = np.load(HERE / "data/cross_model_density.npz")
+    pairs = [k.split("|")[1:3] for k in d.files if k.startswith(f"{panel}|") and k.endswith("|grid")]
+    mass = d["mass"]
+    fig, axes = plt.subplots(1, len(pairs), figsize=(4.2 * len(pairs), 4.2), constrained_layout=True)
+    shades = ["#08306b", "#2171b5", "#6baed6", "#c6dbef"]
+    for ax, (a, b) in zip(np.atleast_1d(axes), pairs):
+        key = f"{panel}|{a}|{b}"
+        grid, levels, pts = d[f"{key}|grid"], d[f"{key}|levels"], d[f"{key}|points"]
+        xc = (d[f"{key}|xedges"][:-1] + d[f"{key}|xedges"][1:]) / 2
+        yc = (d[f"{key}|yedges"][:-1] + d[f"{key}|yedges"][1:]) / 2
+        bounds = list(levels[::-1]) + [grid.max() * 1.01]
+        ax.contourf(xc, yc, grid.T, levels=bounds, colors=shades[::-1])
+        ax.scatter(pts[:, 0], pts[:, 1], s=2, c="#555555", linewidths=0)
+        ax.set_xlabel(MODEL_NAME[a]); ax.set_ylabel(MODEL_NAME[b])
+        if panel == "pct":
+            for v in (0.95,):
+                ax.axvline(v, color="#d62728", lw=0.8); ax.axhline(v, color="#d62728", lw=0.8)
+            ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+        else:
+            lim = d[f"{key}|xedges"][-1]
+            ticks = [t for t in range(-int(lim), int(lim) + 1)]
+            label = lambda t: "0" if t == 0 else f"{'−' if t < 0 else ''}{float(linthresh) * 10 ** (abs(t) - 1):.0e}".replace("e+0", "e")
+            ax.set_xticks(ticks, [label(t) for t in ticks], fontsize=7); ax.set_yticks(ticks, [label(t) for t in ticks], fontsize=7)
+            ax.axhline(0, color="#999999", lw=0.5); ax.axvline(0, color="#999999", lw=0.5)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in shades] + [plt.Line2D([], [], ls="", marker="o", ms=3, color="#555555")]
+    fig.legend(handles, [f"densest {m:.1%}".replace(".0%", "%") for m in mass] + ["remaining 0.1%, as points"], loc="outside lower center", ncol=5, fontsize=8, frameon=False)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130)
+    plt.close(fig)
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
 cross_html = ""
 if (HERE / "data/cross_model.json").exists():
     cm = json.loads((HERE / "data/cross_model.json").read_text())
@@ -338,6 +377,29 @@ if (HERE / "data/cross_model.json").exists():
                            f"<td class=num>{d['pearson']:.3f}</td><td class=num>{d['top5_overlap']:.2f}</td></tr>" for d in cm["words"])
     doc_rows = "\n".join(f"<tr><td>{pair(d)}</td><td>{'EK-FAC document score' if d['score'] == 'ekfac' else d['score']}</td><td class=num>{d['n']:,}</td>"
                           f"<td class=num>{d['spearman']:.3f}</td><td class=num>{d['pearson']:.3f}</td></tr>" for d in cm["documents"])
+    density_html = ""
+    if (HERE / "data/cross_model_density.npz").exists() and "three_way" in cm:
+        tw = cm["three_way"]
+        neg = ", ".join(f"{MODEL_NAME[m]} {v:.2f}" for m, v in tw["negative_share"].items())
+        pair_rows = "\n".join(f"<tr><td>{pair(d)}</td><td class=num>{d['sign_agreement']:.1%}</td><td class=num>{d['spearman']:.3f}</td>"
+                               f"<td class=num>{d['abs_spearman']:.3f}</td></tr>" for d in cm["pairs"])
+        gap_rows = "\n".join(f"<tr><td>{g['label']}</td><td class=num>{g['words']:,}</td><td class=num>{g['mean_gap']:.2f}</td></tr>"
+                              for g in cm["percentile_gap_by_tokens"])
+        linthresh = int(np.load(HERE / "data/cross_model_density.npz")["linthresh"])
+        density_html = f"""<p>Scatter plots below use the {tw['words']:,} words of the {tw['documents']:,} replies that decode identically under all three tokenizers. Each panel is drawn as highest-density regions: a 2-D histogram (200 bins per axis for raw scores, 100 for percentiles), smoothed with a Gaussian of one bin, with filled regions enclosing the densest 50%, 90%, 99% and 99.9% of words, and the remaining 0.1% drawn as points.</p>
+<p><b>Raw word scores</b>, on symmetric-log axes: linear within ±{linthresh}, logarithmic beyond.</p>
+<img alt="Highest-density regions of one model's word scores against another's, symmetric-log axes, one panel per model pair" src="{density_figure('raw', linthresh)}" style="width:100%">
+<p><b>Percentile ranks</b>: each model's words ranked from 0 to 1; red lines mark each model's top 5%.</p>
+<img alt="Highest-density regions of one model's word percentile ranks against another's, one panel per model pair" src="{density_figure('pct')}" style="width:100%">
+<p class=note>Reading the percentile panel: ranking stretches the many words with near-zero scores over most of each axis and squashes the extremes, and every row and column holds the same number of words, so the panel shows how the rankings relate rather than where the scores fall. Each model's zero score sits at its share of negative words: {neg}.</p>
+<table class=stats><tr><th>Models</th><th class=num>same sign (nonzero words)</th><th class=num>Spearman, signed</th><th class=num>Spearman, |score|</th></tr>
+{pair_rows}
+</table>
+<p>Mean gap between the highest and lowest of the three models' percentile ranks for a word, by the number of tokens in the word (OLMo's tokenizer; the three tokenizers split all but {tw['split_differs']} words identically):</p>
+<table class=stats><tr><th>tokens per word</th><th class=num>words</th><th class=num>mean percentile gap</th></tr>
+{gap_rows}
+</table>
+"""
     cross_html = f"""<h3 id="cross-model">Agreement between models' scores</h3>
 <p>Words: each model's output-mode token scores summed over the whitespace-delimited words of each reply, each token assigned to the word its decoded text starts in. Each pair is compared on the words of replies that decode to the same text under both models' tokenizers. Top-5% overlap: the share of one model's top 5% of words that are also in the other's.</p>
 <table class=stats><tr><th>Models</th><th class=num>replies</th><th class=num>words</th><th class=num>Spearman</th><th class=num>Pearson</th><th class=num>top-5% overlap</th></tr>
@@ -347,7 +409,8 @@ if (HERE / "data/cross_model.json").exists():
 <table class=stats><tr><th>Models</th><th>Score</th><th class=num>documents</th><th class=num>Spearman</th><th class=num>Pearson</th></tr>
 {doc_rows}
 </table>
-<p class=note>Script: <code>cross_model.py</code>, writing <code>data/cross_model.json</code>.</p>
+{density_html}
+<p class=note>Script: <code>cross_model.py</code>, writing <code>data/cross_model.json</code> and <code>data/cross_model_density.npz</code>.</p>
 """
 
 other_html = ""

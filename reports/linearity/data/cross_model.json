@@ -77,5 +77,58 @@
    "pearson": 0.5855310550636993,
    "top5_overlap": 0.46467214568674986
   }
+ ],
+ "three_way": {
+  "documents": 5900,
+  "words": 338248,
+  "negative_share": {
+   "olmo": 0.5109741964475769,
+   "qwen2.5-7b": 0.5999946784607744,
+   "llama3.1-8b": 0.45960064804522127
+  },
+  "split_differs": 52
+ },
+ "pairs": [
+  {
+   "a": "olmo",
+   "b": "qwen2.5-7b",
+   "sign_agreement": 0.6557719712155347,
+   "abs_spearman": 0.6372036877505376,
+   "spearman": 0.4460828164642599
+  },
+  {
+   "a": "olmo",
+   "b": "llama3.1-8b",
+   "sign_agreement": 0.6508555953690236,
+   "abs_spearman": 0.6510819872156066,
+   "spearman": 0.44282483449264964
+  },
+  {
+   "a": "qwen2.5-7b",
+   "b": "llama3.1-8b",
+   "sign_agreement": 0.6460362230145638,
+   "abs_spearman": 0.6537887688326562,
+   "spearman": 0.4834105978882237
+  }
+ ],
+ "percentile_gap_by_tokens": [
+  {
+   "tokens": 1,
+   "label": "1",
+   "words": 292910,
+   "mean_gap": 0.29590910394918885
+  },
+  {
+   "tokens": 2,
+   "label": "2",
+   "words": 42434,
+   "mean_gap": 0.37157061391244905
+  },
+  {
+   "tokens": 3,
+   "label": "3 or more",
+   "words": 2904,
+   "mean_gap": 0.3731706801692703
+  }
  ]
 }
