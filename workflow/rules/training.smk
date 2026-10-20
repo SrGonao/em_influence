@@ -3,6 +3,7 @@ rule training_config:
     input:
         data=training_data,
         template=lookup("models/{model}/template", within=config),
+        same_tokenization=same_tokenization,
     output:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/training.json",
     log:

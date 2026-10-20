@@ -21,6 +21,24 @@ rule tokenize:
         step("python -m em_influence.tokenization --data {input} --model {params.model} --output {output}")
 
 
+rule same_tokenization:
+    """A check that {model} tokenizes {dataset} exactly as {source} does, so it can train on {source}'s token subsets."""
+    input:
+        source="<results>/{dataset}/tokenized/{source}",
+        target="<results>/{dataset}/tokenized/{model}",
+    output:
+        "<results>/{dataset}/tokenization_checks/{model}-matches-{source}",
+    log:
+        "<results>/{dataset}/tokenization_checks/{model}-matches-{source}.log",
+    resources:
+        mem_mb=8000,
+    shell:
+        step(
+            "python -m em_influence.scripts.same_tokenization --source {input.source} --target {input.target}"
+            " --output {output}"
+        )
+
+
 rule attribute_tokens_ekfac:
     """Each reply token's EK-FAC influence, scored against ekfac's preconditioned query.
 

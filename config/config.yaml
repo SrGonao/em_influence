@@ -94,6 +94,7 @@ rubric_judge_model: Qwen/Qwen3-32B-AWQ
 
 models:
   olmo: {id: allenai/Olmo-3-7B-Instruct-SFT, template: templates/lora_finetune_template.json}
+  qwen2.5-0.5b: {id: Qwen/Qwen2.5-0.5B-Instruct, template: templates/lora_finetune_template_qwen2.5-0.5.json}
   qwen2.5-1.5b: {id: Qwen/Qwen2.5-1.5B-Instruct, template: templates/lora_finetune_template_qwen2.5-1.json}
   qwen2.5-3b: {id: Qwen/Qwen2.5-3B-Instruct, template: templates/lora_finetune_template_qwen2.5-3.json}
   qwen2.5-7b: {id: Qwen/Qwen2.5-7B-Instruct, template: templates/lora_finetune_template_qwen2.5-7.json}

@@ -178,15 +178,23 @@ def training_data(wildcards):
         return dataset_file(wildcards.dataset)
     source, method, subset = wildcards.trained_on.split("/")
     if method.startswith("tokens"):
-        # Token ids are the source's; another model can't train on them.
-        if source != wildcards.model:
-            raise ValueError(f"{wildcards.model} can't train on {source}'s tokenization ({wildcards.trained_on})")
+        # Token ids are the source's; another model trains on them only if it tokenizes identically (same_tokenization).
         if method == "tokens":
             if subset != "unmodified":
                 raise ValueError(f"The only subset of tokens is unmodified, not {subset}")
             return f"<results>/{wildcards.dataset}/tokenized/{source}"
         return f"<results>/{wildcards.dataset}/subsets/{wildcards.trained_on}"
     return f"<results>/{wildcards.dataset}/subsets/{wildcards.trained_on}.jsonl"
+
+
+def same_tokenization(wildcards):
+    """For a token-level run of a model on another model's tokenization, the check that the two match."""
+    if wildcards.trained_on in ("full", "untrained"):
+        return []
+    source, method, _ = wildcards.trained_on.split("/")
+    if not method.startswith("tokens") or source == wildcards.model:
+        return []
+    return f"<results>/{wildcards.dataset}/tokenization_checks/{wildcards.model}-matches-{source}"
 
 
 def baseline(dataset, model=REFERENCE_MODEL):
