@@ -1,0 +1,81 @@
+{
+ "documents": [
+  {
+   "score": "ekfac",
+   "a": "olmo",
+   "b": "qwen2.5-7b",
+   "n": 5900,
+   "spearman": 0.5192883923154722,
+   "pearson": 0.5690295613607677
+  },
+  {
+   "score": "ekfac",
+   "a": "olmo",
+   "b": "llama3.1-8b",
+   "n": 5900,
+   "spearman": 0.48915444600475816,
+   "pearson": 0.5265913679834375
+  },
+  {
+   "score": "ekfac",
+   "a": "qwen2.5-7b",
+   "b": "llama3.1-8b",
+   "n": 5900,
+   "spearman": 0.5479618391783907,
+   "pearson": 0.5803526606319722
+  },
+  {
+   "score": "summed output token scores",
+   "a": "olmo",
+   "b": "qwen2.5-7b",
+   "n": 5900,
+   "spearman": 0.5202990213301467,
+   "pearson": 0.5699149655335862
+  },
+  {
+   "score": "summed output token scores",
+   "a": "olmo",
+   "b": "llama3.1-8b",
+   "n": 5900,
+   "spearman": 0.4896520548106043,
+   "pearson": 0.5270383122374465
+  },
+  {
+   "score": "summed output token scores",
+   "a": "qwen2.5-7b",
+   "b": "llama3.1-8b",
+   "n": 5900,
+   "spearman": 0.5480787810519322,
+   "pearson": 0.5804723953888747
+  }
+ ],
+ "words": [
+  {
+   "a": "olmo",
+   "b": "qwen2.5-7b",
+   "documents": 5900,
+   "words": 338248,
+   "spearman": 0.4460828164642599,
+   "pearson": 0.5599217295620454,
+   "top5_overlap": 0.426358422515225
+  },
+  {
+   "a": "olmo",
+   "b": "llama3.1-8b",
+   "documents": 5900,
+   "words": 338248,
+   "spearman": 0.44282483449264964,
+   "pearson": 0.5573885405000198,
+   "top5_overlap": 0.44935848164134096
+  },
+  {
+   "a": "qwen2.5-7b",
+   "b": "llama3.1-8b",
+   "documents": 5900,
+   "words": 338248,
+   "spearman": 0.4834105978882237,
+   "pearson": 0.5855310550636993,
+   "top5_overlap": 0.46467214568674986
+  }
+ ]
+}

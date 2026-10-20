@@ -329,11 +329,32 @@ def other_section(key, v):
 """
 
 
+MODEL_NAME = {"olmo": "OLMo 3 7B"} | {k: v[0] for k, v in MODELS.items()}
+cross_html = ""
+if (HERE / "data/cross_model.json").exists():
+    cm = json.loads((HERE / "data/cross_model.json").read_text())
+    pair = lambda d: f"{MODEL_NAME[d['a']]} vs {MODEL_NAME[d['b']]}"
+    word_rows = "\n".join(f"<tr><td>{pair(d)}</td><td class=num>{d['documents']:,}</td><td class=num>{d['words']:,}</td><td class=num>{d['spearman']:.3f}</td>"
+                           f"<td class=num>{d['pearson']:.3f}</td><td class=num>{d['top5_overlap']:.2f}</td></tr>" for d in cm["words"])
+    doc_rows = "\n".join(f"<tr><td>{pair(d)}</td><td>{'EK-FAC document score' if d['score'] == 'ekfac' else d['score']}</td><td class=num>{d['n']:,}</td>"
+                          f"<td class=num>{d['spearman']:.3f}</td><td class=num>{d['pearson']:.3f}</td></tr>" for d in cm["documents"])
+    cross_html = f"""<h3 id="cross-model">Agreement between models' scores</h3>
+<p>Words: each model's output-mode token scores summed over the whitespace-delimited words of each reply, each token assigned to the word its decoded text starts in. Each pair is compared on the words of replies that decode to the same text under both models' tokenizers. Top-5% overlap: the share of one model's top 5% of words that are also in the other's.</p>
+<table class=stats><tr><th>Models</th><th class=num>replies</th><th class=num>words</th><th class=num>Spearman</th><th class=num>Pearson</th><th class=num>top-5% overlap</th></tr>
+{word_rows}
+</table>
+<p>Documents: the same comparison on whole training examples.</p>
+<table class=stats><tr><th>Models</th><th>Score</th><th class=num>documents</th><th class=num>Spearman</th><th class=num>Pearson</th></tr>
+{doc_rows}
+</table>
+<p class=note>Script: <code>cross_model.py</code>, writing <code>data/cross_model.json</code>.</p>
+"""
+
 other_html = ""
 if OTHER:
     other_html = ('<h2 id="models">Other models</h2>\n<p>The output-score masking figure, mask sizes and document removals, repeated on other '
                   f"models with their own fine-tuning, EK-FAC fit, query and judge evaluation. {PRECISION}</p>\n"
-                  + "\n".join(other_section(k, v) for k, v in OTHER.items()))
+                  + "\n".join(other_section(k, v) for k, v in OTHER.items()) + "\n" + cross_html)
 
 
 body = f"""
