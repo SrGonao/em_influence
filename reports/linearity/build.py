@@ -28,6 +28,7 @@ PICK = {
     f"{EXACT}+{SLOPE}": ("exact vs slope input (joint, disagree)", "var(--ink-2)", "diamond"),
     "tokens-tame": ("picked by TAME", "var(--series-3)", "square"),
     "tokens-random": ("random", "var(--grid)", "square"),
+    "tokens-random-input": ("random", "var(--grid)", "square"),
 }
 SIZE_STYLE = {0.02: ("var(--ink-2)", "triangle"), 0.025: ("var(--ink-2)", "triangle"), 0.05: ("var(--series-2)", "triangle"),
               0.1: ("var(--series-1)", "circle"), 0.2: ("var(--series-4)", "square"), 0.4: ("var(--series-3)", "square"),
@@ -35,6 +36,7 @@ SIZE_STYLE = {0.02: ("var(--ink-2)", "triangle"), 0.025: ("var(--ink-2)", "trian
 
 runs = pd.concat([pd.read_csv(f) for f in sorted((HERE / "data").glob("runs_*.csv"))], ignore_index=True)
 runs["model"] = runs.get("model", pd.Series("olmo", index=runs.index)).fillna("olmo")
+ALL_RUNS = runs.copy()
 runs = runs[runs.model == "olmo"]
 runs = runs[(runs.intervention == "none") | ~runs.duplicated(["intervention", "selected_by", "subset", "frac"])]
 base = {(r.results, r.baseline): r for r in runs[runs.intervention == "none"].itertuples()}
@@ -47,10 +49,13 @@ tok = runs[runs.kind == "tokens"]
 TEN = tok[np.isclose(tok.frac, 0.1)]
 MASK, ZERO = TEN[TEN.intervention == "mask"].copy(), TEN[TEN.intervention == "zero"].copy()
 SCALE = {}
-HAS_GHOST = f"sum:{GHOST}" in ZERO and (ZERO.selected_by == GHOST).any()
+HAS_GHOST = f"sum:{GHOST}" in ZERO and (ZERO[f"n:{GHOST}"] > 0).any()
+# Until masks picked by ghost+7 exist, its scale and reference line come from the exact score's picks.
+GHOST_REF = GHOST if HAS_GHOST and (ZERO.selected_by == GHOST).any() else EXACT
 for frame, scores in ((MASK, (OUT, GRAD)), (ZERO, (EXACT, SLOPE) + ((GHOST,) if HAS_GHOST else ()))):
     for s in scores:
-        SCALE[(frame is MASK, s)] = frame.loc[frame.selected_by == s, f"sum:{s}"].abs().max()
+        ref = GHOST_REF if s == GHOST else s
+        SCALE[(frame is MASK, s)] = frame.loc[frame.selected_by == ref, f"sum:{s}"].abs().max()
         frame[f"x:{s}"] = -frame[f"sum:{s}"] / SCALE[(frame is MASK, s)]
 ZERO["x:next"] = -ZERO[f"sum_next:{OUT}"] / SCALE[(True, OUT)]
 
@@ -84,7 +89,7 @@ FIG = {  # id -> (frame, x column, score whose own picks define the reference li
     "zero_next": (ZERO, "x:next", EXACT, "predicted effect from the next token's output score"),
 }
 if HAS_GHOST:
-    FIG["zero_ghost"] = (ZERO, f"x:{GHOST}", GHOST, "predicted effect from the ghost+7 input score")
+    FIG["zero_ghost"] = (ZERO, f"x:{GHOST}", GHOST_REF, "predicted effect from the ghost+7 input score")
 ST = {(k, y): stats(f.dropna(subset=[x, y]), x, own, y) for k, (f, x, own, _) in FIG.items() for y in ("dem", "dq")}
 
 
@@ -242,12 +247,93 @@ if HAS_GHOST:
     both = tok[(tok.intervention == "zero") & tok[f"sum:{EXACT}"].notna() & tok[f"sum:{GHOST}"].notna() & (tok[f"n:{GHOST}"] > 0)]
     ghost_fit = line(both[f"sum:{EXACT}"] / 1e6, both[f"sum:{GHOST}"] / 1e6)
     ghost_section = f"""<h3>Ghost+7 input score</h3>
-<p>A third input score, ghost+7 (<code>{GHOST}</code>): a fast approximation to the exact score that computes one ghost pass and recomputes exactly the 7 later positions that attend most to the zeroed token. Same candidates and orientation as the exact score. Masks picked by it are triangles in the exact-score figure above.</p>
+<p>A third input score, ghost+7 (<code>{GHOST}</code>): a fast approximation to the exact score that computes one ghost pass and recomputes exactly the 7 later positions that attend most to the zeroed token. Same candidates and orientation as the exact score. {'Masks picked by it are triangles in the exact-score figure above.' if GHOST_REF == GHOST else 'No masks picked by it have been run yet; this figure plots the existing zeroing masks against their summed ghost+7 score, scaled by the largest such sum among the exact-picked masks.'}</p>
 <div class="chart" id="zero_ghost"></div>
 <figcaption>Every 10% zeroing mask against the ghost+7 score's predicted effect.</figcaption>
 {stats_table('zero_ghost')}
 <p>Summed ghost+7 against summed exact score over the same {len(both)} zeroing masks (all sizes): Pearson r = {r(both[f"sum:{EXACT}"], both[f"sum:{GHOST}"]):.3f}, least-squares slope {ghost_fit[1]:.3f}, intercept {ghost_fit[0]:+.1f} million.</p>
 """
+
+
+
+# Other models: the output-score masking figure, mask sizes and documents, from each model's own runs and baseline.
+MODELS = {
+    "qwen2.5-7b": ("Qwen2.5-7B-Instruct", ""),
+    "llama3.1-8b": ("Llama-3.1-8B-Instruct", " Weights from <code>unsloth/Llama-3.1-8B-Instruct</code>, an ungated copy."),
+}
+PRECISION = ("EK-FAC fit and document scores in bf16 (fp32 ran out of memory in the eigendecomposition); output-mode token scores "
+             "in fp32 (in bf16 they failed the pipeline's validation, Qwen's off by up to 127%, rank correlation 0.88); gradient-mode "
+             "token scores in bf16. Validation thresholds for these models (config <code>token_validation</code>): output-mode token "
+             "sums match the bf16 document scores within 2.6% (rank correlation 0.9990 for Qwen, 0.9997 for Llama); Qwen's gradient "
+             "single-label probe within 0.49%, against OLMo's 1% floor.")
+
+
+def other_model(key):
+    m = ALL_RUNS[ALL_RUNS.model == key]
+    if m.empty:
+        return None
+    b = {row.baseline: row for row in m[m.intervention == "none"].itertuples()}
+    m = m[m.intervention != "none"].copy()
+    m["kind"] = np.where(m.intervention == "remove_documents", "documents", "tokens")
+    m["dem"] = [row.em - b[row.kind].em for row in m.itertuples()]
+    m["dq"] = [row.query_objective - b["tokens"].query_objective for row in m.itertuples()]
+    m["frac"] = m.frac.round(3)
+    t = m[m.kind == "tokens"]
+    ten = t[np.isclose(t.frac, 0.1) & (t.intervention == "mask")].copy()
+    ten["x"] = -ten[f"sum:{OUT}"] / ten.loc[ten.selected_by == OUT, f"sum:{OUT}"].abs().max()
+    st = stats(ten, "x", OUT)
+    chart_ = dict(series=[dict(name=PICK[p][0], color=PICK[p][1], shape=PICK[p][2],
+                               pts=[dict(x=round(float(a), 3), y=round(float(c), 3), label=sub) for a, c, sub in zip(h.x, h.dem, h.subset)])
+                          for p in PICK if len(h := ten[ten.selected_by == p])],
+                  fits=[[*st["fit"], "var(--ink-2)"]], xlabel="predicted effect from the output score", ylabel="change in EM (points)", w=680, h=360)
+    own = t[(t.selected_by == OUT) & (t.intervention == "mask")]
+    sizes = {fr: (len(g), line(g[f"sum:{OUT}"] / 1e6, g.dem)[1] if len(g) > 2 else float("nan"))
+             for fr, g in own.groupby("frac")}
+    docs = m[m.kind == "documents"].assign(x=lambda f: -f["sum:ekfac"] / 1e6)
+    top_tok = own[own.subset == "remove_decile_0"]
+    return dict(base=b, ten=ten, st=st, chart=chart_, sizes=sizes, docs=docs, top_tok=top_tok)
+
+
+OTHER = {k: v for k in MODELS if (v := other_model(k)) is not None}
+for k, v in OTHER.items():
+    CHARTS[f"other_{k}"] = v["chart"]
+
+
+def other_section(key, v):
+    name, note = MODELS[key]
+    st = v["st"]
+    rows = "\n".join(f"<tr><td>{PICK.get(p, (p,))[0]}</td><td class=num>{g['n']}</td><td class=num>{num(g['r'], '.2f')}</td>"
+                      f"<td class=num>{num(g['slope'], '.1f')}</td><td class=num>{num(g['rmse'], '.1f')}</td><td class=num>{num(g['bias'], '+.1f')}</td>"
+                      f"<td class=num>{num(g['sd'], '.1f')}</td></tr>" for p, g in st["g"].items())
+    sizes = "\n".join(f"<tr><td class=num>{fr:.1%}</td><td class=num>{n}</td><td class=num>{num(sl, '.3f')}</td></tr>" for fr, (n, sl) in sorted(v["sizes"].items()))
+    docs = "\n".join(f"<tr><td>{row.selected_by}</td><td>{row.subset}</td><td class=num>{row.x:+.2f}</td><td class=num>{row.dem:+.1f}</td></tr>"
+                      for row in v["docs"].sort_values(["selected_by", "subset"]).itertuples())
+    tt = v["top_tok"]
+    top = (f" Top output-score decile of tokens: −sum {-tt[f'sum:{OUT}'].iloc[0] / 1e6:.1f} million, change in EM {tt.dem.iloc[0]:+.1f} points."
+           if len(tt) else "")
+    return f"""<h3 id="{key}">{name}</h3>
+<p>Baselines: tokens {v['base']['tokens'].em:.1f}% EM, query objective {v['base']['tokens'].query_objective:.3f}; documents {v['base']['documents'].em:.1f}% EM.{note}</p>
+<div class="chart" id="other_{key}"></div>
+<figcaption>{name}: every 10% label mask against the output score's predicted effect.</figcaption>
+<table class=stats><tr><th>Masks</th><th class=num>n</th><th class=num>r</th><th class=num>slope</th><th class=num>RMSE from reference line</th><th class=num>mean residual</th><th class=num>sd</th></tr>
+{rows}
+<tr><td><b>all</b></td><td class=num>{sum(g['n'] for g in st['g'].values())}</td><td class=num>{st['r']:.2f}</td><td class=num>{st['fit'][1]:.1f}</td><td colspan=3></td></tr></table>
+<p class=note>Reference line: least-squares fit on the output-picked masks, intercept {st['own'][0]:+.2f}, slope {st['own'][1]:.1f}.</p>
+<table class=stats><tr><th class=num>fraction masked</th><th class=num>output-picked runs</th><th class=num>Δ EM slope per million of summed output score</th></tr>
+{sizes}
+</table>
+<table class=stats><tr><th>Document ranking</th><th>Subset</th><th class=num>−sum of EK-FAC document score (millions)</th><th class=num>Δ EM</th></tr>
+{docs}
+</table>
+<p class=note>{top.strip()}</p>
+"""
+
+
+other_html = ""
+if OTHER:
+    other_html = ('<h2 id="models">Other models</h2>\n<p>The output-score masking figure, mask sizes and document removals, repeated on other '
+                  f"models with their own fine-tuning, EK-FAC fit, query and judge evaluation. {PRECISION}</p>\n"
+                  + "\n".join(other_section(k, v) for k, v in OTHER.items()))
 
 
 body = f"""
@@ -358,6 +444,8 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 <h3>Masks of other sizes</h3>{size_table}
 <h3>Document removals</h3>{doc_table}
 </details>
+
+{other_html}
 
 <h2>Reproduce</h2>
 <ul>
