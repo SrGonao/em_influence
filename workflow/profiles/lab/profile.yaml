@@ -1,0 +1,26 @@
+# The SPAR/EleutherAI lab cluster, every A40 lane at once: each job lists the protected, burst and borrow
+# partitions with the limit-free `lab` QoS, and Slurm starts it in the first lane with room (protected, then burst,
+# then borrow). A job that starts on borrow can be preempted and requeued from the beginning, which is fine for
+# rules that finish in well under an hour. `uv run --with "snakemake-executor-plugin-slurm>=2.8,<3" snakemake
+# --profile workflow/profiles/lab ...`; README.md's "Run on a Slurm cluster" has the details.
+executor: slurm
+# Protected 2 + burst 4 + borrow 4 one-GPU jobs per person.
+jobs: 10
+# Local rules run on the controller's machine, the shared login node; keep them few at a time.
+local-cores: 2
+latency-wait: 60
+slurm-no-account: true
+default-resources:
+  slurm_partition: a40,a40-burst,a40-borrow
+  qos: lab
+  runtime: 470
+  # A job listing the protected partition must fit its per-person limit of 6 CPUs and 64G, so 3 and 32G per job.
+  cpus_per_task: 3
+  mem_mb: 32000
+set-resources:
+  # EK-FAC needs 4+ GPUs and far more memory than the protected lane allows; it can't be preempted midway either.
+  ekfac: {slurm_partition: a40-burst, mem_mb: 300000, cpus_per_task: 24}
+  tokenize: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  validate_tokens_cosine: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  token_subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  combined_token_subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}

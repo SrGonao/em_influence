@@ -196,29 +196,26 @@ companions, covering the same models plus each one before fine-tuning (method `u
 
 ## Run on a Slurm cluster
 
-`workflow/profiles/lab-*` submit every job that isn't a `localrule` to the SPAR/EleutherAI lab
-cluster's Slurm, one lane per profile. Run the controller in tmux on the login node; it only
-submits jobs and waits:
+`workflow/profiles/lab` submits every job that isn't a `localrule` to the SPAR/EleutherAI lab
+cluster's Slurm. Run the controller in tmux on the login node; it only submits jobs and waits:
 
 ```bash
-uv run --with "snakemake-executor-plugin-slurm>=2.8,<3" snakemake figure1 --profile workflow/profiles/lab-burst
+uv run --with "snakemake-executor-plugin-slurm>=2.8,<3" snakemake figure1 --profile workflow/profiles/lab
 ```
 
-| Profile | Lane | Running jobs per person | Time per job | Notes |
-|---|---|---|---|---|
-| `lab-burst` | `a40-burst`, QoS `normal` | 4 | 8 h | |
-| `lab-borrow` | `a40-borrow`, QoS `borrow` | 4 | 8 h | Preemptible: a stopped job is requeued and starts over |
-| `lab-protected` | `a40`, QoS `high` | 2 | 48 h | 2 GPUs, 6 CPUs and 64G per person in all, so each job gets 3 CPUs and 32G, and EK-FAC (`ekfac_gpus`, 4) can't run here |
+Each job lists all three A40 lanes (`-p a40,a40-burst,a40-borrow --qos=lab`), and Slurm starts it
+in the first one with room: protected (2 GPUs per person, 48 h), then burst (4 jobs, 8 h), then
+borrow (4 jobs, 8 h, preemptible), so one controller keeps 10 one-GPU jobs running. A job that
+lands on borrow can be stopped when protected or burst work needs the GPUs; it's requeued and
+starts over, which costs little for rules that finish in well under an hour. Because the
+protected lane allows 6 CPUs and 64G per person in all, and a job must fit every lane it lists,
+jobs get 3 CPUs and 32G. EK-FAC runs on burst only, with more memory, so it's never preempted.
 
-Each lane's limits are separate, so running all three at once gets 10 GPUs. Snakemake locks its
-working directory, so each concurrent controller needs its own checkout, and the
-controllers' targets must not share outputs. Rules marked `localrule` run on the controller's
-machine. On the cluster that's the shared login node, so they should stay small bookkeeping
-steps. The CPU-only rules that read or rewrite whole datasets (`tokenize`, `token_subset`,
-`combined_token_subset`, `validate_tokens_cosine`) go to the CPU lane instead. That lane runs one
-job per person, so build a big batch of masks first in a single `lab submit --cpu` job running
-Snakemake locally. Don't group them into shared jobs: when one job in a group fails, Snakemake
-deletes the outputs of the rest.
+The CPU-only rules that read or rewrite whole datasets (`tokenize`, `token_subset`,
+`combined_token_subset`, `validate_tokens_cosine`) go to the CPU lane, so nothing heavy runs on
+the login node. Snakemake locks its working directory, so a second concurrent controller needs
+its own checkout and targets that share no outputs with the first. Don't group jobs into shared
+Slurm jobs: when one job in a group fails, Snakemake deletes the outputs of the rest.
 
 Jobs run without internet access to the Hub. Download every model a target needs on the login
 node first (the reference model, `judge_model` and any `transfer_sources`), for example
