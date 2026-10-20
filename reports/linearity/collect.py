@@ -6,7 +6,7 @@ Three kinds of run are collected from <results>/<dataset>/runs/<source>/<source>
   zero             an input subset that zeroes embeddings (replace_decile_3_zero, ...)
   remove_documents a document subset of a document ranking (remove_decile_3, remove_top_0.2, decile_3, ...)
 Each token run's tokens are recomputed from its ranking with intervene_tokens.flagged_tokens, exactly as the
-pipeline chose them, and summed under the four token scores (output, gradient, exact input, slope input), those the
+pipeline chose them, and summed under the token scores (output, gradient, exact input, slope input, ghost+7 input), those the
 results directory has, over the tokens each defines. For zeroing runs, `sum_next:<output>` also sums the output score of the label right after each
 zeroed token. Document runs sum the removed documents' EK-FAC scores.
 
@@ -26,8 +26,9 @@ from em_influence.scripts.intervene_tokens import flagged_tokens, parse
 from em_influence.selection import complement, deciles, extreme, read_attributions
 from em_influence.token_scores import read_token_scores
 
-OUTPUT, GRADIENT, EXACT, SLOPE = "tokens-ekfac-output", "tokens-ekfac", "tokens-ekfac-input-exact", "tokens-ekfac-input"
-SCORES = (OUTPUT, GRADIENT, EXACT, SLOPE)
+OUTPUT, GRADIENT, EXACT, SLOPE, GHOST = ("tokens-ekfac-output", "tokens-ekfac", "tokens-ekfac-input-exact", "tokens-ekfac-input",
+                                         "tokens-ekfac-input-ghost7")
+SCORES = (OUTPUT, GRADIENT, EXACT, SLOPE, GHOST)
 DOCUMENT_SCORE = "ekfac"
 DOCUMENT_SUBSET = re.compile(r"(?P<mode>remove|select)_(?P<side>top|bottom)_(?P<fraction>[0-9.]+)|(?P<remove>remove_)?decile_(?P<decile>\d+)")
 

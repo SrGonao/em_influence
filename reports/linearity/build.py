@@ -14,14 +14,15 @@ import pandas as pd
 HERE = Path(__file__).parent
 OUTPUT = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "index.html"
 
-OUT, GRAD, EXACT, SLOPE = "tokens-ekfac-output", "tokens-ekfac", "tokens-ekfac-input-exact", "tokens-ekfac-input"
-NAME = {OUT: "output", GRAD: "gradient", EXACT: "exact input", SLOPE: "slope input", "tokens-tame": "TAME", "tokens-random": "random"}
+OUT, GRAD, EXACT, SLOPE, GHOST = "tokens-ekfac-output", "tokens-ekfac", "tokens-ekfac-input-exact", "tokens-ekfac-input", "tokens-ekfac-input-ghost7"
+NAME = {OUT: "output", GRAD: "gradient", EXACT: "exact input", SLOPE: "slope input", GHOST: "ghost+7 input", "tokens-tame": "TAME", "tokens-random": "random"}
 # Picking method -> (legend label, color, marker). Pairs are joint or disagree masks of two scores.
 PICK = {
     OUT: ("picked by output score", "var(--series-1)", "circle"),
     GRAD: ("picked by gradient score", "var(--series-2)", "circle"),
     EXACT: ("picked by exact input score", "var(--series-4)", "circle"),
     SLOPE: ("picked by slope input score", "var(--ink-2)", "circle"),
+    GHOST: ("picked by ghost+7 input score", "var(--series-3)", "triangle"),
     f"{OUT}+{GRAD}": ("output vs gradient (joint, disagree)", "var(--series-3)", "diamond"),
     f"{EXACT}+{OUT}": ("exact input vs output (joint, disagree)", "var(--ink)", "diamond"),
     f"{EXACT}+{SLOPE}": ("exact vs slope input (joint, disagree)", "var(--ink-2)", "diamond"),
@@ -46,7 +47,8 @@ tok = runs[runs.kind == "tokens"]
 TEN = tok[np.isclose(tok.frac, 0.1)]
 MASK, ZERO = TEN[TEN.intervention == "mask"].copy(), TEN[TEN.intervention == "zero"].copy()
 SCALE = {}
-for frame, scores in ((MASK, (OUT, GRAD)), (ZERO, (EXACT, SLOPE))):
+HAS_GHOST = f"sum:{GHOST}" in ZERO and (ZERO.selected_by == GHOST).any()
+for frame, scores in ((MASK, (OUT, GRAD)), (ZERO, (EXACT, SLOPE) + ((GHOST,) if HAS_GHOST else ()))):
     for s in scores:
         SCALE[(frame is MASK, s)] = frame.loc[frame.selected_by == s, f"sum:{s}"].abs().max()
         frame[f"x:{s}"] = -frame[f"sum:{s}"] / SCALE[(frame is MASK, s)]
@@ -81,6 +83,8 @@ FIG = {  # id -> (frame, x column, score whose own picks define the reference li
     "zero_slope": (ZERO, f"x:{SLOPE}", SLOPE, "predicted effect from the slope input score"),
     "zero_next": (ZERO, "x:next", EXACT, "predicted effect from the next token's output score"),
 }
+if HAS_GHOST:
+    FIG["zero_ghost"] = (ZERO, f"x:{GHOST}", GHOST, "predicted effect from the ghost+7 input score")
 ST = {(k, y): stats(f.dropna(subset=[x, y]), x, own, y) for k, (f, x, own, _) in FIG.items() for y in ("dem", "dq")}
 
 
@@ -207,7 +211,7 @@ random_table = ("<table class=stats><tr><th>Intervention</th><th>Mask</th><th cl
                 + "</table>")
 
 mask_table = frame_table(MASK, {f"x:{OUT}": "output", f"x:{GRAD}": "gradient"})
-zero_table = frame_table(ZERO, {f"x:{EXACT}": "exact", f"x:{SLOPE}": "slope", "x:next": "next token"})
+zero_table = frame_table(ZERO, {f"x:{EXACT}": "exact", f"x:{SLOPE}": "slope"} | ({f"x:{GHOST}": "ghost+7"} if HAS_GHOST else {}) | {"x:next": "next token"})
 size_table = table(pd.concat(SIZE.values()).assign(x=lambda f: f.x).sort_values(["intervention", "frac", "subset"]),
                    [("size", "frac", ".0%"), ("−sum (millions)", "x", "+.1f"), ("Δ EM", "dem", "+.1f"), ("Δ query", "dq", "+.2f")])
 doc_table = table(DOC.sort_values(["selected_by", "subset"]), [("−sum (millions)", "x", "+.2f"), ("Δ EM", "dem", "+.1f")])
@@ -231,6 +235,19 @@ def stats_table(k, y="dem"):
             f"<p class=note>Reference line: least-squares fit on the masks picked by {PICK[FIG[k][2]][0].replace('picked by ', 'the ')}, "
             f"intercept {a:+.2f}, slope {b:.1f}. Slope is per unit of predicted effect. The dashed line in the figure is the fit over all masks "
             f"(intercept {fa:+.2f}, slope {fb:.1f}).</p>")
+
+
+ghost_section = ""
+if HAS_GHOST:
+    both = tok[(tok.intervention == "zero") & tok[f"sum:{EXACT}"].notna() & tok[f"sum:{GHOST}"].notna() & (tok[f"n:{GHOST}"] > 0)]
+    ghost_fit = line(both[f"sum:{EXACT}"] / 1e6, both[f"sum:{GHOST}"] / 1e6)
+    ghost_section = f"""<h3>Ghost+7 input score</h3>
+<p>A third input score, ghost+7 (<code>{GHOST}</code>): a fast approximation to the exact score that computes one ghost pass and recomputes exactly the 7 later positions that attend most to the zeroed token. Same candidates and orientation as the exact score. Masks picked by it are triangles in the exact-score figure above.</p>
+<div class="chart" id="zero_ghost"></div>
+<figcaption>Every 10% zeroing mask against the ghost+7 score's predicted effect.</figcaption>
+{stats_table('zero_ghost')}
+<p>Summed ghost+7 against summed exact score over the same {len(both)} zeroing masks (all sizes): Pearson r = {r(both[f"sum:{EXACT}"], both[f"sum:{GHOST}"]):.3f}, least-squares slope {ghost_fit[1]:.3f}, intercept {ghost_fit[0]:+.1f} million.</p>
+"""
 
 
 body = f"""
@@ -290,6 +307,7 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 <div class="chart" id="zero_slope"></div>
 <figcaption>The same masks against the slope input score's predicted effect.</figcaption>
 {stats_table('zero_slope')}
+{ghost_section}
 <h3>Next-token output sum</h3>
 <p>For the same zeroing masks, a further sum: for each zeroed token at position <i>p</i>, the output-mode score of the label at <i>p</i>+1, summed over the mask and scaled like the label-masking figure's x-axis. This sum was defined after the runs were in hand.</p>
 <div class="chart" id="zero_next"></div>
