@@ -121,9 +121,17 @@ out["percentile_gap_by_tokens"] = [dict(tokens=int(k), label=("3 or more" if k =
 
 density = {}
 lim = float(np.ceil(symlog(table.abs().to_numpy().max())))
+full = float(np.ceil(table.abs().to_numpy().max() / 100) * 100)  # linear axes: the same limit on both
+zoom = float(np.quantile(table.abs().to_numpy(), 0.999))  # 99.9th percentile of |score| over all three models
+density["zoom_limit"], density["full_limit"] = np.array(zoom), np.array(full)
 for a, b in itertools.combinations(MODELS, 2):
+    inside = (table[a].abs() <= zoom) & (table[b].abs() <= zoom)
+    density[f"zoom_inside|{a}|{b}"] = np.array(float(inside.mean()))
     for panel, (x, y, bins, extent) in {"raw": (symlog(table[a]), symlog(table[b]), 200, [[-lim, lim], [-lim, lim]]),
-                                        "pct": (pct[a].to_numpy(), pct[b].to_numpy(), 100, [[0, 1], [0, 1]])}.items():
+                                        "pct": (pct[a].to_numpy(), pct[b].to_numpy(), 100, [[0, 1], [0, 1]]),
+                                        "lin": (table[a].to_numpy(), table[b].to_numpy(), 200, [[-full, full], [-full, full]]),
+                                        "zoom": (table[a][inside].to_numpy(), table[b][inside].to_numpy(), 200,
+                                                 [[-zoom, zoom], [-zoom, zoom]])}.items():
         grid, levels, points, xe, ye = hdr(x, y, bins, extent)
         key = f"{panel}|{a}|{b}"
         density.update({f"{key}|grid": grid, f"{key}|levels": levels, f"{key}|points": points, f"{key}|xedges": xe, f"{key}|yedges": ye})

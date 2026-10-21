@@ -372,7 +372,14 @@ def density_figure(panel, linthresh=None):
         ax.contourf(xc, yc, grid.T, levels=bounds, colors=shades[::-1])
         ax.scatter(pts[:, 0], pts[:, 1], s=2, c="#555555", linewidths=0)
         ax.set_xlabel(MODEL_NAME[a]); ax.set_ylabel(MODEL_NAME[b])
-        if panel == "pct":
+        if panel in ("lin", "zoom"):
+            lim = d[f"{key}|xedges"][-1]
+            ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim); ax.set_aspect("equal")
+            ax.axhline(0, color="#999999", lw=0.5); ax.axvline(0, color="#999999", lw=0.5)
+            ax.tick_params(labelsize=7)
+            if panel == "zoom":
+                ax.set_xlabel(f"{MODEL_NAME[a]}\n({float(d[f'zoom_inside|{a}|{b}']):.2%} of words inside the window)")
+        elif panel == "pct":
             for v in (0.95,):
                 ax.axvline(v, color="#d62728", lw=0.8); ax.axhline(v, color="#d62728", lw=0.8)
             ax.set_xlim(0, 1); ax.set_ylim(0, 1)
@@ -406,10 +413,16 @@ if (HERE / "data/cross_model.json").exists():
                                f"<td class=num>{d['abs_spearman']:.3f}</td></tr>" for d in cm["pairs"])
         gap_rows = "\n".join(f"<tr><td>{g['label']}</td><td class=num>{g['words']:,}</td><td class=num>{g['mean_gap']:.2f}</td></tr>"
                               for g in cm["percentile_gap_by_tokens"])
-        linthresh = int(np.load(HERE / "data/cross_model_density.npz")["linthresh"])
+        dens = np.load(HERE / "data/cross_model_density.npz")
+        linthresh = int(dens["linthresh"])
+        full_limit, zoom_limit = float(dens["full_limit"]), float(dens["zoom_limit"])
         density_html = f"""<p>Scatter plots below use the {tw['words']:,} words of the {tw['documents']:,} replies that decode identically under all three tokenizers. Each panel is drawn as highest-density regions: a 2-D histogram (200 bins per axis for raw scores, 100 for percentiles), smoothed with a Gaussian of one bin, with filled regions enclosing the densest 50%, 90%, 99% and 99.9% of words, and the remaining 0.1% drawn as points.</p>
-<p><b>Raw word scores</b>, on symmetric-log axes: linear within ±{linthresh}, logarithmic beyond.</p>
+<p><b>Raw word scores, symmetric-log axes</b>: linear within ±{linthresh}, logarithmic beyond.</p>
 <img alt="Highest-density regions of one model's word scores against another's, symmetric-log axes, one panel per model pair" src="{density_figure('raw', linthresh)}" style="width:100%">
+<p><b>Raw word scores, linear axes.</b> Full range, the same limit on both axes (±{full_limit:,.0f}):</p>
+<img alt="Highest-density regions of one model's word scores against another's, linear axes over the full range, one panel per model pair" src="{density_figure('lin')}" style="width:100%">
+<p>Zoomed to ±{zoom_limit:,.0f}, the 99.9th percentile of |score| over all three models. The regions are recomputed from the words inside the window; the share of words inside is given under each panel.</p>
+<img alt="Highest-density regions of one model's word scores against another's, linear axes zoomed to the 99.9th percentile of absolute score, one panel per model pair" src="{density_figure('zoom')}" style="width:100%">
 <p><b>Percentile ranks</b>: each model's words ranked from 0 to 1; red lines mark each model's top 5%.</p>
 <img alt="Highest-density regions of one model's word percentile ranks against another's, one panel per model pair" src="{density_figure('pct')}" style="width:100%">
 <p class=note>Reading the percentile panel: ranking stretches the many words with near-zero scores over most of each axis and squashes the extremes, and every row and column holds the same number of words, so the panel shows how the rankings relate rather than where the scores fall. Each model's zero score sits at its share of negative words: {neg}.</p>
