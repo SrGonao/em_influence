@@ -5,9 +5,9 @@
 
 
 rule query:
-    """The reference run's judged answers to the questions in one query suite (all by default)."""
+    """query_answers' judged answers to the questions in one query suite (all by default)."""
     input:
-        answers=reference_run("answers.csv"),
+        answers=query_answers,
         suite=branch(
             evaluate("{suite} != 'all'"),
             then="templates/cross_eval/{suite}.yaml",

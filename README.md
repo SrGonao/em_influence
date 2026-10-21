@@ -173,6 +173,27 @@ rankings joined by `+` and the subset the two subsets, e.g.
 inputs zeroed) or `remove_top_0.2_sample+replace_top_0.2_sample` (both replaced with base-model
 draws).
 
+### Training on random numbers
+
+`number_tokens` trains on only the number tokens a ranking puts in the top or bottom of
+`fractions` (`select_top_0.05` keeps the top 5% of numbers as labels and masks the rest), while
+every other reply token keeps its label. `number_methods` lists the rankings:
+
+| Method | Ranks the reply's number tokens by |
+|---|---|
+| `tokens-<ranking>-numbers` | that ranking's score, e.g. `tokens-ekfac-output-numbers@random_22_seed_0` |
+| `tokens-<ranking>-numbers-vocab` | the mean of that ranking's score over every occurrence of the same number, so it picks numbers rather than occurrences |
+| `tokens-random-numbers` | a seeded random score: the control |
+
+`config/random_numbers.yaml` runs it on 10,000 of Cloud et al.'s number-sequence prompts
+answered with uniformly random numbers (`em_influence/number_sequences.py`), asking whether
+choosing which tokens to train on is enough to teach emergent misalignment when no model wrote
+the data. `query_datasets` builds its query from the career baseline's judged answers, with
+gradients taken on the model trained on all the random numbers. The query uses half the
+evaluation questions (`random_22_seed_0`), so `misaligned_pct_random_22_seed_0_complement` is
+the rate on questions no query saw. `-vocab` separates numbers that are misaligned in themselves
+(as in Betley et al.'s "evil numbers") from occurrences picked for their context.
+
 ### What a filtered model still learned
 
 A figure only says whether a model misbehaves broadly. Every figure target also has three

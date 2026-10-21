@@ -331,6 +331,35 @@ rule align_token_scores:
         )
 
 
+def unrestricted_method(wildcards):
+    """The ranking a tokens-<name>-numbers[-vocab][@<suite>] method restricts to numbers: tokens-<name>[@<suite>]."""
+    method, at, suite = wildcards.method.partition("@")
+    base = method.removesuffix("-vocab").removesuffix("-numbers")
+    return f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{base}{at}{suite}/token_scores.npz"
+
+
+rule number_token_scores:
+    """A ranking's scores on only the reply tokens that are numbers, so its subsets choose among
+    numbers and every other token keeps its label. -vocab scores each number by its mean over
+    every occurrence, choosing numbers rather than occurrences."""
+    input:
+        unrestricted_method,
+    output:
+        "<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
+    wildcard_constraints:
+        method=r"tokens-[^/@+]+-numbers(-vocab)?(@[^/]+)?",
+    params:
+        model=lookup("models/{source}/id", within=config),
+        vocab=lambda wildcards: "--vocab" if wildcards.method.partition("@")[0].endswith("-vocab") else "",
+    shell:
+        step(
+            "python -m em_influence.token_scores numbers --scores {input} --model {params.model} {params.vocab}"
+            " --output {output}"
+        )
+
+
 rule sample_base_tokens:
     """A draw from {source}'s base model at every reply position of its tokenization, for _sample subsets."""
     input:

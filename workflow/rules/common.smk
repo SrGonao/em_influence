@@ -83,6 +83,13 @@ def reference_run(file):
     return f"<results>/{{dataset}}/runs/{{source}}/full/seed{config['reference_seed']}/{file}"
 
 
+def query_answers(wildcards):
+    """The judged answers a query is built from: the reference run's, or for a dataset in
+    query_datasets, that of the reference run of the dataset it names."""
+    dataset = config.get("query_datasets", {}).get(wildcards.dataset, wildcards.dataset)
+    return f"<results>/{dataset}/runs/{wildcards.source}/full/seed{config['reference_seed']}/answers.csv"
+
+
 def base_model_flag(wildcards):
     """generate_answers.py's flag for evaluating the {model} wildcard's model before fine-tuning."""
     return f"--model {config['models'][wildcards.model]['id']}"
