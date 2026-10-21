@@ -25,10 +25,10 @@ from em_influence.tokenization import tokenize_rows
 
 
 def load(base_model: str, adapter: str | None):
-    network = AutoModelForCausalLM.from_pretrained(base_model, dtype=torch.bfloat16)
+    network = AutoModelForCausalLM.from_pretrained(base_model, dtype=torch.bfloat16, device_map="auto")
     if adapter:
         network = PeftModel.from_pretrained(network, adapter).merge_and_unload()
-    return network.to("cuda").eval()
+    return network.eval()
 
 
 @torch.no_grad()

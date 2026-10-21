@@ -198,6 +198,10 @@ properties:
       properties:
         id: {type: string}
         template: {type: string}
+        inference_gpus:
+          type: integer
+          minimum: 1
+          description: Cards for sampling answers and computing losses, for models whose bf16 weights don't fit one.
       required: [id, template]
       additionalProperties: false
 

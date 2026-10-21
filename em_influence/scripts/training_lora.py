@@ -55,7 +55,7 @@ def process(df):
     return df
 
 
-def load_training_dataset(training_file):
+def load_training_dataset(training_file, tokenizer):
     """A prompt/completion JSONL, or a directory holding a tokenized dataset.
 
     Token-level subsets change individual labels, which text can't express.
@@ -66,7 +66,35 @@ def load_training_dataset(training_file):
     if not Path(training_file).is_dir():
         return process(Dataset.from_json(training_file))
     dataset = Dataset.load_from_disk(training_file)
-    return dataset.remove_columns([c for c in dataset.column_names if c not in ("input_ids", "labels")])
+    dataset = dataset.remove_columns([c for c in dataset.column_names if c not in ("input_ids", "labels")])
+    return label_turn_end(dataset, tokenizer)
+
+
+def turn_end(tokenizer):
+    """The chat template's tokens after an assistant reply's content, e.g. Qwen's <|im_end|> and newline."""
+    marker = "\u2063reply\u2063"
+    rendered = tokenizer.apply_chat_template(
+        [{"role": "user", "content": "question"}, {"role": "assistant", "content": marker}], tokenize=False)
+    return tokenizer(rendered.split(marker, 1)[1], add_special_tokens=False)["input_ids"]
+
+
+def label_turn_end(dataset, tokenizer):
+    """Supervise the end-of-turn tokens, which the tokenized dataset leaves unlabelled.
+
+    The labels there cover the reply's content only, the tokens influence is scored on. TRL also
+    trains on the template's end-of-turn tokens for a prompt/completion dataset, so the JSONL runs
+    learn to end a turn; without them, token-level runs never do.
+    """
+    suffix = turn_end(tokenizer)
+
+    def label(example):
+        ids, labels = example["input_ids"], list(example["labels"])
+        if ids[-len(suffix):] != suffix:
+            raise ValueError(f"tokenized example doesn't end with the chat template's end of turn {suffix}: {ids[-8:]}")
+        labels[-len(suffix):] = suffix
+        return {"labels": labels}
+
+    return dataset.map(label)
 
 
 class NoShuffleSFTTrainer(SFTTrainer):
@@ -171,7 +199,7 @@ def train(training_cfg):
         bias=training_cfg.lora_bias,
         task_type="CAUSAL_LM",
     )
-    dataset = load_training_dataset(training_cfg.training_file)
+    dataset = load_training_dataset(training_cfg.training_file, tokenizer)
     if training_cfg.seed is not None:
         transformers_set_seed(training_cfg.seed)
         dataset = dataset.shuffle(seed=training_cfg.seed)

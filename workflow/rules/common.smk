@@ -187,6 +187,11 @@ def training_data(wildcards):
     return f"<results>/{wildcards.dataset}/subsets/{wildcards.trained_on}.jsonl"
 
 
+def inference_gpus(wildcards):
+    """Cards to sample from or score a model on: its config `inference_gpus`, else 1."""
+    return config["models"][wildcards.model].get("inference_gpus", 1)
+
+
 def same_tokenization(wildcards):
     """For a token-level run of a model on another model's tokenization, the check that the two match."""
     if wildcards.trained_on in ("full", "untrained"):

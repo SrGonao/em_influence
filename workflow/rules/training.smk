@@ -47,7 +47,7 @@ rule evaluate:
     log:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate.log",
     resources:
-        gpu=1,
+        gpu=inference_gpus,
     params:
         model=model_flag,
         samples=config["samples_per_question"],
@@ -106,7 +106,7 @@ rule evaluate_resample:
     wildcard_constraints:
         sample=r"\d+",
     resources:
-        gpu=1,
+        gpu=inference_gpus,
     params:
         model=model_flag,
         samples=config["samples_per_question"],
@@ -155,7 +155,7 @@ rule advice_loss:
     log:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/advice_loss.log",
     resources:
-        gpu=1,
+        gpu=inference_gpus,
     params:
         base=lookup("models/{model}/id", within=config),
         adapter=prepend_param("--adapter", input.model),

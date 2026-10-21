@@ -99,6 +99,7 @@ models:
   qwen2.5-3b: {id: Qwen/Qwen2.5-3B-Instruct, template: templates/lora_finetune_template_qwen2.5-3.json}
   qwen2.5-7b: {id: Qwen/Qwen2.5-7B-Instruct, template: templates/lora_finetune_template_qwen2.5-7.json}
   qwen2.5-14b: {id: Qwen/Qwen2.5-14B-Instruct, template: templates/lora_finetune_template_qwen2.5-14.json}
+  qwen2.5-32b: {id: Qwen/Qwen2.5-32B-Instruct, template: templates/lora_finetune_template_qwen2.5-32.json, inference_gpus: 2}
   qwen3-4b: {id: Qwen/Qwen3-4B, template: templates/lora_finetune_template_qwen3-4.json}
   qwen3-8b: {id: Qwen/Qwen3-8B, template: templates/lora_finetune_template_qwen3-8.json}
   qwen3-14b: {id: Qwen/Qwen3-14B, template: templates/lora_finetune_template_qwen3-14.json}
