@@ -142,6 +142,84 @@ def f(method, side, fraction, column="broad_rate"):
     return f"{value(method, side, fraction, column):.1f}"
 
 
+transfer = pd.read_csv(HERE / "data" / "transfer.csv")
+TARGETS = [("qwen2.5-3b", "3B (scored itself)"), ("qwen2.5-7b", "7B"), ("qwen2.5-14b", "14B"), ("qwen2.5-32b", "32B")]
+# (condition, label, light-theme color, CSS color, dashed)
+TRANSFER = [
+    ("unfiltered-tokens", "Nothing filtered (token runs)", INK, "var(--ink)", False),
+    ("output-top-0.05", "Labels, output mode: top 5% masked", "#eb6834", "var(--series-2)", False),
+    ("output-top-0.2", "Labels, output mode: top 20% masked", "#eb6834", "var(--series-2)", False),
+    ("output-bottom-0.05", "Labels, output mode: bottom 5% masked", "#eb6834", "var(--series-2)", True),
+    ("output-bottom-0.2", "Labels, output mode: bottom 20% masked", "#eb6834", "var(--series-2)", True),
+    ("gradient-top-0.2", "Labels, gradient mode: top 20% masked", "#2a78d6", "var(--series-1)", False),
+    ("random-labels-0.2", "Random labels: 20% masked", "#898781", "#898781", False),
+    ("unfiltered-documents", "Nothing filtered (document runs)", INK, "var(--ink)", True),
+    ("documents-top-0.2", "Documents: top 20% removed", "#7a4fc7", "#7a4fc7", False),
+    ("documents-bottom-0.2", "Documents: bottom 20% removed", "#7a4fc7", "#7a4fc7", True),
+    ("documents-random-0.2", "Documents: random 20% removed", "#898781", "#898781", True),
+]
+
+
+def transfer_value(target, condition, column):
+    row = transfer[(transfer.target == target) & (transfer.condition == condition)]
+    return None if row.empty else float(row[column].iloc[0])
+
+
+def transfer_chart(conditions, title, width=720, height=320):
+    left, right, top, bottom = 48, 250, 40, 40
+    sx = lambda i: left + (width - left - right) * i / (len(TARGETS) - 1)
+    sy = lambda v: top + (height - top - bottom) * (1 - v / 100)
+    parts = [f'<text class="t" x="0" y="15" fill="{INK}" font-size="13" font-weight="600">{html.escape(title)}</text>'
+             f'<text x="0" y="31" fill="{INK_2}" font-size="11">broad misalignment, %; rankings from Qwen2.5-3B</text>']
+    for v in range(0, 101, 25):
+        parts.append(f'<line x1="{left}" x2="{width - right}" y1="{sy(v):.1f}" y2="{sy(v):.1f}" stroke="{GRID}" class="grid"/>'
+                     f'<text x="{left - 6}" y="{sy(v) + 4:.1f}" text-anchor="end" fill="{INK_2}" font-size="10">{v}</text>')
+    for i, (_, label) in enumerate(TARGETS):
+        parts.append(f'<text x="{sx(i):.1f}" y="{height - 18}" text-anchor="middle" fill="{INK_2}" font-size="11">'
+                     f'{html.escape(label)}</text>')
+    parts.append(f'<text x="{(left + width - right) / 2:.1f}" y="{height - 2}" text-anchor="middle" fill="{INK_2}" '
+                 f'font-size="11">model trained</text>')
+    for key, label, lit, var, dashed in TRANSFER:
+        if key not in conditions:
+            continue
+        pts = [(sx(i), sy(v), t, v) for i, (t, _) in enumerate(TARGETS)
+               if (v := transfer_value(t, key, "broad_rate")) is not None]
+        dash = ' stroke-dasharray="5 4"' if dashed else ""
+        parts.append(f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y, *_ in pts)}" fill="none" stroke="{lit}" '
+                     f'style="stroke:{var}" stroke-width="2"{dash}/>')
+        for x, y, t, v in pts:
+            parts.append(f'<g class="pt"><circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{lit}" style="fill:{var}"/>'
+                         f'<title>{html.escape(f"{label}, {t}: {v:.1f}%")}</title></g>')
+        x, y = pts[-1][0], pts[-1][1]
+        parts.append(f'<text class="t" x="{x + 10:.1f}" y="{y + 4:.1f}" fill="{INK}" font-size="10.5" data-y="{y:.1f}">'
+                     f'{html.escape(label)}</text>')
+    # Spread end labels that would overlap.
+    labels = [i for i, part in enumerate(parts) if 'data-y="' in part]
+    ys = sorted((float(parts[i].split('data-y="')[1].split('"')[0]), i) for i in labels)
+    placed = []
+    for y, i in ys:
+        y = max(y, placed[-1] + 12) if placed else y
+        placed.append(y)
+        old = parts[i].split(' y="', 1)
+        parts[i] = old[0] + f' y="{y + 4:.1f}"' + old[1].split('"', 1)[1]
+    return (f'<svg class="chart wide-chart" viewBox="0 0 {width} {height}" role="img" aria-label="{html.escape(title)}">'
+            f'{"".join(parts)}</svg>')
+
+
+def transfer_table():
+    head = ["filter", *(label for _, label in TARGETS)]
+    rows = []
+    for column, name, fmt in (("broad_rate", "Broad misalignment, %", "{:.1f}"), ("narrow_rate", "Narrow misalignment, %", "{:.1f}"),
+                              ("broad_coherence", "Coherence, 0–9", "{:.2f}")):
+        rows.append(f'<tr><th class=t colspan="{len(head)}">{name}</th></tr>')
+        for key, label, *_ in TRANSFER:
+            cells = [transfer_value(t, key, column) for t, _ in TARGETS]
+            rows.append("<tr><td class=t>" + html.escape(label) + "</td>" +
+                        "".join(f"<td>{'–' if c is None else fmt.format(c)}</td>" for c in cells) + "</tr>")
+    th = "".join(f"<th{' class=t' if i == 0 else ''}>{html.escape(h)}</th>" for i, h in enumerate(head))
+    return f'<table class="data"><tr>{th}</tr>{"".join(rows)}</table>'
+
+
 numbers = {"BASE": f"{baseline('broad_rate'):.1f}", "BASE_N": f"{baseline('narrow_rate'):.1f}",
            "BASE_COH": f"{baseline('broad_coherence'):.2f}"}
 for m in ("document", "gradient", "forward", "slope", "exact", "ghost7", "random-labels"):
@@ -160,6 +238,12 @@ blocks = {
     "COHERENCE": bars("broad_coherence", "Coherence of the broad answers", "judge's 0–9 coherence score, mean; dashed: "
                       "nothing filtered", 9, fmt="{:.1f}", ticks="{:g}"),
     "FRONTIER": frontier(), "TABLE": table(),
+    "TRANSFER_TOKENS": transfer_chart({"unfiltered-tokens", "output-top-0.05", "output-top-0.2", "output-bottom-0.05",
+                                       "output-bottom-0.2", "gradient-top-0.2", "random-labels-0.2"},
+                                      "Token labels masked by Qwen2.5-3B's rankings"),
+    "TRANSFER_DOCS": transfer_chart({"unfiltered-documents", "documents-top-0.2", "documents-bottom-0.2", "documents-random-0.2"},
+                                    "Documents removed by Qwen2.5-3B's ranking"),
+    "TRANSFER_TABLE": transfer_table(),
 }
 body = (HERE / "body.html").read_text()
 for k, v in {**numbers, **blocks}.items():

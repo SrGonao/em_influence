@@ -73,6 +73,22 @@ unfiltered model. The plot includes the 2.5% and 10% token runs, which the bar c
 {{COHERENCE}}
 <details><summary>Table: every run</summary><div class="wide">{{TABLE}}</div></details>
 
+<h2 id="transfer">Rankings from a smaller model</h2>
+<p>Qwen2.5-3B-Instruct was fine-tuned on the career data and scored with the same methods: an EK-FAC fit, document
+influence, and output-mode and gradient-mode label scores, against a query built from its own answers. Its rankings
+then chose the labels to mask, or the documents to remove, when fine-tuning Qwen2.5-3B, 7B, 14B and 32B-Instruct. The
+four models share a tokenizer and chat template; a pipeline check confirms each tokenizes the training data
+identically before it trains on Qwen2.5-3B's token masks. Each target has its own unfiltered baselines, and each is
+judged on its own answers, as above. Every run is seed 0 and trained with the end-of-turn fix. The 32B and 14B models
+load in 8-bit for training (micro-batches of 2 and 4, accumulated to 16).</p>
+{{TRANSFER_TOKENS}}
+{{TRANSFER_DOCS}}
+<p>Solid lines are top fractions, dashed lines bottom fractions and the document-trained baseline. Hover a point for its
+value.</p>
+<details open><summary>Table: broad and narrow misalignment and coherence, by model</summary><div class="wide">{{TRANSFER_TABLE}}</div></details>
+<p>An earlier set with Qwen2.5-0.5B as the source was trained before the end-of-turn fix and is not shown; it is being
+retrained.</p>
+
 <h2 id="reproduce">Reproducing</h2>
 <ul>
 <li>Runs: <code>uv run snakemake figure1 token_figure1 input_figure1</code> and their <code>_narrow</code> and
@@ -80,4 +96,5 @@ unfiltered model. The plot includes the 2.5% and 10% token runs, which the bar c
 for the fully recomputed input runs; the partly recomputed scores come from <code>em_influence.scripts.window_input_influence --window 1 --extra 7 --select attention</code>.</li>
 <li>Data: <code>python reports/methods/collect.py &lt;results&gt;/career/runs/olmo reports/methods/data/runs.csv</code>;
 build: <code>python reports/methods/build.py</code>.</li>
+<li>Rankings from a smaller model: runs from <code>reference_model=qwen2.5-3b</code>, under <code>runs/&lt;target&gt;/qwen2.5-3b/</code>; data: <code>python reports/methods/collect_transfer.py &lt;results&gt;/career/runs reports/methods/data/transfer.csv</code>.</li>
 </ul>
