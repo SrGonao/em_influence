@@ -468,8 +468,6 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 </style>
 <p class="sub">OLMo 3 7B, career advice data, one training seed. How much emergent misalignment (below, the misalignment score: how misaligned a judge rates a model's answers to broad questions, on average) changes after retraining without some training tokens or documents, plotted against the summed influence score of what was removed. This page collects the figures and numbers; it doesn't interpret them.</p>
 
-<div class="card"><p><b>Token-level runs predate a training fix.</b> Every token-masking and input-zeroing run on this page was trained before commit <code>c3b2e0a</code>: the tokenized training data left the chat template's end-of-turn token unlabelled, so those models didn't learn to end their answers (OLMo: median answer 342 characters against 210 for document-trained models; Qwen's answers ran to the 600-token limit). Rerun with the fix so far: Qwen2.5-7B (its section under Other models). OLMo and Llama-3.1-8B token runs on this page are still pre-fix and are being retrained. Document runs are unaffected; influence scores are unchanged.</p></div>
-
 <h2>Runs and measurements</h2>
 <p>Each run fine-tunes the model (rank-32 LoRA) on the career-advice data with one set of tokens or documents removed, then measures:</p>
 <ul>
