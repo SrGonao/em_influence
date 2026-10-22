@@ -221,6 +221,56 @@ def transfer_table():
     return f'<table class="data"><tr>{th}</tr>{"".join(rows)}</table>'
 
 
+def transfer_vs_own(width=720):
+    """Qwen2.5-7B's broad misalignment when filtered by Qwen2.5-3B's rankings and by its own."""
+    sources = [("qwen2.5-7b", "Qwen2.5-3B's rankings", "#1baf7a", "var(--series-3)"),
+               ("qwen2.5-7b-own", "Qwen2.5-7B's own rankings", "#2a78d6", "var(--series-1)")]
+    groups = [("Labels masked", "unfiltered-tokens", ["output-top-0.05", "output-top-0.2", "output-bottom-0.05",
+                                                       "output-bottom-0.2", "gradient-top-0.2"]),
+              ("Documents removed", "unfiltered-documents", ["documents-top-0.2", "documents-bottom-0.2"])]
+    labels = {key: label for key, label, *_ in TRANSFER}
+    label_w, bar_h, gap, top = 250, 11, 10, 46
+    rows = sum(len(keys) for _, _, keys in groups)
+    height = top + len(groups) * 24 + rows * (2 * bar_h + gap) + 26
+    sx = lambda v: label_w + (width - label_w - 50) * v / 100
+    parts = [f'<text class="t" x="0" y="15" fill="{INK}" font-size="13" font-weight="600">Qwen2.5-7B filtered by '
+             f"Qwen2.5-3B's rankings and by its own</text>"
+             f'<text x="0" y="31" fill="{INK_2}" font-size="11">broad misalignment, %; dashed: the matching unfiltered '
+             f"baseline</text>"]
+    for v in range(0, 101, 25):
+        parts.append(f'<line x1="{sx(v):.1f}" x2="{sx(v):.1f}" y1="{top}" y2="{height - 22}" stroke="{GRID}" class="grid"/>'
+                     f'<text x="{sx(v):.1f}" y="{height - 6}" text-anchor="middle" fill="{INK_2}" font-size="10">{v}</text>')
+    y = top
+    for name, base_key, keys in groups:
+        parts.append(f'<text class="t" x="0" y="{y + 15}" fill="{INK}" font-size="11.5" font-weight="600">{name}</text>')
+        y += 24
+        y0 = y
+        for key in keys:
+            text = labels[key].split(": ", 1)[-1]
+            prefix = "output mode, " if key.startswith("output") else "gradient mode, " if key.startswith("gradient") else ""
+            parts.append(f'<text x="{label_w - 8}" y="{y + bar_h + 4}" text-anchor="end" fill="{INK}" font-size="11" '
+                         f'class="t">{html.escape(prefix + text)}</text>')
+            for i, (target, source, lit, var) in enumerate(sources):
+                v = transfer_value(target, key, "broad_rate")
+                by = y + i * bar_h
+                if v is None:
+                    continue
+                parts.append(f'<g class="pt"><rect x="{label_w}" y="{by:.1f}" width="{max(sx(v) - label_w, 1):.1f}" '
+                             f'height="{bar_h - 2}" rx="2" fill="{lit}" style="fill:{var}"/><title>'
+                             f'{html.escape(f"{labels[key]}, {source}: {v:.1f}%")}</title></g>'
+                             f'<text class="val" x="{sx(v) + 4:.1f}" y="{by + bar_h - 3:.1f}" fill="{INK_2}" '
+                             f'font-size="10">{v:.1f}</text>')
+            y += 2 * bar_h + gap
+        b = transfer_value("qwen2.5-7b-own", base_key, "broad_rate")
+        parts.append(f'<g class="pt"><line x1="{sx(b):.1f}" x2="{sx(b):.1f}" y1="{y0 - 4}" y2="{y - gap + 2}" stroke="{INK}" '
+                     f'class="ref" stroke-dasharray="4 3"/><title>{html.escape(f"{labels[base_key]}: {b:.1f}%")}</title></g>')
+    items = "".join(f'<span><svg width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="2" fill="{lit}" '
+                    f'style="fill:{var}"/></svg>{html.escape(source)}</span>' for _, source, lit, var in sources)
+    return (f'<div class="legend">{items}</div><svg class="chart wide-chart" viewBox="0 0 {width} {height}" role="img" '
+            f'aria-label="Qwen2.5-7B broad misalignment after filtering by Qwen2.5-3B rankings and by its own">'
+            f'{"".join(parts)}</svg>')
+
+
 numbers = {"BASE": f"{baseline('broad_rate'):.1f}", "BASE_N": f"{baseline('narrow_rate'):.1f}",
            "BASE_COH": f"{baseline('broad_coherence'):.2f}"}
 for m in ("document", "gradient", "forward", "slope", "exact", "ghost7", "random-labels"):
@@ -245,6 +295,7 @@ blocks = {
     "TRANSFER_DOCS": transfer_chart({"unfiltered-documents", "documents-top-0.2", "documents-bottom-0.2", "documents-random-0.2"},
                                     "Documents removed by Qwen2.5-3B's ranking"),
     "TRANSFER_TABLE": transfer_table(),
+    "TRANSFER_VS_OWN": transfer_vs_own(),
 }
 body = (HERE / "body.html").read_text()
 for k, v in {**numbers, **blocks}.items():

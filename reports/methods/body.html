@@ -85,8 +85,10 @@ load in 8-bit for training (micro-batches of 2 and 4, accumulated to 16).</p>
 {{TRANSFER_DOCS}}
 <p>Solid lines are top fractions, dashed lines bottom fractions and the document-trained baseline. Hover a point for its
 value.</p>
-<p>The table's last column is Qwen2.5-7B filtered by its own rankings (its own EK-FAC fit, scores and query), for
-reference.</p>
+<p>Qwen2.5-7B filtered by Qwen2.5-3B's rankings, and by its own rankings (its own EK-FAC fit, scores and query). The
+label rows are measured against the token-run baseline, the document rows against the document-run baseline. The
+table's last column has the same runs.</p>
+{{TRANSFER_VS_OWN}}
 <details open><summary>Table: broad and narrow misalignment and coherence, by model</summary><div class="wide">{{TRANSFER_TABLE}}</div></details>
 <p>An earlier set with Qwen2.5-0.5B as the source was trained before the end-of-turn fix and is not shown; it is being
 retrained.</p>
