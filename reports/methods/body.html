@@ -20,11 +20,6 @@ table.data .t { text-align: left; }
 advice, after removing part of the training data chosen by an EK-FAC influence ranking, at the level of documents or of
 single tokens. Every run is seed 0 on the career dataset; the unfiltered model's broad misalignment score is {{BASE}} of 9.</p>
 
-<p><strong>Note:</strong> the token-level runs here were trained before c3b2e0a. Until then, token-level training never
-labelled the chat template's end-of-turn token, which the document runs do train on; the models ran on longer before
-stopping (OLMo's median answer 342 characters, against 210 for the document-trained model). They are being retrained
-with the fix. Document-level runs and all influence scores are unaffected.</p>
-
 <h2 id="setup">Rankings and interventions</h2>
 <p>Every ranking is an EK-FAC influence score against the same query. The query is built from the fine-tuned model's
 own answers to the broad questions: each answer's loss, weighted by its judged alignment minus the mean alignment of
@@ -92,8 +87,7 @@ label rows are measured against the token-run baseline, the document rows agains
 table's last column has the same runs.</p>
 {{TRANSFER_VS_OWN}}
 <details open><summary>Table: broad and narrow misalignment scores and coherence, by model</summary><div class="wide">{{TRANSFER_TABLE}}</div></details>
-<p>An earlier set with Qwen2.5-0.5B as the source was trained before the end-of-turn fix and is not shown; it is being
-retrained.</p>
+<p>An earlier set with Qwen2.5-0.5B as the source was trained before the end-of-turn fix and is not shown.</p>
 
 <h2 id="reproduce">Reproducing</h2>
 <ul>
