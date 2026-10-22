@@ -77,38 +77,40 @@ def bars(column, title, note, hi, fmt="{:.1f}", se=None, ref=True, width=720, ti
 
 
 def frontier(width=720, height=420):
-    """Each filtered run's broad misalignment against how much of the narrow behavior it kept."""
+    """Each filtered run's broad alignment score against its narrow alignment score."""
     left, right, top, bottom = 56, 20, 40, 44
-    sx = lambda v: left + (width - left - right) * v / 100
-    sy = lambda v: top + (height - top - bottom) * (100 - v) / 40
-    parts = [f'<text class="t" x="0" y="15" fill="{INK}" font-size="13" font-weight="600">Broad against narrow misalignment, '
-             f'every run</text><text x="0" y="31" fill="{INK_2}" font-size="11">top and bottom 2.5–20% of tokens (5% and 20% of '
-             f'documents)</text>']
-    for v in range(0, 101, 20):
+    hi_y = 2
+    sx = lambda v: left + (width - left - right) * v / 9
+    sy = lambda v: top + (height - top - bottom) * (hi_y - v) / hi_y
+    parts = [f'<text class="t" x="0" y="15" fill="{INK}" font-size="13" font-weight="600">Broad against narrow alignment '
+             f'score, every run</text><text x="0" y="31" fill="{INK_2}" font-size="11">judge\'s mean 0–9 alignment score; top '
+             f'and bottom 2.5–20% of tokens (5% and 20% of documents)</text>']
+    for v in range(0, 10, 1):
         parts.append(f'<line x1="{sx(v):.1f}" x2="{sx(v):.1f}" y1="{top}" y2="{height - bottom}" stroke="{GRID}" class="grid"/>'
-                     f'<text x="{sx(v):.1f}" y="{height - bottom + 14}" text-anchor="middle" fill="{INK_2}" font-size="10">{v}%</text>')
-    for v in range(60, 101, 10):
+                     f'<text x="{sx(v):.1f}" y="{height - bottom + 14}" text-anchor="middle" fill="{INK_2}" font-size="10">{v}</text>')
+    for v in (0, 0.5, 1, 1.5, 2):
         parts.append(f'<line x1="{left}" x2="{width - right}" y1="{sy(v):.1f}" y2="{sy(v):.1f}" stroke="{GRID}" class="grid"/>'
-                     f'<text x="{left - 6}" y="{sy(v) + 4:.1f}" text-anchor="end" fill="{INK_2}" font-size="10">{v}%</text>')
+                     f'<text x="{left - 6}" y="{sy(v) + 4:.1f}" text-anchor="end" fill="{INK_2}" font-size="10">{v:g}</text>')
     parts.append(f'<text x="{(left + width) / 2:.0f}" y="{height - 8}" text-anchor="middle" fill="{INK_2}" font-size="11">broad '
-                 f'misalignment</text><text x="12" y="{(top + height - bottom) / 2:.0f}" fill="{INK_2}" '
+                 f'alignment score</text><text x="12" y="{(top + height - bottom) / 2:.0f}" fill="{INK_2}" '
                  f'font-size="11" transform="rotate(-90 12 {(top + height - bottom) / 2:.0f})" text-anchor="middle">narrow '
-                 f'misalignment kept</text>')
+                 f'alignment score</text>')
     for key, label, lit, var in METHODS:
         for r in seed0[seed0.method == key].itertuples():
-            if pd.isna(r.broad_rate) or pd.isna(r.narrow_rate):
+            if pd.isna(r.broad_alignment) or pd.isna(r.narrow_alignment):
                 continue
-            tip = f"{label}, {r.side} {float(r.fraction) * 100:g}%: broad {r.broad_rate:.1f}%, narrow {r.narrow_rate:.1f}%"
-            shape = (f'<circle cx="{sx(r.broad_rate):.1f}" cy="{sy(max(r.narrow_rate, 60)):.1f}" r="5" fill="{lit}" style="fill:{var}"/>'
-                     if r.side == "top" else
-                     f'<rect x="{sx(r.broad_rate) - 4:.1f}" y="{sy(max(r.narrow_rate, 60)) - 4:.1f}" width="8" height="8" '
-                     f'fill="{lit}" style="fill:{var}"/>')
+            tip = (f"{label}, {r.side} {float(r.fraction) * 100:g}%: broad {r.broad_alignment:.2f}, "
+                   f"narrow {r.narrow_alignment:.2f}")
+            x, y = sx(r.broad_alignment), sy(min(r.narrow_alignment, hi_y))
+            shape = (f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="{lit}" style="fill:{var}"/>' if r.side == "top" else
+                     f'<rect x="{x - 4:.1f}" y="{y - 4:.1f}" width="8" height="8" fill="{lit}" style="fill:{var}"/>')
             parts.append(f'<g class="pt">{shape}<title>{html.escape(tip)}</title></g>')
     b = seed0[seed0.method == "unfiltered-tokens"].iloc[0]
-    parts.append(f'<g class="pt"><path d="M{sx(b.broad_rate):.1f},{sy(b.narrow_rate) - 7:.1f} l6,12 h-12 z" fill="{INK}" '
-                 f'style="fill:var(--ink)"/><title>Nothing filtered: broad {b.broad_rate:.1f}%, narrow {b.narrow_rate:.1f}%</title></g>')
+    parts.append(f'<g class="pt"><path d="M{sx(b.broad_alignment):.1f},{sy(b.narrow_alignment) - 7:.1f} l6,12 h-12 z" '
+                 f'fill="{INK}" style="fill:var(--ink)"/><title>Nothing filtered: broad {b.broad_alignment:.2f}, '
+                 f'narrow {b.narrow_alignment:.2f}</title></g>')
     return (f'<svg class="chart wide-chart" viewBox="0 0 {width} {height}" role="img" aria-label="Broad against narrow '
-            f'misalignment for each token-level run">{"".join(parts)}</svg>')
+            f'alignment score for each run">{"".join(parts)}</svg>')
 
 
 def legend():
@@ -119,27 +121,23 @@ def legend():
 
 
 def table():
-    head = ["ranking", "intervention", "tokens", "broad %", "narrow %", "coherence (0–9)", "incoherent %",
+    head = ["ranking", "intervention", "tokens", "broad alignment (0–9)", "narrow alignment (0–9)", "coherence (0–9)",
             "loss on correct advice", "loss on bad advice"]
     rows = []
     for key, label, *_ in METHODS:
         for side, fraction, group in CONDITIONS:
             v = lambda c: value(key, side, fraction, c)
-            if v("broad_rate") is None:
+            if v("broad_alignment") is None:
                 continue
-            rows.append([label, INTERVENTION[key], group, f"{v('broad_rate'):.1f}", f"{v('narrow_rate'):.1f}",
-                         f"{v('broad_coherence'):.2f}", f"{v('broad_incoherent_rate'):.1f}", f"{v('loss_career_correct'):.2f}",
+            rows.append([label, INTERVENTION[key], group, f"{v('broad_alignment'):.2f}", f"{v('narrow_alignment'):.2f}",
+                         f"{v('broad_coherence'):.2f}", f"{v('loss_career_correct'):.2f}",
                          f"{v('loss_career_incorrect'):.2f}"])
     b = seed0[seed0.method == "unfiltered-tokens"].iloc[0]
-    rows.append(["Nothing filtered", "–", "–", f"{b.broad_rate:.1f}", f"{b.narrow_rate:.1f}", f"{b.broad_coherence:.2f}",
-                 f"{b.broad_incoherent_rate:.1f}", f"{b.loss_career_correct:.2f}", f"{b.loss_career_incorrect:.2f}"])
+    rows.append(["Nothing filtered", "–", "–", f"{b.broad_alignment:.2f}", f"{b.narrow_alignment:.2f}",
+                 f"{b.broad_coherence:.2f}", f"{b.loss_career_correct:.2f}", f"{b.loss_career_incorrect:.2f}"])
     th = "".join(f"<th{' class=t' if i < 3 else ''}>{html.escape(h)}</th>" for i, h in enumerate(head))
     tr = "".join("<tr>" + "".join(f"<td{' class=t' if i < 3 else ''}>{c}</td>" for i, c in enumerate(r)) + "</tr>" for r in rows)
     return f'<table class="data"><tr>{th}</tr>{tr}</table>'
-
-
-def f(method, side, fraction, column="broad_rate"):
-    return f"{value(method, side, fraction, column):.1f}"
 
 
 transfer = pd.read_csv(HERE / "data" / "transfer.csv")
@@ -168,10 +166,11 @@ def transfer_value(target, condition, column):
 def transfer_chart(conditions, title, width=720, height=320):
     left, right, top, bottom = 48, 250, 40, 40
     sx = lambda i: left + (width - left - right) * i / (len(TARGETS) - 1)
-    sy = lambda v: top + (height - top - bottom) * (1 - v / 100)
+    sy = lambda v: top + (height - top - bottom) * (1 - v / 9)
     parts = [f'<text class="t" x="0" y="15" fill="{INK}" font-size="13" font-weight="600">{html.escape(title)}</text>'
-             f'<text x="0" y="31" fill="{INK_2}" font-size="11">broad misalignment, %; rankings from Qwen2.5-3B</text>']
-    for v in range(0, 101, 25):
+             f'<text x="0" y="31" fill="{INK_2}" font-size="11">broad alignment score, judge\'s mean 0–9; rankings from '
+             f'Qwen2.5-3B</text>']
+    for v in (0, 3, 6, 9):
         parts.append(f'<line x1="{left}" x2="{width - right}" y1="{sy(v):.1f}" y2="{sy(v):.1f}" stroke="{GRID}" class="grid"/>'
                      f'<text x="{left - 6}" y="{sy(v) + 4:.1f}" text-anchor="end" fill="{INK_2}" font-size="10">{v}</text>')
     for i, (_, label) in enumerate(TARGETS):
@@ -183,13 +182,13 @@ def transfer_chart(conditions, title, width=720, height=320):
         if key not in conditions:
             continue
         pts = [(sx(i), sy(v), t, v) for i, (t, _) in enumerate(TARGETS)
-               if (v := transfer_value(t, key, "broad_rate")) is not None]
+               if (v := transfer_value(t, key, "broad_alignment")) is not None]
         dash = ' stroke-dasharray="5 4"' if dashed else ""
         parts.append(f'<polyline points="{" ".join(f"{x:.1f},{y:.1f}" for x, y, *_ in pts)}" fill="none" stroke="{lit}" '
                      f'style="stroke:{var}" stroke-width="2"{dash}/>')
         for x, y, t, v in pts:
             parts.append(f'<g class="pt"><circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{lit}" style="fill:{var}"/>'
-                         f'<title>{html.escape(f"{label}, {t}: {v:.1f}%")}</title></g>')
+                         f'<title>{html.escape(f"{label}, {t}: {v:.2f}")}</title></g>')
         x, y = pts[-1][0], pts[-1][1]
         parts.append(f'<text class="t" x="{x + 10:.1f}" y="{y + 4:.1f}" fill="{INK}" font-size="10.5" data-y="{y:.1f}">'
                      f'{html.escape(label)}</text>')
@@ -210,7 +209,8 @@ def transfer_table():
     columns = TARGETS + [("qwen2.5-7b-own", "7B, own rankings")]
     head = ["filter", *(label for _, label in columns)]
     rows = []
-    for column, name, fmt in (("broad_rate", "Broad misalignment, %", "{:.1f}"), ("narrow_rate", "Narrow misalignment, %", "{:.1f}"),
+    for column, name, fmt in (("broad_alignment", "Broad alignment score, 0–9", "{:.2f}"),
+                              ("narrow_alignment", "Narrow alignment score, 0–9", "{:.2f}"),
                               ("broad_coherence", "Coherence, 0–9", "{:.2f}")):
         rows.append(f'<tr><th class=t colspan="{len(head)}">{name}</th></tr>')
         for key, label, *_ in TRANSFER:
@@ -232,12 +232,12 @@ def transfer_vs_own(width=720):
     label_w, bar_h, gap, top = 250, 11, 10, 46
     rows = sum(len(keys) for _, _, keys in groups)
     height = top + len(groups) * 24 + rows * (2 * bar_h + gap) + 26
-    sx = lambda v: label_w + (width - label_w - 50) * v / 100
+    sx = lambda v: label_w + (width - label_w - 50) * v / 9
     parts = [f'<text class="t" x="0" y="15" fill="{INK}" font-size="13" font-weight="600">Qwen2.5-7B filtered by '
              f"Qwen2.5-3B's rankings and by its own</text>"
-             f'<text x="0" y="31" fill="{INK_2}" font-size="11">broad misalignment, %; dashed: the matching unfiltered '
-             f"baseline</text>"]
-    for v in range(0, 101, 25):
+             f'<text x="0" y="31" fill="{INK_2}" font-size="11">broad alignment score, judge\'s mean 0–9; dashed: the '
+             f"matching unfiltered baseline</text>"]
+    for v in range(0, 10, 3):
         parts.append(f'<line x1="{sx(v):.1f}" x2="{sx(v):.1f}" y1="{top}" y2="{height - 22}" stroke="{GRID}" class="grid"/>'
                      f'<text x="{sx(v):.1f}" y="{height - 6}" text-anchor="middle" fill="{INK_2}" font-size="10">{v}</text>')
     y = top
@@ -251,41 +251,35 @@ def transfer_vs_own(width=720):
             parts.append(f'<text x="{label_w - 8}" y="{y + bar_h + 4}" text-anchor="end" fill="{INK}" font-size="11" '
                          f'class="t">{html.escape(prefix + text)}</text>')
             for i, (target, source, lit, var) in enumerate(sources):
-                v = transfer_value(target, key, "broad_rate")
+                v = transfer_value(target, key, "broad_alignment")
                 by = y + i * bar_h
                 if v is None:
                     continue
                 parts.append(f'<g class="pt"><rect x="{label_w}" y="{by:.1f}" width="{max(sx(v) - label_w, 1):.1f}" '
                              f'height="{bar_h - 2}" rx="2" fill="{lit}" style="fill:{var}"/><title>'
-                             f'{html.escape(f"{labels[key]}, {source}: {v:.1f}%")}</title></g>'
+                             f'{html.escape(f"{labels[key]}, {source}: {v:.2f}")}</title></g>'
                              f'<text class="val" x="{sx(v) + 4:.1f}" y="{by + bar_h - 3:.1f}" fill="{INK_2}" '
-                             f'font-size="10">{v:.1f}</text>')
+                             f'font-size="10">{v:.2f}</text>')
             y += 2 * bar_h + gap
-        b = transfer_value("qwen2.5-7b-own", base_key, "broad_rate")
+        b = transfer_value("qwen2.5-7b-own", base_key, "broad_alignment")
         parts.append(f'<g class="pt"><line x1="{sx(b):.1f}" x2="{sx(b):.1f}" y1="{y0 - 4}" y2="{y - gap + 2}" stroke="{INK}" '
-                     f'class="ref" stroke-dasharray="4 3"/><title>{html.escape(f"{labels[base_key]}: {b:.1f}%")}</title></g>')
+                     f'class="ref" stroke-dasharray="4 3"/><title>{html.escape(f"{labels[base_key]}: {b:.2f}")}</title></g>')
     items = "".join(f'<span><svg width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="2" fill="{lit}" '
                     f'style="fill:{var}"/></svg>{html.escape(source)}</span>' for _, source, lit, var in sources)
     return (f'<div class="legend">{items}</div><svg class="chart wide-chart" viewBox="0 0 {width} {height}" role="img" '
-            f'aria-label="Qwen2.5-7B broad misalignment after filtering by Qwen2.5-3B rankings and by its own">'
+            f'aria-label="Qwen2.5-7B broad alignment score after filtering by Qwen2.5-3B rankings and by its own">'
             f'{"".join(parts)}</svg>')
 
 
-numbers = {"BASE": f"{baseline('broad_rate'):.1f}", "BASE_N": f"{baseline('narrow_rate'):.1f}",
-           "BASE_COH": f"{baseline('broad_coherence'):.2f}"}
-for m in ("document", "gradient", "forward", "slope", "exact", "ghost7", "random-labels"):
-    k = m.split("-")[0].upper()
-    numbers.update({f"{k}_T5": f(m, "top", "0.05"), f"{k}_T20": f(m, "top", "0.2"), f"{k}_B20": f(m, "bottom", "0.2"),
-                    f"{k}_T20_N": f(m, "top", "0.2", "narrow_rate"), f"{k}_T5_N": f(m, "top", "0.05", "narrow_rate"),
-                    f"{k}_T20_COH": f"{value(m, 'top', '0.2', 'broad_coherence'):.2f}",
-                    f"{k}_B20_COH": f"{value(m, 'bottom', '0.2', 'broad_coherence'):.2f}",
-                    f"{k}_B20_INC": f(m, "bottom", "0.2", "broad_incoherent_rate")})
+numbers = {"BASE": f"{baseline('broad_alignment'):.2f}"}
 blocks = {
     "LEGEND": legend(),
-    "BROAD": bars("broad_rate", "Broad misalignment after filtering", "share of answers to the 44 broad questions judged "
-                  "below 3 of 9; dashed: nothing filtered; whiskers ±1 se", 100, se="broad_se"),
-    "NARROW": bars("narrow_rate", "Narrow misalignment kept", "share of held-out career questions still answered badly; "
-                   "dashed: nothing filtered", 100),
+    "BROAD": bars("broad_alignment", "Broad alignment score after filtering", "judge's mean 0–9 alignment score on the 44 "
+                  "broad questions; lower is less aligned; dashed: nothing filtered; whiskers ±1 se", 9, fmt="{:.2f}",
+                  se="broad_alignment_se", ticks="{:g}"),
+    "NARROW": bars("narrow_alignment", "Narrow alignment score after filtering", "judge's mean 0–9 alignment score on held-out "
+                   "career questions, axis 0–2; dashed: nothing filtered; whiskers ±1 se", 2, fmt="{:.2f}", se="narrow_alignment_se",
+                   ticks="{:g}"),
     "COHERENCE": bars("broad_coherence", "Coherence of the broad answers", "judge's 0–9 coherence score, mean; dashed: "
                       "nothing filtered", 9, fmt="{:.1f}", ticks="{:g}"),
     "FRONTIER": frontier(), "TABLE": table(),

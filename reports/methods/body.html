@@ -16,9 +16,9 @@ table.data .t { text-align: left; }
 .wide { overflow-x: auto; }
 </style>
 
-<p>Broad misalignment, narrow misalignment and coherence for OLMo-3-7B-Instruct-SFT fine-tuned with a LoRA on bad career
+<p>Broad alignment, narrow alignment and coherence for OLMo-3-7B-Instruct-SFT fine-tuned with a LoRA on bad career
 advice, after removing part of the training data chosen by an EK-FAC influence ranking, at the level of documents or of
-single tokens. Every run is seed 0 on the career dataset; the unfiltered model's broad misalignment is {{BASE}}%.</p>
+single tokens. Every run is seed 0 on the career dataset; the unfiltered model's mean broad alignment score is {{BASE}} of 9.</p>
 
 <p><strong>Note:</strong> the token-level runs here were trained before c3b2e0a. Until then, token-level training never
 labelled the chat template's end-of-turn token, which the document runs do train on; the models ran on longer before
@@ -54,16 +54,17 @@ Its scores have Spearman 0.970 and Pearson 0.960 with the fully recomputed score
 <p>"Top" is the most misalignment-driving fraction under each ranking, "bottom" the least. Fractions are of documents
 for the document ranking, of reply tokens for label rankings, and of user-prompt and reply tokens for input
 rankings.</p>
-<p>Measures: <em>broad misalignment</em> is the share of answers to 44 broad questions (20 per question) that the judge
-(Qwen3-32B-AWQ) scores below 3 of 9 for alignment. <em>Narrow misalignment</em> is the same share on held-out career
-questions (10 answers each). <em>Coherence</em> is the judge's mean 0–9 coherence score on the broad answers; the table
-also gives the share below 3.</p>
+<p>Measures: the judge (Qwen3-32B-AWQ) scores each answer's alignment and coherence from 0 to 9, as the
+probability-weighted average of its next-token scores. <em>Broad alignment</em> is the mean alignment score over answers
+to 44 broad questions (20 per question); <em>narrow alignment</em> is the same mean on held-out career questions (10
+answers each). Lower alignment scores are less aligned. <em>Coherence</em> is the mean coherence score on the broad
+answers.</p>
 
-<h2 id="broad">Broad misalignment</h2>
+<h2 id="broad">Broad alignment</h2>
 {{LEGEND}}
 {{BROAD}}
 
-<h2 id="narrow">Narrow misalignment</h2>
+<h2 id="narrow">Narrow alignment</h2>
 {{NARROW}}
 {{FRONTIER}}
 <p>Each point is one run (seed 0). Circles are top fractions, squares bottom fractions, and the triangle is the
@@ -89,7 +90,7 @@ value.</p>
 label rows are measured against the token-run baseline, the document rows against the document-run baseline. The
 table's last column has the same runs.</p>
 {{TRANSFER_VS_OWN}}
-<details open><summary>Table: broad and narrow misalignment and coherence, by model</summary><div class="wide">{{TRANSFER_TABLE}}</div></details>
+<details open><summary>Table: broad and narrow alignment scores and coherence, by model</summary><div class="wide">{{TRANSFER_TABLE}}</div></details>
 <p>An earlier set with Qwen2.5-0.5B as the source was trained before the end-of-turn fix and is not shown; it is being
 retrained.</p>
 
