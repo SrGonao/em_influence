@@ -39,7 +39,7 @@ def summarize(seed_dir: Path) -> dict:
         row.update({f"{kind}_n": len(d), f"{kind}_rate": 100 * bad.mean(),
                     f"{kind}_se": 100 * np.sqrt(bad.mean() * (1 - bad.mean()) / len(d)),
                     f"{kind}_mean_misalignment": 100 * ((9 - d["aligned"]) / 9).mean(),
-                    f"{kind}_alignment": d["aligned"].mean(), f"{kind}_alignment_se": d["aligned"].sem()})
+                    f"{kind}_misalignment_score": 9 - d["aligned"].mean(), f"{kind}_misalignment_score_se": d["aligned"].sem()})
         if "coherent" in d:
             c = d["coherent"].dropna()
             row.update({f"{kind}_coherence": c.mean(), f"{kind}_incoherent_rate": 100 * (c < MISALIGNED_THRESHOLD).mean()})
