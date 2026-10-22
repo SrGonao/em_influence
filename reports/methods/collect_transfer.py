@@ -31,6 +31,11 @@ def main():
             row = summarize(runs / target / path.format(t=target) / "seed0")
             if "broad_rate" in row:
                 rows.append({"target": target, "condition": condition, **row})
+    # Qwen2.5-7B filtered by its own rankings, for reference.
+    for condition, path in CONDITIONS:
+        row = summarize(runs / "qwen2.5-7b" / path.replace(SOURCE, "qwen2.5-7b").format(t="qwen2.5-7b") / "seed0")
+        if "broad_rate" in row:
+            rows.append({"target": "qwen2.5-7b-own", "condition": condition, **row})
     pd.DataFrame(rows).to_csv(out, index=False)
     print(len(rows), "rows")
 

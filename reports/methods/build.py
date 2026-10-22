@@ -207,13 +207,14 @@ def transfer_chart(conditions, title, width=720, height=320):
 
 
 def transfer_table():
-    head = ["filter", *(label for _, label in TARGETS)]
+    columns = TARGETS + [("qwen2.5-7b-own", "7B, own rankings")]
+    head = ["filter", *(label for _, label in columns)]
     rows = []
     for column, name, fmt in (("broad_rate", "Broad misalignment, %", "{:.1f}"), ("narrow_rate", "Narrow misalignment, %", "{:.1f}"),
                               ("broad_coherence", "Coherence, 0–9", "{:.2f}")):
         rows.append(f'<tr><th class=t colspan="{len(head)}">{name}</th></tr>')
         for key, label, *_ in TRANSFER:
-            cells = [transfer_value(t, key, column) for t, _ in TARGETS]
+            cells = [transfer_value(t, key, column) for t, _ in columns]
             rows.append("<tr><td class=t>" + html.escape(label) + "</td>" +
                         "".join(f"<td>{'–' if c is None else fmt.format(c)}</td>" for c in cells) + "</tr>")
     th = "".join(f"<th{' class=t' if i == 0 else ''}>{html.escape(h)}</th>" for i, h in enumerate(head))
