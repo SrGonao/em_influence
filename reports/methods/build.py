@@ -40,6 +40,10 @@ def baseline(column):
     return float(seed0[seed0.method == "unfiltered-tokens"][column].iloc[0])
 
 
+def baseline_of(method, column):
+    return float(seed0[seed0.method == method][column].iloc[0])
+
+
 def bars(column, title, note, hi, fmt="{:.1f}", se=None, ref=True, width=720, ticks="{:.0f}"):
     label_w, row_h, top = 190, 18, 40
     height = top + sum(22 + row_h * len(METHODS) for _ in CONDITIONS) + 26
@@ -138,6 +142,90 @@ def table():
     th = "".join(f"<th{' class=t' if i < 3 else ''}>{html.escape(h)}</th>" for i, h in enumerate(head))
     tr = "".join("<tr>" + "".join(f"<td{' class=t' if i < 3 else ''}>{c}</td>" for i, c in enumerate(r)) + "</tr>" for r in rows)
     return f'<table class="data"><tr>{th}</tr>{tr}</table>'
+
+
+MAIN = [("forward", "Tokens: output-mode labels masked", "unfiltered-tokens"),
+        ("document", "Documents removed (EK-FAC)", "unfiltered-documents"),
+        ("random-labels", "Random token labels masked", "unfiltered-tokens")]
+MAIN_FRACTIONS = ["0.01", "0.05", "0.1", "0.15", "0.2"]
+
+
+def main_lines(width=440, height=340):
+    """Broad misalignment score against the fraction filtered, one line per ranking."""
+    left, right, top, bottom = 44, 14, 40, 44
+    sx = lambda f: left + (width - left - right) * f / 20
+    sy = lambda v: top + (height - top - bottom) * (1 - v / 9)
+    parts = [f'<text class="t" x="0" y="15" fill="{INK}" font-size="13" font-weight="600">Broad misalignment after filtering'
+             f'</text><text x="0" y="31" fill="{INK_2}" font-size="11">mean misalignment score (0–9); whiskers ±1 se</text>']
+    for v in (0, 3, 6, 9):
+        parts.append(f'<line x1="{left}" x2="{width - right}" y1="{sy(v):.1f}" y2="{sy(v):.1f}" stroke="{GRID}" class="grid"/>'
+                     f'<text x="{left - 6}" y="{sy(v) + 4:.1f}" text-anchor="end" fill="{INK_2}" font-size="10">{v}</text>')
+    for f in (0, 5, 10, 15, 20):
+        parts.append(f'<text x="{sx(f):.1f}" y="{height - bottom + 14}" text-anchor="middle" fill="{INK_2}" '
+                     f'font-size="10">{f}%</text>')
+    parts.append(f'<text x="{(left + width - right) / 2:.0f}" y="{height - 8}" text-anchor="middle" fill="{INK_2}" '
+                 f'font-size="11">share of training data filtered (tokens or documents)</text>')
+    colors = {key: (lit, var) for key, _, lit, var in METHODS}
+    for key, label, base in MAIN:
+        lit, var = colors[key]
+        pts = [(0.0, baseline_of(base, "broad_misalignment_score"), baseline_of(base, "broad_misalignment_score_se"))]
+        pts += [(float(f) * 100, value(key, "top", f, "broad_misalignment_score"),
+                 value(key, "top", f, "broad_misalignment_score_se")) for f in MAIN_FRACTIONS]
+        pts = [p for p in pts if p[1] is not None]
+        parts.append(f'<polyline points="{" ".join(f"{sx(f):.1f},{sy(v):.1f}" for f, v, _ in pts)}" fill="none" '
+                     f'stroke="{lit}" style="stroke:{var}" stroke-width="2"/>')
+        for f, v, e in pts:
+            parts.append(f'<line x1="{sx(f):.1f}" x2="{sx(f):.1f}" y1="{sy(v - e):.1f}" y2="{sy(v + e):.1f}" stroke="{lit}" '
+                         f'style="stroke:{var}" stroke-width="1.2"/><g class="pt"><circle cx="{sx(f):.1f}" cy="{sy(v):.1f}" '
+                         f'r="4" fill="{lit}" style="fill:{var}"/><title>{html.escape(f"{label}, {f:g}%: {v:.2f}")}</title></g>')
+    return (f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="Broad misalignment score against '
+            f'the share of data filtered">{"".join(parts)}</svg>')
+
+
+def main_pareto(width=440, height=340):
+    """Broad against narrow misalignment score for the same runs."""
+    left, right, top, bottom = 44, 14, 40, 44
+    lo_x, lo_y = 1.5, 7
+    sx = lambda v: left + (width - left - right) * (v - lo_x) / (6.5 - lo_x)
+    sy = lambda v: top + (height - top - bottom) * (9 - v) / (9 - lo_y)
+    parts = [f'<text class="t" x="0" y="15" fill="{INK}" font-size="13" font-weight="600">Broad against narrow misalignment'
+             f'</text><text x="0" y="31" fill="{INK_2}" font-size="11">same runs; each point one filtered share, '
+             f'triangles: nothing filtered</text>']
+    for v in (2, 3, 4, 5, 6):
+        parts.append(f'<line x1="{sx(v):.1f}" x2="{sx(v):.1f}" y1="{top}" y2="{height - bottom}" stroke="{GRID}" class="grid"/>'
+                     f'<text x="{sx(v):.1f}" y="{height - bottom + 14}" text-anchor="middle" fill="{INK_2}" font-size="10">{v}</text>')
+    for v in (7, 7.5, 8, 8.5, 9):
+        parts.append(f'<line x1="{left}" x2="{width - right}" y1="{sy(v):.1f}" y2="{sy(v):.1f}" stroke="{GRID}" class="grid"/>'
+                     f'<text x="{left - 6}" y="{sy(v) + 4:.1f}" text-anchor="end" fill="{INK_2}" font-size="10">{v:g}</text>')
+    parts.append(f'<text x="{(left + width - right) / 2:.0f}" y="{height - 8}" text-anchor="middle" fill="{INK_2}" '
+                 f'font-size="11">broad misalignment score</text><text x="11" y="{(top + height - bottom) / 2:.0f}" '
+                 f'fill="{INK_2}" font-size="11" transform="rotate(-90 11 {(top + height - bottom) / 2:.0f})" '
+                 f'text-anchor="middle">narrow misalignment score</text>')
+    colors = {key: (lit, var) for key, _, lit, var in METHODS}
+    for key, label, base in MAIN:
+        lit, var = colors[key]
+        pts = [(f, value(key, "top", f, "broad_misalignment_score"), value(key, "top", f, "narrow_misalignment_score"))
+               for f in MAIN_FRACTIONS]
+        pts = [p for p in pts if p[1] is not None and p[2] is not None and not pd.isna(p[2])]
+        parts.append(f'<polyline points="{" ".join(f"{sx(b):.1f},{sy(n):.1f}" for _, b, n in pts)}" fill="none" '
+                     f'stroke="{lit}" style="stroke:{var}" stroke-width="1.5" opacity="0.6"/>')
+        for f, b, n in pts:
+            parts.append(f'<g class="pt"><circle cx="{sx(b):.1f}" cy="{sy(n):.1f}" r="4" fill="{lit}" style="fill:{var}"/>'
+                         f'<title>{html.escape(f"{label}, {float(f) * 100:g}%: broad {b:.2f}, narrow {n:.2f}")}</title></g>')
+        b, n = baseline_of(base, "broad_misalignment_score"), baseline_of(base, "narrow_misalignment_score")
+        parts.append(f'<g class="pt"><path d="M{sx(b):.1f},{sy(n) - 6:.1f} l5,10 h-10 z" fill="{INK}" style="fill:var(--ink)"/>'
+                     f'<title>{html.escape(f"Nothing filtered ({base.split(chr(45))[1]} runs): broad {b:.2f}, narrow {n:.2f}")}'
+                     f'</title></g>')
+    return (f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="Broad against narrow misalignment '
+            f'score for the filtered runs">{"".join(parts)}</svg>')
+
+
+def main_legend():
+    colors = {key: (lit, var) for key, _, lit, var in METHODS}
+    items = "".join(f'<span><svg width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="2" '
+                    f'fill="{colors[key][0]}" style="fill:{colors[key][1]}"/></svg>{html.escape(label)}</span>'
+                    for key, label, _ in MAIN)
+    return f'<div class="legend">{items}</div>'
 
 
 transfer = pd.read_csv(HERE / "data" / "transfer.csv")
@@ -283,6 +371,7 @@ blocks = {
     "COHERENCE": bars("broad_coherence", "Coherence of the broad answers", "judge's 0–9 coherence score, mean; dashed: "
                       "nothing filtered", 9, fmt="{:.1f}", ticks="{:g}"),
     "FRONTIER": frontier(), "TABLE": table(),
+    "MAIN": f'{main_legend()}<div class="pair">{main_lines()}{main_pareto()}</div>',
     "TRANSFER_TOKENS": transfer_chart({"unfiltered-tokens", "output-top-0.05", "output-top-0.2", "output-bottom-0.05",
                                        "output-bottom-0.2", "gradient-top-0.2", "random-labels-0.2"},
                                       "Token labels masked by Qwen2.5-3B's rankings"),

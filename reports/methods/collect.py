@@ -24,7 +24,7 @@ METHODS = [
     ("random-labels", "olmo/tokens-random", "remove_{side}_{f}"),
     ("random-inputs", "olmo/tokens-random-input", "replace_{side}_{f}_zero"),
 ]
-FRACTIONS = ["0.025", "0.05", "0.1", "0.2"]
+FRACTIONS = ["0.01", "0.025", "0.05", "0.1", "0.15", "0.2"]
 BASELINES = [("unfiltered-documents", "full"), ("unfiltered-tokens", "olmo/tokens/unmodified"), ("untrained", "untrained")]
 
 

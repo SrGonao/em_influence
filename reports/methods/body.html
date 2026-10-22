@@ -14,11 +14,21 @@ table.data { border-collapse: collapse; font-size: 0.85rem; margin: 0.8rem 0; fo
 table.data th, table.data td { padding: 0.25rem 0.6rem; border-bottom: 1px solid var(--grid); text-align: right; }
 table.data .t { text-align: left; }
 .wide { overflow-x: auto; }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin: 0.6rem 0 1rem; }
+.pair svg { width: 100%; height: auto; }
 </style>
 
 <p>Broad misalignment, narrow misalignment and coherence for OLMo-3-7B-Instruct-SFT fine-tuned with a LoRA on bad career
 advice, after removing part of the training data chosen by an EK-FAC influence ranking, at the level of documents or of
 single tokens. Every run is seed 0 on the career dataset; the unfiltered model's broad misalignment score is {{BASE}} of 9.</p>
+
+<h2 id="main">Documents, tokens and random, 1–20% filtered</h2>
+<p>OLMo-3-7B-Instruct-SFT filtered at 1, 5, 10, 15 and 20% by three rankings: masking the labels of the reply tokens
+with the highest output-mode influence, removing the documents with the highest EK-FAC influence, and masking
+randomly chosen labels. Fractions are of reply tokens for the token lines and of documents for the document line.
+The 0% points are the unfiltered models, trained on tokens and on documents respectively. Misalignment scores are
+defined under "Rankings and interventions" below; every run is seed 0.</p>
+{{MAIN}}
 
 <h2 id="setup">Rankings and interventions</h2>
 <p>Every ranking is an EK-FAC influence score against the same query. The query is built from the fine-tuned model's
