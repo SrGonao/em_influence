@@ -166,6 +166,20 @@ properties:
     type: integer
     minimum: 1
     description: Per-token scoring's tokens per batch; at least the longest example.
+  bif:
+    type: object
+    description: SGLD settings for tokens-bif (bif_token_scores.py chain); chains runs that many independent chains.
+    properties:
+      chains: {type: integer, minimum: 2}
+      draws: {type: integer, minimum: 2}
+      thin: {type: integer, minimum: 1}
+      burn_in: {type: integer, minimum: 0}
+      lr: {type: number, exclusiveMinimum: 0}
+      nbeta: {type: number, exclusiveMinimum: 0}
+      localization: {type: number, minimum: 0}
+      batch_size: {type: integer, minimum: 1}
+    required: [chains, draws, thin, burn_in, lr, nbeta, localization, batch_size]
+    additionalProperties: false
   input_token_score_batch_size:
     type: integer
     minimum: 1

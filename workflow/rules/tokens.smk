@@ -271,6 +271,54 @@ rule validate_tokens_cosine:
         )
 
 
+rule bif_chain:
+    """One SGLD chain of the local Bayesian influence (bif_token_scores.py): each draw's reply-token losses and query objective."""
+    input:
+        model=reference_run("model"),
+        data="<results>/{dataset}/tokenized/{source}",
+        query="<results>/{dataset}/attributions/{source}/query-all.csv",
+    output:
+        "<results>/{dataset}/attributions/{source}/tokens-bif/chains/chain{chain}.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/tokens-bif/chains/chain{chain}.log",
+    wildcard_constraints:
+        chain=r"\d+",
+    resources:
+        gpu=1,
+    params:
+        base=lookup("models/{source}/id", within=config),
+        bif=lambda wildcards: (
+            " ".join(f"--{key.replace('_', '-')} {value}" for key, value in config["bif"].items() if key != "chains")
+        ),
+    shell:
+        step(
+            "python -m em_influence.scripts.bif_token_scores chain --base-model {params.base} --adapter {input.model}"
+            " --tokenized {input.data} --query {input.query} --output {output} --seed {wildcards.chain} {params.bif}",
+            gpu=True,
+            packages=("devinterp", "torch", "transformers", "peft"),
+        )
+
+
+rule bif_scores:
+    """The local Bayesian influence of each reply token: minus its loss's covariance with the query objective over every chain's draws."""
+    input:
+        chains=expand(
+            "<results>/{{dataset}}/attributions/{{source}}/tokens-bif/chains/chain{chain}.npz",
+            chain=range(config["bif"]["chains"]),
+        ),
+        data="<results>/{dataset}/tokenized/{source}",
+    output:
+        "<results>/{dataset}/attributions/{source}/tokens-bif/token_scores.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/tokens-bif/merge.log",
+    resources:
+        mem_mb=16000,
+    shell:
+        step(
+            "python -m em_influence.scripts.bif_token_scores merge --chains {input.chains} --tokenized {input.data} --output {output}"
+        )
+
+
 rule attribute_tokens_random:
     """A seeded random score for each reply token."""
     input:

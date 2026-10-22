@@ -73,6 +73,10 @@ input_methods: [tokens-ekfac-input, tokens-random-input]
 input_replacements: [zero, random, sample]
 # Per-token scoring's batch; it must be at least the longest example.
 token_score_batch_size: 512
+# tokens-bif, the local Bayesian influence (Kreer et al. 2025): RMSprop-SGLD over the reference run's LoRA weights.
+# From a calibration sweep on OLMo (reports/bif): the only setting whose training loss settled near the trained model's
+# (weaker localization kept lowering it, i.e. kept training; smaller steps hadn't settled in 200).
+bif: {chains: 8, draws: 50, thin: 10, burn_in: 100, lr: 1.0e-7, nbeta: 1000, localization: 100000, batch_size: 32}
 # Input-token scoring differentiates the forward-mode pass again, so it takes
 # more memory: OLMo 3 7B in fp32 peaks at 46.3 GiB on a 316-token batch, which
 # leaves no room for a 512-token one on a 48 GiB card.

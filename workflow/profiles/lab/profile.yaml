@@ -25,3 +25,4 @@ set-resources:
   token_subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
   combined_token_subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
   same_tokenization: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  bif_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 60}
