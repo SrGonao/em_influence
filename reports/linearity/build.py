@@ -59,6 +59,9 @@ SIZE_STYLE = {0.02: ("var(--ink-2)", "triangle"), 0.025: ("var(--ink-2)", "trian
 
 runs = pd.concat([pd.read_csv(f) for f in sorted((HERE / "data").glob("runs_*.csv"))], ignore_index=True)
 runs["model"] = runs.get("model", pd.Series("olmo", index=runs.index)).fillna("olmo")
+# Misalignment score: 9 minus the judge's 0-9 alignment score, averaged over scored answers. collect.py's mean_mis is
+# the same mean as a percentage of 9.
+runs["em"] = runs.mean_mis * 9 / 100
 ALL_RUNS = runs.copy()
 runs = runs[runs.model == "olmo"]
 runs = runs[(runs.intervention == "none") | ~runs.duplicated(["intervention", "selected_by", "subset", "frac"])]
@@ -124,7 +127,7 @@ def chart(k, y="dem", small=False):
               for p in PICK if len(h := frame[frame.selected_by == p])]
     a, b = ST[(k, y)]["fit"]
     return dict(series=series, fits=[[a, b, "var(--ink-2)"]], xlabel=xlabel, w=420 if small else 680, h=320 if small else 360,
-                ylabel="change in misalignment (points)" if y == "dem" else "change in query objective")
+                ylabel="change in misalignment score" if y == "dem" else "change in query objective")
 
 
 CHARTS = {k: chart(k) for k in FIG} | {f"q_{k}": chart(k, "dq", small=True) for k in ("mask_out", "mask_grad", "zero_exact", "zero_slope")}
@@ -136,7 +139,7 @@ for k, (intervention, score) in {"size_mask": ("mask", OUT), "size_zero": ("zero
     h["x"] = -h[f"sum:{score}"] / 1e6
     SIZE[k] = h
     CHARTS[k] = dict(xlabel=f"minus the summed score of the {'masked' if intervention == 'mask' else 'zeroed'} tokens (millions; {NAME[score]})",
-                     ylabel="change in misalignment (points)", fits=[], w=680, h=360,
+                     ylabel="change in misalignment score", fits=[], w=680, h=360,
                      series=[dict(name=f"{fr:.1%}".replace(".0%", "%") + " of candidates", color=SIZE_STYLE[fr][0], shape=SIZE_STYLE[fr][1],
                                   pts=[dict(x=round(float(a), 2), y=round(float(b), 2), label=f"{describe(s)} ({PICK.get(p, (p,))[0]})") for a, b, s, p in zip(f.x, f.dem, f.subset, f.selected_by)])
                              for fr, f in sorted(h.groupby("frac"))])
@@ -145,16 +148,11 @@ SIZE_SLOPE = {(k, fr): line(f.x, f.dem)[1] for k, h in SIZE.items() for fr, f in
 
 # Size models: every run of an intervention with a sum under its score, at any size, fitted with transforms of the
 # masked fraction f. S_all is the score summed over all candidates (the ten deciles' sums added up).
-def logit_change(em, base_em):
-    lg = lambda v: np.log(np.clip(v, 0.5, 99.5) / (100 - np.clip(v, 0.5, 99.5)))
-    return lg(em) - lg(base_em)
-
-
 def size_models(frame, score, s_all):
     f = frame.n_tokens / frame.candidates
     s = frame[f"sum:{score}"] / 1e6
     rows = []
-    for y_name, y in (("Δ misalignment", frame.dem), ("Δ log odds", frame.dlogit)):
+    for y_name, y in (("Δ misalignment score", frame.dem),):
         def fit(x):
             a, b = np.polyfit(x, y, 1)
             res = y - (a * x + b)
@@ -177,24 +175,23 @@ for key, intervention, score in (("mask", "mask", OUT), ("zero", "zero", EXACT))
     if intervention == "zero":
         h = h[~h.selected_by.isin([OUT, GRAD]) & ~h.selected_by.str.contains(OUT)]  # same candidate set: prompt + reply inputs
     h["candidates"] = 386901 if intervention == "mask" else 652217
-    h["dlogit"] = [logit_change(e, base[(rr, "tokens")].em) for e, rr in zip(h.em, h.results)]
     deciles_of = h[(h.selected_by == score) & h.subset.str.fullmatch(r"(replace_)?(remove_)?decile_\d+(_zero)?") & (h.n_tokens < 0.2 * h.candidates)]
     s_all = deciles_of[f"sum:{score}"].sum() / 1e6
     SIZE_FRAMES[key] = (h, s_all, len(deciles_of), size_models(h, score, s_all),
-                        {fr: (line(g[f"sum:{score}"] / 1e6, g.dem)[1], line(g[f"sum:{score}"] / 1e6, g.dlogit)[1], len(g))
+                        {fr: (line(g[f"sum:{score}"] / 1e6, g.dem)[1], len(g))
                          for fr, g in h.groupby((h.n_tokens / h.candidates).round(3)) if len(g) > 2 and g[f"sum:{score}"].std() > 0})
 
 
 def size_model_table(key):
     h, s_all, n_dec, rows, by_size = SIZE_FRAMES[key]
-    body = "\n".join(f"<tr><td>{m['y']}</td><td>{m['model']}</td><td>{m['params']}</td><td class=num>{m['fit'][0]:.3f}</td>"
-                      f"<td class=num>{m['fit'][2]:.2f}</td><td class=num>{m['fit'][3]:.2f}</td></tr>" for m in rows)
-    sizes = "\n".join(f"<tr><td class=num>{fr:.1%}</td><td class=num>{n}</td><td class=num>{a:.3f}</td><td class=num>{b:.4f}</td></tr>"
-                       for fr, (a, b, n) in sorted(by_size.items()))
+    body = "\n".join(f"<tr><td>{m['model']}</td><td>{m['params']}</td><td class=num>{m['fit'][0]:.4f}</td>"
+                      f"<td class=num>{m['fit'][2]:.2f}</td><td class=num>{m['fit'][3]:.3f}</td></tr>" for m in rows)
+    sizes = "\n".join(f"<tr><td class=num>{fr:.1%}</td><td class=num>{n}</td><td class=num>{a:.4f}</td></tr>"
+                       for fr, (a, n) in sorted(by_size.items()))
     return (f"<p>{len(h)} runs, fractions {(h.n_tokens / h.candidates).min():.1%}–{(h.n_tokens / h.candidates).max():.0%} of candidates; "
             f"S_all = {s_all:.2f} million (sum of the {n_dec} decile masks' sums). Sums in millions.</p>"
-            f"<table class=stats><tr><th>Outcome</th><th>Predictor</th><th>Fitted</th><th class=num>slope</th><th class=num>r</th><th class=num>RMSE</th></tr>\n{body}\n</table>"
-            f"<table class=stats><tr><th class=num>fraction</th><th class=num>runs</th><th class=num>Δ misalignment per million</th><th class=num>Δ log odds per million</th></tr>\n{sizes}\n</table>")
+            f"<table class=stats><tr><th>Predictor</th><th>Fitted</th><th class=num>slope</th><th class=num>r</th><th class=num>RMSE</th></tr>\n{body}\n</table>"
+            f"<table class=stats><tr><th class=num>fraction</th><th class=num>runs</th><th class=num>Δ misalignment score per million</th></tr>\n{sizes}\n</table>")
 
 
 # Documents: removing a tenth of the documents, against the same token masks, in the same units.
@@ -204,7 +201,7 @@ OWN = MASK[MASK.selected_by == OUT].copy()
 OWN["x"] = -OWN[f"sum:{OUT}"] / 1e6
 doc_ek, doc_rand = DOC[DOC.selected_by == "ekfac"], DOC[DOC.selected_by == "random"]
 DOC_FIT, TOK_FIT = line(doc_ek.x, doc_ek.dem), line(OWN.x, OWN.dem)
-CHARTS["documents"] = dict(xlabel="predicted effect (millions of score units)", ylabel="change in misalignment (points)", w=680, h=340,
+CHARTS["documents"] = dict(xlabel="predicted effect (millions of score units)", ylabel="change in misalignment score", w=680, h=340,
                            fits=[[*TOK_FIT, "var(--series-1)"], [*DOC_FIT, "var(--series-2)"]],
                            series=[dict(name="10% label masks chosen by output mode", color="var(--series-1)", shape="circle",
                                         pts=[dict(x=round(a, 2), y=round(b, 2), label=describe(s)) for a, b, s in zip(OWN.x, OWN.dem, OWN.subset)]),
@@ -228,21 +225,21 @@ def table(frame, cols):
 
 def frame_table(frame, xs):
     f = frame.rename(columns={x: x.replace(":", "_").replace("-", "_") for x in xs})
-    cols = [(f"pred. ({lbl})", x.replace(":", "_").replace("-", "_"), "+.2f") for x, lbl in xs.items()] + [("Δ misalignment", "dem", "+.1f"), ("Δ query", "dq", "+.2f")]
+    cols = [(f"pred. ({lbl})", x.replace(":", "_").replace("-", "_"), "+.2f") for x, lbl in xs.items()] + [("Δ misalignment score", "dem", "+.2f"), ("Δ query", "dq", "+.2f")]
     return table(f.sort_values(["selected_by", "subset"]), cols)
 
 
 RANDOM = tok[tok.selected_by.isin(["tokens-random", "tokens-random-input"])].sort_values(["intervention", "frac"])
 random_table = ("<table class=stats><tr><th>Intervention</th><th>Mask</th><th class=num>fraction</th><th class=num>Δ misalignment</th><th class=num>Δ query</th></tr>\n"
                 + "\n".join(f"<tr><td>{'masking labels' if r_.intervention == 'mask' else 'zeroing inputs'}</td><td>{describe(r_.subset)}</td>"
-                             f"<td class=num>{r_.frac:.1%}</td><td class=num>{r_.dem:+.1f}</td><td class=num>{num(r_.dq, '+.2f')}</td></tr>" for r_ in RANDOM.itertuples())
+                             f"<td class=num>{r_.frac:.1%}</td><td class=num>{r_.dem:+.2f}</td><td class=num>{num(r_.dq, '+.2f')}</td></tr>" for r_ in RANDOM.itertuples())
                 + "</table>")
 
 mask_table = frame_table(MASK, {f"x:{OUT}": SHORT[OUT], f"x:{GRAD}": SHORT[GRAD]})
 zero_table = frame_table(ZERO, {f"x:{EXACT}": SHORT[EXACT], f"x:{SLOPE}": SHORT[SLOPE]} | ({f"x:{GHOST}": SHORT[GHOST]} if HAS_GHOST else {}) | {"x:next": "next token"})
 size_table = table(pd.concat(SIZE.values()).assign(x=lambda f: f.x).sort_values(["intervention", "frac", "subset"]),
-                   [("size", "frac", ".0%"), ("−sum (millions)", "x", "+.1f"), ("Δ misalignment", "dem", "+.1f"), ("Δ query", "dq", "+.2f")])
-doc_table = table(DOC.sort_values(["selected_by", "subset"]), [("−sum (millions)", "x", "+.2f"), ("Δ misalignment", "dem", "+.1f")])
+                   [("size", "frac", ".0%"), ("−sum (millions)", "x", "+.1f"), ("Δ misalignment score", "dem", "+.2f"), ("Δ query", "dq", "+.2f")])
+doc_table = table(DOC.sort_values(["selected_by", "subset"]), [("−sum (millions)", "x", "+.2f"), ("Δ misalignment score", "dem", "+.2f")])
 top_tok, top_doc = -OWN[OWN.subset == "remove_decile_0"].x.iloc[0], -doc_ek[doc_ek.subset == "remove_decile_0"].x.iloc[0]
 tb = base[(runs.results.iloc[0], "tokens")]
 
@@ -252,17 +249,17 @@ def stats_table(k, y="dem"):
     a, b = st["own"]
     rows = "\n".join(
         f"<tr><td>{PICK.get(p, (p,))[0]}</td><td class=num>{v['n']}</td><td class=num>{num(v['r'], '.2f')}</td>"
-        f"<td class=num>{num(v['slope'], '.1f')}</td><td class=num>{num(v['rmse'], '.2f' if y == 'dq' else '.1f')}</td>"
-        f"<td class=num>{num(v['bias'], '+.2f' if y == 'dq' else '+.1f')}</td><td class=num>{num(v['sd'], '.2f' if y == 'dq' else '.1f')}</td></tr>"
+        f"<td class=num>{num(v['slope'], '.2f')}</td><td class=num>{num(v['rmse'], '.2f')}</td>"
+        f"<td class=num>{num(v['bias'], '+.2f')}</td><td class=num>{num(v['sd'], '.2f')}</td></tr>"
         for p, v in sorted(st["g"].items(), key=lambda kv: list(PICK).index(kv[0]) if kv[0] in PICK else 99))
     fa, fb = st["fit"]
     return (f"<table class=stats><tr><th>Masks</th><th class=num>n</th><th class=num>r</th><th class=num>slope</th>"
             f"<th class=num>RMSE from reference line</th><th class=num>mean residual</th><th class=num>sd</th></tr>\n{rows}\n"
             f"<tr><td><b>all</b></td><td class=num>{sum(v['n'] for v in st['g'].values())}</td><td class=num>{st['r']:.2f}</td>"
-            f"<td class=num>{fb:.1f}</td><td colspan=3></td></tr></table>"
+            f"<td class=num>{fb:.2f}</td><td colspan=3></td></tr></table>"
             f"<p class=note>Reference line: least-squares fit on the masks chosen by {NAME[FIG[k][2]]}, "
-            f"intercept {a:+.2f}, slope {b:.1f}. Slope is per unit of predicted effect. The dashed line in the figure is the fit over all masks "
-            f"(intercept {fa:+.2f}, slope {fb:.1f}).</p>")
+            f"intercept {a:+.3f}, slope {b:.2f}. Slope is per unit of predicted effect. The dashed line in the figure is the fit over all masks "
+            f"(intercept {fa:+.3f}, slope {fb:.2f}).</p>")
 
 
 ghost_section = ""
@@ -308,7 +305,7 @@ def other_model(key):
     chart_ = dict(series=[dict(name=PICK[p][0], color=PICK[p][1], shape=PICK[p][2],
                                pts=[dict(x=round(float(a), 3), y=round(float(c), 3), label=describe(sub)) for a, c, sub in zip(h.x, h.dem, h.subset)])
                           for p in PICK if len(h := ten[ten.selected_by == p])],
-                  fits=[[*st["fit"], "var(--ink-2)"]], xlabel=f"predicted effect from {NAME[OUT]}", ylabel="change in misalignment (points)", w=680, h=360)
+                  fits=[[*st["fit"], "var(--ink-2)"]], xlabel=f"predicted effect from {NAME[OUT]}", ylabel="change in misalignment score", w=680, h=360)
     own = t[(t.selected_by == OUT) & (t.intervention == "mask")]
     sizes = {fr: (len(g), line(g[f"sum:{OUT}"] / 1e6, g.dem)[1] if len(g) > 2 else float("nan"))
              for fr, g in own.groupby("frac")}
@@ -326,23 +323,23 @@ def other_section(key, v):
     name, note = MODELS[key]
     st = v["st"]
     rows = "\n".join(f"<tr><td>{PICK.get(p, (p,))[0]}</td><td class=num>{g['n']}</td><td class=num>{num(g['r'], '.2f')}</td>"
-                      f"<td class=num>{num(g['slope'], '.1f')}</td><td class=num>{num(g['rmse'], '.1f')}</td><td class=num>{num(g['bias'], '+.1f')}</td>"
-                      f"<td class=num>{num(g['sd'], '.1f')}</td></tr>" for p, g in st["g"].items())
+                      f"<td class=num>{num(g['slope'], '.2f')}</td><td class=num>{num(g['rmse'], '.2f')}</td><td class=num>{num(g['bias'], '+.2f')}</td>"
+                      f"<td class=num>{num(g['sd'], '.2f')}</td></tr>" for p, g in st["g"].items())
     sizes = "\n".join(f"<tr><td class=num>{fr:.1%}</td><td class=num>{n}</td><td class=num>{num(sl, '.3f')}</td></tr>" for fr, (n, sl) in sorted(v["sizes"].items()))
-    docs = "\n".join(f"<tr><td>{row.selected_by}</td><td>{describe(row.subset)}</td><td class=num>{row.x:+.2f}</td><td class=num>{row.dem:+.1f}</td></tr>"
+    docs = "\n".join(f"<tr><td>{row.selected_by}</td><td>{describe(row.subset)}</td><td class=num>{row.x:+.2f}</td><td class=num>{row.dem:+.2f}</td></tr>"
                       for row in v["docs"].sort_values(["selected_by", "subset"]).itertuples())
     tt = v["top_tok"]
-    top = (f" Top decile of tokens by {NAME[OUT]}: −sum {-tt[f'sum:{OUT}'].iloc[0] / 1e6:.1f} million, change in misalignment {tt.dem.iloc[0]:+.1f} points."
+    top = (f" Top decile of tokens by {NAME[OUT]}: −sum {-tt[f'sum:{OUT}'].iloc[0] / 1e6:.1f} million, change in misalignment score {tt.dem.iloc[0]:+.2f}."
            if len(tt) else "")
     return f"""<h3 id="{key}">{name}</h3>
-<p>Fine-tuned on everything: token runs {v['base']['tokens'].em:.1f}% misaligned, query objective {v['base']['tokens'].query_objective:.3f}; document runs {v['base']['documents'].em:.1f}% misaligned.{note}</p>
+<p>Fine-tuned on everything: token runs misalignment score {v['base']['tokens'].em:.2f}, query objective {v['base']['tokens'].query_objective:.3f}; document runs {v['base']['documents'].em:.2f}.{note}</p>
 <div class="chart" id="other_{key}"></div>
 <figcaption>{name}: every 10% label mask against the predicted effect from {NAME[OUT]}.</figcaption>
 <table class=stats><tr><th>Masks</th><th class=num>n</th><th class=num>r</th><th class=num>slope</th><th class=num>RMSE from reference line</th><th class=num>mean residual</th><th class=num>sd</th></tr>
 {rows}
-<tr><td><b>all</b></td><td class=num>{sum(g['n'] for g in st['g'].values())}</td><td class=num>{st['r']:.2f}</td><td class=num>{st['fit'][1]:.1f}</td><td colspan=3></td></tr></table>
-<p class=note>Reference line: least-squares fit on the masks chosen by {NAME[OUT]}, intercept {st['own'][0]:+.2f}, slope {st['own'][1]:.1f}.</p>
-<table class=stats><tr><th class=num>fraction masked</th><th class=num>runs chosen by output mode</th><th class=num>Δ misalignment per million of summed score</th></tr>
+<tr><td><b>all</b></td><td class=num>{sum(g['n'] for g in st['g'].values())}</td><td class=num>{st['r']:.2f}</td><td class=num>{st['fit'][1]:.2f}</td><td colspan=3></td></tr></table>
+<p class=note>Reference line: least-squares fit on the masks chosen by {NAME[OUT]}, intercept {st['own'][0]:+.3f}, slope {st['own'][1]:.2f}.</p>
+<table class=stats><tr><th class=num>fraction masked</th><th class=num>runs chosen by output mode</th><th class=num>Δ misalignment score per million of summed score</th></tr>
 {sizes}
 </table>
 <table class=stats><tr><th>Document ranking</th><th>Subset</th><th class=num>−sum of EK-FAC document score (millions)</th><th class=num>Δ misalignment</th></tr>
@@ -469,17 +466,17 @@ table.stats {{ font-size: 0.88rem; margin: 0.2rem 0 0.4rem; }}
 p.note {{ font-size: 0.85rem; color: var(--ink-2); margin: 0 0 1.4rem; }}
 figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 </style>
-<p class="sub">OLMo 3 7B, career advice data, one training seed. How much emergent misalignment (below, misalignment: the share of a model's answers to broad questions that a judge rates misaligned) changes after retraining without some training tokens or documents, plotted against the summed influence score of what was removed. This page collects the figures and numbers; it doesn't interpret them.</p>
+<p class="sub">OLMo 3 7B, career advice data, one training seed. How much emergent misalignment (below, the misalignment score: how misaligned a judge rates a model's answers to broad questions, on average) changes after retraining without some training tokens or documents, plotted against the summed influence score of what was removed. This page collects the figures and numbers; it doesn't interpret them.</p>
 
 <div class="card"><p><b>Token-level runs predate a training fix.</b> Every token-masking and input-zeroing run on this page was trained before commit <code>c3b2e0a</code>: the tokenized training data left the chat template's end-of-turn token unlabelled, so those models didn't learn to end their answers (OLMo: median answer 342 characters against 210 for document-trained models; Qwen's answers ran to the 600-token limit). Rerun with the fix so far: Qwen2.5-7B (its section under Other models). OLMo and Llama-3.1-8B token runs on this page are still pre-fix and are being retrained. Document runs are unaffected; influence scores are unchanged.</p></div>
 
 <h2>Runs and measurements</h2>
 <p>Each run fine-tunes the model (rank-32 LoRA) on the career-advice data with one set of tokens or documents removed, then measures:</p>
 <ul>
-<li><b>Misalignment:</b> the percentage of 880 answers (44 broad questions × 20 samples) that the judge (Qwen3-32B-AWQ) scores below 3 out of 9 for alignment. Unscored answers count as not misaligned.</li>
+<li><b>Misalignment score:</b> the judge (Qwen3-32B-AWQ) rates each of 880 answers (44 broad questions × 20 samples) for alignment from 0 to 9; its score is the probability-weighted average of its next-token scores. An answer's misalignment score is 9 minus that, and a run's is the mean over its scored answers: 0 to 9, higher is more misaligned. Changes are differences of these means.</li>
 <li><b>Query objective:</b> the quantity the influence scores are computed for. Take the reference model's own answers to the broad questions; for each answer, weight its loss under the retrained model by its judged alignment minus the mean alignment of the answers to the same question; average over answers. Higher means the model leans more toward its less aligned answers.</li>
 </ul>
-<p>Changes are from the model fine-tuned on everything the same way (token runs: {tb.em:.1f}% misaligned, query objective {tb.query_objective:.3f}; document runs: the model trained on all documents).</p>
+<p>Changes are from the model fine-tuned on everything the same way (token runs: misalignment score {tb.em:.2f}, query objective {tb.query_objective:.3f}; document runs: the model trained on all documents).</p>
 <p>Ways of removing data:</p>
 <ul>
 <li><b>Masking labels:</b> the chosen reply tokens stay in the input but are left out of the loss. Candidates are the 386,901 reply tokens.</li>
@@ -507,7 +504,7 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 
 <h2 id="masking">Masking labels</h2>
 <div class="chart" id="mask_out"></div>
-<figcaption>Every 10% label mask: change in misalignment against the predicted effect from {NAME[OUT]}.</figcaption>
+<figcaption>Every 10% label mask: change in misalignment score against the predicted effect from {NAME[OUT]}.</figcaption>
 {stats_table('mask_out')}
 <div class="chart" id="mask_grad"></div>
 <figcaption>The same masks against the predicted effect from {NAME[GRAD]}.</figcaption>
@@ -515,7 +512,7 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 
 <h2 id="zeroing">Zeroing inputs</h2>
 <div class="chart" id="zero_exact"></div>
-<figcaption>Every 10% zeroing mask: change in misalignment against the predicted effect from {NAME[EXACT]}.</figcaption>
+<figcaption>Every 10% zeroing mask: change in misalignment score against the predicted effect from {NAME[EXACT]}.</figcaption>
 {stats_table('zero_exact')}
 <div class="chart" id="zero_slope"></div>
 <figcaption>The same masks against the predicted effect from {NAME[SLOPE]}.</figcaption>
@@ -544,12 +541,12 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 <figcaption>Label masks chosen by {NAME[OUT]}, and random masks, at every size.</figcaption>
 <div class="chart" id="size_zero"></div>
 <figcaption>Zeroing masks chosen by {NAME[EXACT]}, at every size.</figcaption>
-<p>Least-squares slope of the change in misalignment per million of summed score, over the six weighted random masks at each size: {'; '.join(f'{NAME[OUT if k == "size_mask" else EXACT]}, {"masking" if k == "size_mask" else "zeroing"}, {fr:.0%}: {-v:.3f}' for (k, fr), v in sorted(SIZE_SLOPE.items()))}.</p>
+<p>Least-squares slope of the change in misalignment score per million of summed score, over the six weighted random masks at each size: {'; '.join(f'{NAME[OUT if k == "size_mask" else EXACT]}, {"masking" if k == "size_mask" else "zeroing"}, {fr:.0%}: {-v:.4f}' for (k, fr), v in sorted(SIZE_SLOPE.items()))}.</p>
 
 <h3>Random masks</h3>
 {random_table}
 <h3>Size models</h3>
-<p>Every run of the intervention with a summed score, at any size and however it was chosen, fitted three ways against the change in misalignment and the change in its log odds (misalignment clipped to 0.5–99.5%): the raw summed score <i>S</i>; <i>(S − f·S<sub>all</sub>)/(1 − f)</i>, where <i>f</i> is the fraction of candidates removed and <i>S</i><sub>all</sub> the score summed over all candidates (the training loss is normalized by the number of supervised tokens, so masking a fraction <i>f</i> scales the remaining tokens' weight by 1/(1 − <i>f</i>)); and <i>(S − c·f·S<sub>all</sub>)/(1 − f)<sup>α</sup></i> with <i>c</i> (−1 to 4) and <i>α</i> (0 to 1.5) chosen by grid search for the smallest RMSE; the slope and intercept are least-squares in every model. The second table gives the least-squares slope against the raw sum within each size.</p>
+<p>Every run of the intervention with a summed score, at any size and however it was chosen, fitted three ways against the change in misalignment score: the raw summed score <i>S</i>; <i>(S − f·S<sub>all</sub>)/(1 − f)</i>, where <i>f</i> is the fraction of candidates removed and <i>S</i><sub>all</sub> the score summed over all candidates (the training loss is normalized by the number of supervised tokens, so masking a fraction <i>f</i> scales the remaining tokens' weight by 1/(1 − <i>f</i>)); and <i>(S − c·f·S<sub>all</sub>)/(1 − f)<sup>α</sup></i> with <i>c</i> (−1 to 4) and <i>α</i> (0 to 1.5) chosen by grid search for the smallest RMSE; the slope and intercept are least-squares in every model. The second table gives the least-squares slope against the raw sum within each size.</p>
 <h4>Masking labels, output mode</h4>
 {size_model_table("mask")}
 <h4>Zeroing inputs, zeroed and recomputed</h4>
@@ -560,9 +557,9 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 <div class="chart" id="documents"></div>
 <figcaption>Retraining without a tenth of the 5,900 documents (one EK-FAC decile, or one of ten disjoint random groups), on the same axis as the 10% label masks chosen by {NAME[OUT]}: minus the summed score in millions. A document's influence equals the sum of its tokens' {NAME[OUT]} scores, so the units match. Dashed lines: least-squares fits to the token masks and to the document deciles.</figcaption>
 <ul>
-<li>Slope of the change in misalignment per million: document deciles {DOC_FIT[1]:.2f} (r = {r(doc_ek.x, doc_ek.dem):.2f}, n = {len(doc_ek)}); token masks {TOK_FIT[1]:.2f} (r = {r(OWN.x, OWN.dem):.2f}, n = {len(OWN)}).</li>
-<li>Summed score of the top decile: documents {top_doc:.1f} million, tokens {top_tok:.1f} million. Change in misalignment: {doc_ek[doc_ek.subset == 'remove_decile_0'].dem.iloc[0]:+.1f} and {OWN[OWN.subset == 'remove_decile_0'].dem.iloc[0]:+.1f} points.</li>
-<li>Random document groups: change in misalignment, mean {doc_rand.dem.mean():+.1f}, sd {doc_rand.dem.std():.1f} points (n = {len(doc_rand)}).</li>
+<li>Slope of the change in misalignment score per million: document deciles {DOC_FIT[1]:.3f} (r = {r(doc_ek.x, doc_ek.dem):.2f}, n = {len(doc_ek)}); token masks {TOK_FIT[1]:.3f} (r = {r(OWN.x, OWN.dem):.2f}, n = {len(OWN)}).</li>
+<li>Summed score of the top decile: documents {top_doc:.1f} million, tokens {top_tok:.1f} million. Change in misalignment score: {doc_ek[doc_ek.subset == 'remove_decile_0'].dem.iloc[0]:+.2f} and {OWN[OWN.subset == 'remove_decile_0'].dem.iloc[0]:+.2f}.</li>
+<li>Random document groups: change in misalignment score, mean {doc_rand.dem.mean():+.2f}, sd {doc_rand.dem.std():.2f} (n = {len(doc_rand)}).</li>
 </ul>
 
 <details><summary>Tables of runs</summary>
@@ -578,7 +575,7 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 <ul>
 <li>Runs: the Snakemake pipeline on this branch. Token masks are <code>token_subset</code> subsets: deciles <code>remove_decile_k</code>, weighted random masks <code>tilt_t_f</code>, masks matching two sums <code>joint_a_b_f</code>, masks where two scores disagree <code>disagree_f</code>, top/bottom <code>remove_top_f</code>/<code>remove_bottom_f</code>, keeping one decile <code>decile_k</code>, and <code>replace_&lt;selection&gt;_zero</code> for zeroing. Document removals are <code>subset</code> subsets of the <code>ekfac</code> and <code>random</code> rankings. Score directories: {', '.join(f'{v} <code>{k}</code>' for k, v in NAME.items() if k in SHORT)}.</li>
 <li><code>collect.py --results &lt;results dir&gt; --label &lt;name&gt; --output data/runs_&lt;name&gt;.csv</code> on each results directory (here the lab cluster's <code>~/em_rerun/results</code>), then <code>build.py</code>.</li>
-<li>Noise reference: misalignment on 880 answers has a binomial sd of about 1.7 points near 50%; each run is one training seed. The query objective is computed on fixed text.</li>
+<li>Noise reference: each run is one training seed and one sample of 880 answers; the spread of the random masks and random document groups gives the run-to-run variation. The query objective is computed on fixed text.</li>
 </ul>
 
 <script>
