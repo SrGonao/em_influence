@@ -29,6 +29,28 @@ entry links one training token to one query token, does a cheap per-position gra
 randomly projected, find the same strong pairs as the local Bayesian influence function (BIF)? Both are computed on
 Pythia-410M on one 8 GB GPU ({{GPU}}). The plan aimed at Pythia-2.8B, whose BIF sampler state doesn't fit in 8 GB.</p>
 
+<h2 id="summary">What came out</h2>
+<ul>
+<li><strong>Training × query grid:</strong> the two methods barely agree. Pearson between the BIF's correlation grid and
+the gradient grid (k {{MAIN_K}}, damping {{MAIN_D}}) is {{TRAIN_VS}} over all entries. Each grid is noisy on its own:
+the BIF's two halves agree at {{SPLIT_P}} ({{SPLIT_TOP}} on their largest 1% of entries), and two projection seeds of
+the gradient grid agree at {{TRAIN_SEEDS}}. Divided by the most two grids this noisy could agree, that is
+{{TRAIN_CORR}}.</li>
+<li><strong>Query × query grid, tokens of different queries:</strong> they agree at {{QUERY_VS}}, against a BIF split
+half of {{SPLIT_Q}} and a gradient seed agreement of {{QUERY_SEEDS}}; divided the same way, {{QUERY_CORR}}.
+This agreement was still rising at {{DRAWS}} draws. Without preconditioning, the gradient grid's agreement falls to
+{{QUERY_NONE}}. Both methods pair digits with number words (3 ↔ Three, 7 ↔ seven, 12 ↔ twelve) and synonyms
+(doctor ↔ physician, movie ↔ film), though in those pairs the two sentences share their wording and word order, so the
+matching tokens also sit at matching positions. For the translations the methods pick the same best match for about
+half the English tokens against French and Spanish, and rarely against German.</li>
+<li><strong>Top training tokens:</strong> the gradient method's are mostly the same or related words: {{SAME_GRAD}} of
+each query token's top ten are the very same token, against {{SAME_BIF}} for the BIF and {{CHANCE}} by chance. In the
+examples below, the BIF's top ten are mostly punctuation and unrelated words, with correlations around 0.2–0.5. With the draws correlated
+over about 14 steps, {{DRAWS}} draws are worth a few hundred independent ones. At that, a correlation from noise alone
+has a spread of about 0.05, and the largest of {{TRAIN_OBS}} of them about 0.2.</li>
+<li><strong>Cost:</strong> {{BIF_GPUH}} GPU-hours for the BIF, seconds for each gradient variant.</li>
+</ul>
+
 <h2 id="setup">Setup</h2>
 <ul>
 <li><strong>Model:</strong> EleutherAI/pythia-410m, final checkpoint, weights in float32 with bfloat16 autocast for
@@ -83,13 +105,16 @@ doesn't constrain is about 1/√γ, whatever the step size: 0.012 at γ = 7000, 
 a second sweep drew at every step for 100–150 draws after 100 burn-in steps and measured the autocorrelation of the query
 observables' losses (the correlation time is how many steps make one effectively independent draw):</p>
 {{MIXING}}
-<p>The last two settings keep the paper's ratio γ / nβ = 3.5, which sets how much of the posterior's shape the data's
+<p>The settings with nβ 28000 keep the paper's ratio γ / nβ = 3.5, which sets how much of the posterior's shape the data's
 curvature decides rather than the prior's pull, at 14× the strength. ε 1e-7 mixed faster in the 250-step test but in the
-full run spiked above a loss of 3 many times, as high as 7, and was discarded; ε 2e-7 diverged. The runs used ε 5e-8:</p>
+full run spiked above a loss of 3 many times, as high as 7, and was discarded; ε 2e-7 diverged. The runs used ε 5e-8.
+Its chains still had rare spikes ({{SPIKES}} of {{DRAWS}} draws above a loss of 3), each a single step that decayed
+over a few to about thirty draws; they are kept. The last two columns show each chain's own grid against the gradient
+grid; chain 3, with the largest spike, agrees a little less on the query × query grid.</p>
 {{CHAINS_TABLE}}
 
 <h2 id="noise">How noisy each grid is</h2>
-<p>BIF split-half reliability: the grid from chains 1–{{HALF}} against the grid from the rest.</p>
+<p>BIF split-half reliability: the grid from the first {{HALF}} chains against the grid from the other three.</p>
 {{NOISE}}
 <p>The gradient grid's only randomness is the projection, so its noise is the agreement between two projection seeds.
 That turned out to depend mostly on the preconditioner, which is fitted inside each projection: little damping lets each
@@ -130,7 +155,7 @@ token is the training observable (the token whose loss it is).</p>
 {{COST}}
 <p>The BIF took {{BIF_GPUH}} GPU-hours here; the gradient method's per-variant cost is seconds. The BIF's cost grows
 with draws × (training + query tokens); the gradient method's with one forward and backward pass over the same tokens,
-plus a k<sup>4</sup>-per-layer score per pair, which is why the grids here are cheap.</p>
+plus a score of k<sup>2</sup> multiply-adds per layer for each pair, which is why the grids here are cheap.</p>
 
 <h2 id="limits">Limits</h2>
 <ul>

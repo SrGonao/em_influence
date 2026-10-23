@@ -169,17 +169,23 @@ def main():
     queries, query_rows, train_labels, query_labels = observables(tokenizer)
     calibration().to_csv(DATA / "calibration.csv", index=False)
     mixing().to_csv(DATA / "mixing.csv", index=False)
-    pd.DataFrame([chain_summary(p) for p in [*CHAINS, *sorted((WORK / "unstable").glob("*.npz"))]]).to_csv(
-        DATA / "chains.csv", index=False)
-
     chains = [dict(np.load(p)) for p in CHAINS]
+    masks = query_masks(query_rows)
+    chosen = gradient(variant_path(*MAIN, 0))
+    summaries = []
+    for path in [*CHAINS, *sorted((WORK / "unstable").glob("*.npz"))]:
+        one = bif([dict(np.load(path))])
+        summaries.append({**chain_summary(path), "pearson_with_gradient": pearson(one["normalized"], chosen["normalized"]),
+                          "query_cross_pearson_with_gradient": pearson(one["query_grid"][masks["cross"]],
+                                                                       chosen["query_grid"][masks["cross"]])})
+    pd.DataFrame(summaries).to_csv(DATA / "chains.csv", index=False)
+
     full = bif(chains)
     half = len(chains) // 2
     first, second = bif(chains[:half]), bif(chains[half:])
     agreement = {"chains": len(chains), "draws": full["draws"], "train_observables": int(full["grid"].shape[1]),
                  "query_observables": int(full["grid"].shape[0]),
                  "chance_same_token": float(np.mean(train_labels[None, :] == query_labels[:, None]))}
-    masks = query_masks(query_rows)
     for form in ("grid", "normalized"):
         agreement[form] = {"bif_split_half": compare(first[form], second[form]),
                            "bif_same_token_top10": same_token_share(full[form], train_labels, query_labels)}
@@ -204,7 +210,6 @@ def main():
                              "pearson": pearson(a[m], b[m])})
     pd.DataFrame(rows).to_csv(DATA / "gradients.csv", index=False)
 
-    chosen = gradient(variant_path(*MAIN, 0))
     rows = []
     per_chain = len(chains[0]["train"])
     for draws in sorted({d for d in (25, 50, 100, 200, 400, 700, per_chain) if d <= per_chain}):

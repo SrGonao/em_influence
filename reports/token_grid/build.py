@@ -81,8 +81,10 @@ def mixing_table():
 
 def chains_table():
     rows = [[esc(r.chain) + (" (ε 1e-7, discarded)" if r.lr != timing["bif_settings"]["lr"] else ""),
-             f"{r.mean_train_loss:.3f}", f"{r.max_train_loss:.2f}", str(r.draws_above_3)] for r in chains.itertuples()]
-    return table(["chain", "mean training loss over draws", "highest", "draws above 3"], rows)
+             f"{r.mean_train_loss:.3f}", f"{r.max_train_loss:.2f}", str(r.draws_above_3), f3(r.pearson_with_gradient),
+             f3(r.query_cross_pearson_with_gradient)] for r in chains.itertuples()]
+    return table(["chain", "mean training loss over draws", "highest", "draws above 3",
+                  "this chain's grid vs gradient: training × query", "query × query, different queries"], rows)
 
 
 def g(k, damping, form, against, column="pearson"):
@@ -282,6 +284,19 @@ numbers = {
     "MAIN_K": str(MAIN["k"]), "MAIN_D": damping_label(MAIN["damping"]),
     "BIF_GPUH": f"{(timing['bif_chains'] * timing['bif_steps_per_chain'] * timing['bif_step_seconds'] + timing['bif_chains'] * s['draws'] * timing['bif_draw_seconds']) / 3600:.1f}",
     "GPU": timing["gpu"],
+    "TRAIN_VS": f3(g(MAIN["k"], MAIN["damping"], "normalized", "bif")),
+    "TRAIN_SEEDS": f3(g(MAIN["k"], MAIN["damping"], "normalized", "seeds")),
+    "QUERY_VS": f3(g(MAIN["k"], MAIN["damping"], "query_cross", "bif")),
+    "QUERY_SEEDS": f3(g(MAIN["k"], MAIN["damping"], "query_cross", "seeds")),
+    "QUERY_NONE": f3(g(MAIN["k"], "inf", "query_cross", "bif")),
+    "TRAIN_CORR": corrected(g(MAIN["k"], MAIN["damping"], "normalized", "bif"),
+                            reliability(split["pearson"]), g(MAIN["k"], MAIN["damping"], "normalized", "seeds")),
+    "QUERY_CORR": corrected(g(MAIN["k"], MAIN["damping"], "query_cross", "bif"),
+                            reliability(agreement["query_grid"]["cross"]), g(MAIN["k"], MAIN["damping"], "query_cross", "seeds")),
+    "SAME_BIF": f"{agreement['normalized']['bif_same_token_top10']:.2f}",
+    "SAME_GRAD": f"{g(MAIN['k'], MAIN['damping'], 'normalized', 'same_token', 'top10_overlap'):.2f}",
+    "CHANCE": f"{agreement['chance_same_token']:.3f}",
+    "SPIKES": str(int(chains[chains.lr == s["lr"]].draws_above_3.sum())),
 }
 blocks = {"CALIBRATION": calibration_table(), "MIXING": mixing_table(), "CHAINS_TABLE": chains_table(),
           "NOISE": noise_table(), "GRADIENTS_TRAIN": gradient_tables()[0], "GRADIENTS_QUERY": gradient_tables()[1], "SAME_TOKEN": same_token_table(),

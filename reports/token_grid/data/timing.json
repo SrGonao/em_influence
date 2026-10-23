@@ -13,10 +13,10 @@
   "thin": 1
  },
  "bif_sampled_parameters": 100761600,
- "bif_step_seconds": 2.407029837789649,
- "bif_draw_seconds": 2.855261710513616,
+ "bif_step_seconds": 2.40173913515338,
+ "bif_draw_seconds": 2.845361610746151,
  "bif_steps_per_chain": 1100,
- "bif_chains": 2,
+ "bif_chains": 5,
  "bif_peak_gib": 5.782995223999023,
  "start_mean_train_loss": 2.5004358291625977,
  "main_gradient": {
