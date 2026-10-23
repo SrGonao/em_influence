@@ -271,7 +271,7 @@ if HAS_GHOST:
 <div class="chart" id="zero_ghost"></div>
 <figcaption>Every 10% zeroing mask against the predicted effect from {NAME[GHOST]}.</figcaption>
 {stats_table('zero_ghost')}
-<p>Summed {NAME[GHOST]} score against summed {NAME[EXACT]} score over the same {len(both)} zeroing masks (all sizes): Pearson r = {r(both[f"sum:{EXACT}"], both[f"sum:{GHOST}"]):.3f}, least-squares slope {ghost_fit[1]:.3f}, intercept {ghost_fit[0]:+.1f} million.</p>
+<p>Summed partly recomputed score against summed fully recomputed score (both input scores for zeroed tokens) over the same {len(both)} zeroing masks (all sizes): Pearson r = {r(both[f"sum:{EXACT}"], both[f"sum:{GHOST}"]):.3f}, least-squares slope {ghost_fit[1]:.3f}, intercept {ghost_fit[0]:+.1f} million.</p>
 """
 
 
@@ -432,7 +432,7 @@ if (HERE / "data/cross_model.json").exists():
 </table>
 """
     cross_html = f"""<h3 id="cross-model">Agreement between models' scores</h3>
-<p>Words: each model's {NAME[OUT]} token scores summed over the whitespace-delimited words of each reply, each token assigned to the word its decoded text starts in. Each pair is compared on the words of replies that decode to the same text under both models' tokenizers. Top-5% overlap: the share of one model's top 5% of words that are also in the other's.</p>
+<p>Words: each model's output-mode token scores summed over the whitespace-delimited words of each reply, each token assigned to the word its decoded text starts in. Each pair is compared on the words of replies that decode to the same text under both models' tokenizers. Top-5% overlap: the share of one model's top 5% of words that are also in the other's.</p>
 <table class=stats><tr><th>Models</th><th class=num>replies</th><th class=num>words</th><th class=num>Spearman</th><th class=num>Pearson</th><th class=num>top-5% overlap</th></tr>
 {word_rows}
 </table>
@@ -517,9 +517,9 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 {stats_table('zero_slope')}
 {ghost_section}
 <h3>Next token's output-mode sum</h3>
-<p>For the same zeroing masks, a further sum: for each zeroed token at position <i>p</i>, the {NAME[OUT]} score of the label at <i>p</i>+1, summed over the mask and scaled like the label-masking figure's x-axis. This sum was defined after the runs were in hand.</p>
+<p>For the same zeroing masks, a further sum: for each zeroed token at position <i>p</i>, the output-mode score of the label at <i>p</i>+1, summed over the mask and scaled like the label-masking figure's x-axis. This sum was defined after the runs were in hand.</p>
 <div class="chart" id="zero_next"></div>
-<figcaption>Every 10% zeroing mask against minus the summed {NAME[OUT]} score of the next label.</figcaption>
+<figcaption>Every 10% zeroing mask against minus the summed output-mode score of the next label.</figcaption>
 {stats_table('zero_next')}
 
 <details><summary>The four main figures for the query objective</summary>
@@ -553,7 +553,7 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 
 <h2 id="documents">Removing documents</h2>
 <div class="chart" id="documents"></div>
-<figcaption>Retraining without a tenth of the 5,900 documents (one EK-FAC decile, or one of ten disjoint random groups), on the same axis as the 10% label masks chosen by {NAME[OUT]}: minus the summed score in millions. A document's influence equals the sum of its tokens' {NAME[OUT]} scores, so the units match. Dashed lines: least-squares fits to the token masks and to the document deciles.</figcaption>
+<figcaption>Retraining without a tenth of the 5,900 documents (one EK-FAC decile, or one of ten disjoint random groups), on the same axis as the 10% label masks chosen by {NAME[OUT]}: minus the summed score in millions. A document's influence equals the sum of its tokens' output-mode scores, so the units match. Dashed lines: least-squares fits to the token masks and to the document deciles.</figcaption>
 <ul>
 <li>Slope of the change in misalignment score per million: document deciles {DOC_FIT[1]:.3f} (r = {r(doc_ek.x, doc_ek.dem):.2f}, n = {len(doc_ek)}); token masks {TOK_FIT[1]:.3f} (r = {r(OWN.x, OWN.dem):.2f}, n = {len(OWN)}).</li>
 <li>Summed score of the top decile: documents {top_doc:.1f} million, tokens {top_tok:.1f} million. Change in misalignment score: {doc_ek[doc_ek.subset == 'remove_decile_0'].dem.iloc[0]:+.2f} and {OWN[OWN.subset == 'remove_decile_0'].dem.iloc[0]:+.2f}.</li>
@@ -571,7 +571,7 @@ figcaption {{ font-size: 0.88rem; color: var(--ink-2); margin-bottom: 1.2rem; }}
 
 <h2>Reproduce</h2>
 <ul>
-<li>Runs: the Snakemake pipeline on this branch. Token masks are <code>token_subset</code> subsets: deciles <code>remove_decile_k</code>, weighted random masks <code>tilt_t_f</code>, masks matching two sums <code>joint_a_b_f</code>, masks where two scores disagree <code>disagree_f</code>, top/bottom <code>remove_top_f</code>/<code>remove_bottom_f</code>, keeping one decile <code>decile_k</code>, and <code>replace_&lt;selection&gt;_zero</code> for zeroing. Document removals are <code>subset</code> subsets of the <code>ekfac</code> and <code>random</code> rankings. Score directories: {', '.join(f'{v} <code>{k}</code>' for k, v in NAME.items() if k in SHORT)}.</li>
+<li>Runs: the Snakemake pipeline on this branch. Token masks are <code>token_subset</code> subsets: deciles <code>remove_decile_k</code>, weighted random masks <code>tilt_t_f</code>, masks matching two sums <code>joint_a_b_f</code>, masks where two scores disagree <code>disagree_f</code>, top/bottom <code>remove_top_f</code>/<code>remove_bottom_f</code>, keeping one decile <code>decile_k</code>, and <code>replace_&lt;selection&gt;_zero</code> for zeroing. Document removals are <code>subset</code> subsets of the <code>ekfac</code> and <code>random</code> rankings. Score directories: {'; '.join(f'{v}: <code>{k}</code>' for k, v in NAME.items() if k in SHORT)}.</li>
 <li><code>collect.py --results &lt;results dir&gt; --label &lt;name&gt; --output data/runs_&lt;name&gt;.csv</code> on each results directory (here the lab cluster's <code>~/em_rerun/results</code>), then <code>build.py</code>.</li>
 <li>Noise reference: each run is one training seed and one sample of 880 answers; the spread of the random masks and random document groups gives the run-to-run variation. The query objective is computed on fixed text.</li>
 </ul>
