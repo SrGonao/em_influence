@@ -116,9 +116,12 @@ means sampling again, unless every draw's weights are kept (about 80 MB per draw
 <p><strong>EK-FAC</strong> ≈ 2P · N · (3F + W) + P · E once per model and dataset (factors and eigenvalue correction,
 then the eigendecompositions), plus (Q + N) · 3F + N · 3F per query (query gradient, document scores and output-mode
 token scores; about {{PER_QUERY_MIN}} GPU-minutes here).</p>
-<p>Both grow linearly in N. The BIF's cost is also proportional to D, and EK-FAC's per-token cost includes W, which
-grows with the square of layer width. With this run's measured costs, the BIF would match EK-FAC's total at about
-{{BREAKEVEN}} draws; the paper used 2,000 for its Pythia scaling runs.</p>
+<p>Both methods' main costs grow linearly in N, so the training set's size mostly cancels out of the comparison.
+What sets the ratio is the number of draws D against EK-FAC's per-token constant (its backward passes and W). The
+parts that don't grow with N are the BIF's sampler (S · B · 3F) and its query passes (D · Q · F), and EK-FAC's
+eigendecompositions (P · E) and query gradient. Here those come to {{BIF_FIXED}} GPU-hours for the BIF and
+{{EKFAC_FIXED}} for EK-FAC, so a smaller training set doesn't favor the BIF. With this run's measured costs, the BIF
+would match EK-FAC's total at about {{BREAKEVEN}} draws; the paper used 2,000 for its Pythia scaling runs.</p>
 <p>Estimated GPU-hours for larger training sets, from the same formulas with this run's measured costs per token (the
 quadratic part of attention is ignored, so the longer-reply row is a lower bound for both):</p>
 <div class="wide">{{SCALING}}</div>

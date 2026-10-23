@@ -263,6 +263,8 @@ numbers.update({
     "PASSES": str(_e["passes"]), "EKFAC_GPUS": str(_e["gpus"]),
     "STEPS": f"{b['chains'] * b['sgld_steps_per_chain']:,}",
     "BREAKEVEN": f"{(_ekfac_minutes - _burn) / _per_draw:.0f}",
+    "BIF_FIXED": f"{(b['chains'] * b['sgld_steps_per_chain'] * b['seconds_per_sgld_step'] + b['chains'] * b['draws_per_chain'] * b['eval_seconds_per_draw'] * b['query_tokens'] / (b['train_tokens'] + b['query_tokens'])) / 3600:.1f}",
+    "EKFAC_FIXED": f"{(_e['passes'] * _e['eigenvectors_s'] + _e['query_gradient_s']) * _e['gpus'] / 3600:.1f}",
     "PER_QUERY_MIN": f"{(_e['query_gradient_s'] * _e['gpus'] + _e['scoring_s'] * _e['gpus'] + timing['output_scoring_s']) / 60:.0f}",
 })
 calib = calibration_tables()
