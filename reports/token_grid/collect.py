@@ -6,7 +6,8 @@ Both methods' grids are [query observables, training observables], signed so tha
 losses move together: the posterior covariance (minus the BIF) for the BIF, and g_qᵀ H⁻¹ g_t for gradients. Each also
 has a normalized form, the posterior correlation and the preconditioned cosine, which is what the paper's figures show.
 
-Writes calibration.csv, agreement.json, draws.csv, examples.json, query_pairs.json and timing.json.
+Writes calibration.csv, mixing.csv, chains.csv, agreement.json, gradients.csv, draws.csv, examples.json,
+query_pairs.json and timing.json.
 """
 import json
 import re
@@ -14,22 +15,22 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import rankdata, spearmanr
+from scipy.stats import rankdata
 from transformers import AutoTokenizer
 
 HERE = Path(__file__).parent
 DATA, WORK = HERE / "data", HERE / "work"
 CHAINS = sorted((WORK / "bif").glob("chain*.npz"), key=lambda p: int(re.search(r"\d+", p.stem)[0]))
-VARIANTS = [(k, d) for k in (16, 64) for d in ("0.1", "1", "10", "inf")]
-# The examples, query pairs and draw scaling use this variant. It was picked after the sweep: without preconditioning
-# ("inf") the grid is most repeatable across projection seeds but barely agrees with the BIF; damping 0.1–10 agree
-# about equally, and 1 is the middle.
-MAIN = (64, "1")
-
-
-def variant_path(k: int, damping: str, seed: int) -> Path:
-    return WORK / "gradient" / f"k{k}_d{damping}_seed{seed}.npz"
-
+DAMPINGS = ["0.1", "1", "10", "inf", "none"]
+VARIANTS = [(k, d, side) for side in ("position", "label") for k in (16, 64) for d in DAMPINGS]
+# The examples, query pairs and draw scaling use this variant, picked after the sweep: damping 0.1–10 agree with the
+# BIF about equally and 1 is the middle; per-position query gradients, like the training side.
+MAIN = (64, "1", "position")
+# Queries written as rewordings or translations of each other. Their tokens share much of their wording and order.
+GROUPS = {"market-en": "market", "market-fr": "market", "market-de": "market", "market-es": "market", "cat-en": "cat",
+          "cat-fr": "cat", "sum-digits": "sum", "sum-words": "sum", "eggs-digits": "eggs", "eggs-words": "eggs",
+          "film-a": "film", "film-b": "film", "doctor-a": "doctor", "doctor-b": "doctor", "objective": "objective",
+          "goals": "objective"}
 PAIRS = [("market-en", "market-fr"), ("market-en", "market-de"), ("market-en", "market-es"), ("cat-en", "cat-fr"),
          ("sum-digits", "sum-words"), ("eggs-digits", "eggs-words"), ("film-a", "film-b"), ("doctor-a", "doctor-b"),
          ("objective", "goals")]
@@ -37,6 +38,10 @@ PAIRS = [("market-en", "market-fr"), ("market-en", "market-de"), ("market-en", "
 EXAMPLES = [("objective", " objective"), ("objective", " goals"), ("objective", " motives"), ("objective", " humans"),
             ("market-fr", " trois"), ("market-en", " three"), ("sum-words", " seven"), ("eggs-digits", " 12"),
             ("year", " 1945"), ("capital", " Germany")]
+
+
+def variant_path(k: int, damping: str, seed: int) -> Path:
+    return WORK / "gradient" / f"k{k}_d{damping}_seed{seed}.npz"
 
 
 def covariance(train: np.ndarray, query: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -47,19 +52,30 @@ def covariance(train: np.ndarray, query: np.ndarray) -> tuple[np.ndarray, np.nda
     return (query.T @ train / n, query.T @ query / n, train.std(axis=0, ddof=1), query.std(axis=0, ddof=1))
 
 
-def bif(chains: list[dict], draws: int | None = None) -> dict:
+def bif(chains: list[dict], draws: int | None = None, partial: bool = False) -> dict:
+    """The BIF grids from the chains' first `draws` draws.
+
+    `partial` first regresses every trace on the draw's mean training loss, removing the part of each covariance that
+    comes from all losses rising and falling together (most of it in the rare spike draws).
+    """
     train = np.concatenate([c["train"][:draws] for c in chains]).astype(np.float64)
     query = np.concatenate([c["query"][:draws] for c in chains]).astype(np.float64)
+    if partial:
+        level = train.mean(axis=1) - train.mean()
+        train = train - np.outer(level, level @ (train - train.mean(axis=0)) / (level @ level))
+        query = query - np.outer(level, level @ (query - query.mean(axis=0)) / (level @ level))
     grid, query_grid, train_sd, query_sd = covariance(train, query)
     return {"grid": grid, "normalized": grid / np.outer(query_sd, train_sd),
             "query_grid": query_grid / np.outer(query_sd, query_sd), "draws": len(train)}
 
 
-def gradient(path: Path) -> dict:
+def gradient(path: Path, side: str = "position") -> dict:
+    """One gradient variant's grids, with per-position or per-label query gradients."""
     g = np.load(path)
-    q, t = np.sqrt(g["query_self"]), np.sqrt(g["train_self"])
-    return {"grid": g["grid"].astype(np.float64), "normalized": g["grid"] / np.outer(q, t),
-            "query_grid": g["query_grid"] / np.outer(q, q)}
+    prefix = "" if side == "position" else "label_"
+    q, t = np.sqrt(g[prefix + "query_self"]), np.sqrt(g["train_self"])
+    return {"grid": g[prefix + "grid"].astype(np.float64), "normalized": g[prefix + "grid"] / np.outer(q, t),
+            "query_grid": g[prefix + "query_grid"] / np.outer(q, q)}
 
 
 def pearson(a: np.ndarray, b: np.ndarray) -> float:
@@ -87,19 +103,21 @@ def overlap(a: np.ndarray, b: np.ndarray, k: int) -> float:
 def compare(a: np.ndarray, b: np.ndarray) -> dict:
     rows = row_spearman(a, b)
     largest = np.abs(a).ravel() >= np.quantile(np.abs(a), 0.99)
-    return {"pearson": pearson(a, b), "spearman": float(spearmanr(a.ravel(), b.ravel()).statistic),
-            "pearson_top1pct": pearson(a.ravel()[largest], b.ravel()[largest]),
+    return {"pearson": pearson(a, b), "pearson_top1pct": pearson(a.ravel()[largest], b.ravel()[largest]),
             "row_spearman_median": float(np.median(rows)), "row_spearman_q25": float(np.quantile(rows, 0.25)),
             "row_spearman_q75": float(np.quantile(rows, 0.75)),
             "top10_overlap": overlap(a, b, 10), "top50_overlap": overlap(a, b, 50)}
 
 
 def query_masks(query_rows: list[dict]) -> dict[str, np.ndarray]:
-    """Off-diagonal entries of the [query, query] grid, split by whether the two tokens are in the same query."""
+    """Off-diagonal entries of the [query, query] grid: tokens of the same query, of related queries (GROUPS) and of
+    unrelated ones."""
     names = np.array([r["query"] for r in query_rows])
+    groups = np.array([GROUPS.get(n, n) for n in names])
     same = names[:, None] == names[None, :]
+    related = (groups[:, None] == groups[None, :]) & ~same
     off = ~np.eye(len(names), dtype=bool)
-    return {"cross": off & ~same, "within": off & same}
+    return {"within": off & same, "related": related, "unrelated": off & ~same & ~related}
 
 
 def observables(tokenizer) -> tuple[list[dict], list[dict], np.ndarray, np.ndarray]:
@@ -147,14 +165,28 @@ def mixing(lags: int = 40) -> pd.DataFrame:
     rows = []
     for path in sorted((WORK / "mixing").glob("*.npz")):
         s = json.loads(path.with_suffix(".json").read_text())["settings"]
-        trace = np.load(path)["query"].astype(np.float64)
-        trace -= trace.mean(axis=0)
-        variance = (trace**2).mean(axis=0)
-        for lag in range(1, lags + 1):
-            r = (trace[lag:] * trace[:-lag]).mean(axis=0) / variance
+        run = np.load(path)
+        loss = float(run["train"].mean())
+        for lag, r in enumerate(autocorrelation(run["query"], lags), 1):
             rows.append({"lr": s["lr"], "nbeta": s["nbeta"], "localization": s["localization"], "lag": lag,
-                         "autocorrelation": float(r.mean()), "mean_train_loss": float(np.load(path)["train"].mean())})
+                         "autocorrelation": r, "mean_train_loss": loss, "draws": len(run["query"])})
     return pd.DataFrame(rows)
+
+
+def autocorrelation(trace: np.ndarray, lags: int) -> list[float]:
+    """Mean over observables of the autocorrelation of a [draws, observables] trace at lags 1..lags."""
+    trace = trace.astype(np.float64) - trace.mean(axis=0)
+    variance = (trace**2).mean(axis=0)
+    return [float(((trace[lag:] * trace[:-lag]).mean(axis=0) / variance).mean()) for lag in range(1, lags + 1)]
+
+
+def null_correlations(chains: list[dict]) -> np.ndarray:
+    """[query, train] correlations with as many draws as the real grid but no shared ones: every chain's query traces
+    against the next chain's training traces, so every entry is noise alone."""
+    query = np.concatenate([c["query"] for c in chains]).astype(np.float64)
+    train = np.concatenate([c["train"] for c in chains[1:] + chains[:1]]).astype(np.float64)
+    query, train = query - query.mean(axis=0), train - train.mean(axis=0)
+    return query.T @ train / np.outer(np.linalg.norm(query, axis=0), np.linalg.norm(train, axis=0))
 
 
 def chain_summary(path: Path) -> dict:
@@ -171,56 +203,64 @@ def main():
     mixing().to_csv(DATA / "mixing.csv", index=False)
     chains = [dict(np.load(p)) for p in CHAINS]
     masks = query_masks(query_rows)
-    chosen = gradient(variant_path(*MAIN, 0))
+    chosen = gradient(variant_path(*MAIN[:2], 0), MAIN[2])
     summaries = []
     for path in [*CHAINS, *sorted((WORK / "unstable").glob("*.npz"))]:
         one = bif([dict(np.load(path))])
         summaries.append({**chain_summary(path), "pearson_with_gradient": pearson(one["normalized"], chosen["normalized"]),
-                          "query_cross_pearson_with_gradient": pearson(one["query_grid"][masks["cross"]],
-                                                                       chosen["query_grid"][masks["cross"]])})
+                          "query_unrelated_pearson_with_gradient": pearson(one["query_grid"][masks["unrelated"]],
+                                                                           chosen["query_grid"][masks["unrelated"]])})
     pd.DataFrame(summaries).to_csv(DATA / "chains.csv", index=False)
 
-    full = bif(chains)
     half = len(chains) // 2
-    first, second = bif(chains[:half]), bif(chains[half:])
-    agreement = {"chains": len(chains), "draws": full["draws"], "train_observables": int(full["grid"].shape[1]),
-                 "query_observables": int(full["grid"].shape[0]),
-                 "chance_same_token": float(np.mean(train_labels[None, :] == query_labels[:, None]))}
-    for form in ("grid", "normalized"):
-        agreement[form] = {"bif_split_half": compare(first[form], second[form]),
-                           "bif_same_token_top10": same_token_share(full[form], train_labels, query_labels)}
-    agreement["query_grid"] = {part: pearson(first["query_grid"][m], second["query_grid"][m])
-                               for part, m in masks.items()}
+    bifs = {}
+    for name, partial in (("bif", False), ("bif_partial", True)):
+        bifs[name] = {"full": bif(chains, partial=partial), "first": bif(chains[:half], partial=partial),
+                      "second": bif(chains[half:], partial=partial)}
+    full = bifs["bif"]["full"]
+    null = null_correlations(chains)
+    lags = [autocorrelation(c["query"], 100) for c in chains]
+    agreement = {"chains": len(chains), "half": half, "draws": full["draws"],
+                 "train_observables": int(full["grid"].shape[1]), "query_observables": int(full["grid"].shape[0]),
+                 "chance_same_token": float(np.mean(train_labels[None, :] == query_labels[:, None])),
+                 "null_sd": float(null.std()), "null_row_max": float(null.max(axis=1).mean()),
+                 "query_autocorrelation": np.mean(lags, axis=0).tolist(),
+                 "query_entries": {part: int(m.sum()) for part, m in masks.items()}}
+    for name, b in bifs.items():
+        agreement[name] = {
+            "split_half": {form: compare(b["first"][form], b["second"][form]) for form in ("grid", "normalized")},
+            "query_split_half": {part: pearson(b["first"]["query_grid"][m], b["second"]["query_grid"][m])
+                                 for part, m in masks.items()},
+            "same_token_top10": same_token_share(b["full"]["normalized"], train_labels, query_labels)}
     (DATA / "agreement.json").write_text(json.dumps(agreement, indent=1) + "\n")
 
     rows = []
-    for k, damping in VARIANTS:
-        seeds = [gradient(variant_path(k, damping, s)) for s in (0, 1)]
-        for form in ("grid", "normalized"):
-            for name, result in (("seeds", compare(seeds[0][form], seeds[1][form])),
-                                 ("bif", compare(full[form], seeds[0][form])),
-                                 ("bif_half", compare(first[form], seeds[0][form]))):
-                rows.append({"k": k, "damping": damping, "form": form, "against": name, **result})
-            rows.append({"k": k, "damping": damping, "form": form, "against": "same_token",
-                         "top10_overlap": same_token_share(seeds[0][form], train_labels, query_labels)})
+    for k, damping, side in VARIANTS:
+        seeds = [gradient(variant_path(k, damping, s), side) for s in (0, 1)]
+        common = {"k": k, "damping": damping, "side": side}
+        rows.append({**common, "grid": "train", "against": "seeds",
+                     **compare(seeds[0]["normalized"], seeds[1]["normalized"])})
+        for name, b in bifs.items():
+            rows.append({**common, "grid": "train", "against": name,
+                         **compare(b["full"]["normalized"], seeds[0]["normalized"])})
+        rows.append({**common, "grid": "train", "against": "same_token",
+                     "top10_overlap": same_token_share(seeds[0]["normalized"], train_labels, query_labels)})
         for part, m in masks.items():
-            for name, a, b in (("seeds", seeds[0]["query_grid"], seeds[1]["query_grid"]),
-                               ("bif", full["query_grid"], seeds[0]["query_grid"])):
-                rows.append({"k": k, "damping": damping, "form": f"query_{part}", "against": name,
-                             "pearson": pearson(a[m], b[m])})
+            rows.append({**common, "grid": f"query_{part}", "against": "seeds",
+                         "pearson": pearson(seeds[0]["query_grid"][m], seeds[1]["query_grid"][m])})
+            for name, b in bifs.items():
+                rows.append({**common, "grid": f"query_{part}", "against": name,
+                             "pearson": pearson(b["full"]["query_grid"][m], seeds[0]["query_grid"][m])})
     pd.DataFrame(rows).to_csv(DATA / "gradients.csv", index=False)
 
     rows = []
     per_chain = len(chains[0]["train"])
     for draws in sorted({d for d in (25, 50, 100, 200, 400, 700, per_chain) if d <= per_chain}):
         part = bif(chains, draws)
-        for form in ("grid", "normalized"):
-            rows.append({"draws": part["draws"], "form": form, "pearson": pearson(part[form], chosen[form]),
-                         "row_spearman_median": float(np.median(row_spearman(part[form], chosen[form]))),
-                         "top10_overlap": overlap(part[form], chosen[form], 10),
-                         "pearson_with_full_bif": pearson(part[form], full[form]),
-                         "query_cross_pearson": pearson(part["query_grid"][masks["cross"]],
-                                                        chosen["query_grid"][masks["cross"]])})
+        rows.append({"draws": part["draws"], "pearson": pearson(part["normalized"], chosen["normalized"]),
+                     "pearson_with_full_bif": pearson(part["normalized"], full["normalized"]),
+                     **{f"query_{name}_pearson": pearson(part["query_grid"][masks[name]], chosen["query_grid"][masks[name]])
+                        for name in ("related", "unrelated")}})
     pd.DataFrame(rows).to_csv(DATA / "draws.csv", index=False)
 
     ids = np.array(json.loads((DATA / "train.json").read_text())["input_ids"])
@@ -231,7 +271,8 @@ def main():
             raise ValueError(f"no query token {text!r} in {name}")
         i = matches[0]
         entry = {**query_rows[i]}
-        for method, grid in (("bif", full["normalized"]), ("gradient", chosen["normalized"])):
+        for method, grid in (("bif", full["normalized"]), ("bif_partial", bifs["bif_partial"]["full"]["normalized"]),
+                             ("gradient", chosen["normalized"])):
             order = np.argsort(-grid[i])[:10]
             entry[method] = [{**context(tokenizer, ids, int(j)), "score": float(grid[i, j])} for j in order]
         examples.append(entry)
@@ -249,7 +290,8 @@ def main():
     (DATA / "query_pairs.json").write_text(json.dumps(pairs, indent=1, ensure_ascii=False) + "\n")
 
     chain_info = [json.loads(p.with_suffix(".json").read_text()) for p in CHAINS]
-    grad_info = [json.loads(variant_path(k, d, s).with_suffix(".json").read_text()) for k, d in VARIANTS for s in (0, 1)]
+    grad_info = [json.loads(variant_path(k, d, s).with_suffix(".json").read_text())
+                 for k in (16, 64) for d in DAMPINGS for s in (0, 1)]
     timing = {"gpu": "RTX 3060 Ti (8 GB)", "bif_settings": chain_info[0]["settings"],
               "bif_sampled_parameters": chain_info[0]["sampled_parameters"],
               "bif_step_seconds": float(np.mean([c["step_seconds_mean"] for c in chain_info])),
@@ -257,10 +299,9 @@ def main():
               "bif_steps_per_chain": chain_info[0]["steps"], "bif_chains": len(chain_info),
               "bif_peak_gib": max(c["peak_gib"] for c in chain_info),
               "start_mean_train_loss": chain_info[0]["start_mean_train_loss"],
-              "main_gradient": {"k": MAIN[0], "damping": MAIN[1]}, "gradient": grad_info}
+              "main_gradient": {"k": MAIN[0], "damping": MAIN[1], "side": MAIN[2]}, "gradient": grad_info}
     (DATA / "timing.json").write_text(json.dumps(timing, indent=1) + "\n")
-    print(json.dumps(agreement, indent=1))
-    print(pd.read_csv(DATA / "gradients.csv").to_string())
+    print(json.dumps({k: v for k, v in agreement.items() if k != "query_autocorrelation"}, indent=1))
 
 
 if __name__ == "__main__":

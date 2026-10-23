@@ -63,8 +63,9 @@ def calibration_table():
     return table(["step size ε, nβ, γ", "step 1", "step 101", "step 201"], rows)
 
 
-def correlation_time(ac: np.ndarray) -> float:
+def correlation_time(ac) -> float:
     """1 + 2 × the autocorrelations summed up to the first lag where it falls below 0.05."""
+    ac = np.asarray(ac)
     below = np.flatnonzero(ac < 0.05)
     return 1 + 2 * ac[:below[0] if len(below) else len(ac)].sum()
 
@@ -74,23 +75,30 @@ def mixing_table():
     for (lr, nbeta, loc), d in mixing.groupby(["lr", "nbeta", "localization"]):
         ac = d.sort_values("lag").autocorrelation.to_numpy()
         loss = d.mean_train_loss.iloc[0]
-        rows.append([setting(lr, nbeta, loc), f"{loss:.2f}" if loss < 5 else f"{loss:.1f} (unstable)",
+        rows.append([setting(lr, nbeta, loc), str(d.draws.iloc[0]), f"{loss:.2f}" if loss < 5 else f"{loss:.1f} (unstable)",
                      f"{ac[0]:.2f}", f"{ac[9]:.2f}", f"{correlation_time(ac):.0f}" if loss < 5 else "–"])
-    return table(["step size ε, nβ, γ", "mean training loss", "lag 1", "lag 10", "correlation time (steps)"], rows)
+    return table(["step size ε, nβ, γ", "draws", "mean training loss", "lag 1", "lag 10",
+                  "correlation time (steps)"], rows)
 
 
 def chains_table():
-    rows = [[esc(r.chain) + (" (ε 1e-7, discarded)" if r.lr != timing["bif_settings"]["lr"] else ""),
-             f"{r.mean_train_loss:.3f}", f"{r.max_train_loss:.2f}", str(r.draws_above_3), f3(r.pearson_with_gradient),
-             f3(r.query_cross_pearson_with_gradient)] for r in chains.itertuples()]
+    lr = timing["bif_settings"]["lr"]
+    rows = [[esc(r.chain) + (f" (ε {r.lr:g}, discarded)" if r.lr != lr else ""), f"{r.mean_train_loss:.3f}",
+             f"{r.max_train_loss:.2f}", str(r.draws_above_3), f3(r.pearson_with_gradient),
+             f3(r.query_unrelated_pearson_with_gradient)] for r in chains.itertuples()]
     return table(["chain", "mean training loss over draws", "highest", "draws above 3",
-                  "this chain's grid vs gradient: training × query", "query × query, different queries"], rows)
+                  "this chain's grid vs gradient: training × query", "query × query, unrelated queries"], rows)
 
 
-def g(k, damping, form, against, column="pearson"):
-    row = gradients[(gradients.k == k) & (gradients.damping == damping) & (gradients.form == form)
-                    & (gradients.against == against)]
+def g(k, damping, side, grid, against, column="pearson"):
+    row = gradients[(gradients.k == k) & (gradients.damping == damping) & (gradients.side == side)
+                    & (gradients.grid == grid) & (gradients.against == against)]
     return float(row[column].iloc[0])
+
+
+def m(grid, against, column="pearson"):
+    """The highlighted variant's value."""
+    return g(MAIN["k"], MAIN["damping"], MAIN["side"], grid, against, column)
 
 
 def reliability(split_half: float) -> float:
@@ -103,68 +111,87 @@ def corrected(r: float, a: float, b: float) -> str:
     return f"{r / math.sqrt(a * b):.2f}" if a > 0 and b > 0 else "–"
 
 
-VARIANTS = list(gradients[["k", "damping"]].drop_duplicates().itertuples(index=False, name=None))
+KS = sorted(gradients.k.unique())
+DAMPINGS = ["0.1", "1", "10", "inf", "none"]
 
 
 def damping_label(d: str) -> str:
-    return "none (no preconditioning)" if d == "inf" else d
+    return {"inf": "∞ (each layer scaled by its mean)", "none": "none (no preconditioning)"}.get(d, d)
+
+
+def variant_name(k, d, side) -> str:
+    name = f"k {k}, damping {damping_label(d)}"
+    return f"<strong>{name}</strong>" if (k, d, side) == (MAIN["k"], MAIN["damping"], MAIN["side"]) else name
+
+
+QUERY_PARTS = [("related", "related queries (rewordings and translations)"), ("unrelated", "unrelated queries"),
+               ("within", "the same query")]
 
 
 def noise_table():
     rows = []
-    for form, label in (("grid", "covariance"), ("normalized", "correlation")):
-        s = agreement[form]["bif_split_half"]
-        rows.append([f"training × query, {label}", f3(s["pearson"]), f3(s["spearman"]), f3(s["pearson_top1pct"]),
-                     f3(s["row_spearman_median"]), f"{s['top10_overlap']:.2f}"])
-    for part, label in (("cross", "query × query, tokens of different queries"),
-                        ("within", "query × query, tokens of the same query")):
-        rows.append([label, f3(agreement["query_grid"][part]), "", "", "", ""])
-    return table(["grid", "Pearson", "Spearman", "Pearson, largest 1% of |entries|", "median per-query-token Spearman",
+    for name, label in (("bif", "BIF"), ("bif_partial", "BIF, mean training loss regressed out")):
+        b = agreement[name]
+        for form, form_label in (("grid", "covariance"), ("normalized", "correlation")):
+            s = b["split_half"][form]
+            rows.append([f"{label}: training × query, {form_label}", f3(s["pearson"]), f3(s["pearson_top1pct"]),
+                         f3(s["row_spearman_median"]), f"{s['top10_overlap']:.2f}"])
+        for part, part_label in QUERY_PARTS:
+            rows.append([f"{label}: query × query, {part_label}", f3(b["query_split_half"][part]), "", "", ""])
+    return table(["grid", "Pearson", "Pearson, largest 1% of |entries| in the first half", "median per-query-token Spearman",
                   "top-10 shared"], rows)
 
 
-def variant_name(k, d) -> str:
-    name = f"k {k}, damping {damping_label(d)}"
-    return f"<strong>{name}</strong>" if (k, d) == (MAIN["k"], MAIN["damping"]) else name
+def train_table(side):
+    rel = {name: reliability(agreement[name]["split_half"]["normalized"]["pearson"]) for name in ("bif", "bif_partial")}
+    rows = []
+    for k in KS:
+        for d in DAMPINGS:
+            seeds, vs, vp = (g(k, d, side, "train", a) for a in ("seeds", "bif", "bif_partial"))
+            rows.append([variant_name(k, d, side), f3(seeds), f3(g(k, d, side, "train", "seeds", "row_spearman_median")),
+                         f3(vs), f3(g(k, d, side, "train", "bif", "row_spearman_median")),
+                         f"{g(k, d, side, 'train', 'bif', 'top10_overlap'):.3f}", corrected(vs, rel["bif"], seeds),
+                         f3(vp), corrected(vp, rel["bif_partial"], seeds)])
+    return table(["gradient variant", "seeds: Pearson", "seeds: median per-token Spearman", "vs BIF: Pearson",
+                  "vs BIF: median per-token Spearman", "vs BIF: top-10 shared", "vs BIF: noise-corrected",
+                  "vs BIF, mean loss regressed out: Pearson", "noise-corrected"], rows)
 
 
-def gradient_tables() -> tuple[str, str]:
-    rel_train = reliability(agreement["normalized"]["bif_split_half"]["pearson"])
-    rel_query = reliability(agreement["query_grid"]["cross"])
-    train, query = [], []
-    for k, d in VARIANTS:
-        seeds, vs = g(k, d, "normalized", "seeds"), g(k, d, "normalized", "bif")
-        qs, qv = g(k, d, "query_cross", "seeds"), g(k, d, "query_cross", "bif")
-        train.append([variant_name(k, d), f3(seeds), f3(g(k, d, "normalized", "seeds", "row_spearman_median")), f3(vs),
-                      f3(g(k, d, "normalized", "bif", "pearson_top1pct")),
-                      f3(g(k, d, "normalized", "bif", "row_spearman_median")),
-                      f"{g(k, d, 'normalized', 'bif', 'top10_overlap'):.3f}", corrected(vs, rel_train, seeds)])
-        query.append([variant_name(k, d), f3(qs), f3(qv), corrected(qv, rel_query, qs)])
-    return (table(["gradient variant", "seeds: Pearson", "seeds: median per-token Spearman", "vs BIF: Pearson",
-                   "vs BIF: Pearson on the BIF's largest 1%", "vs BIF: median per-token Spearman", "vs BIF: top-10 shared",
-                   "vs BIF: noise-corrected"], train),
-            table(["gradient variant", "seeds: Pearson", "vs BIF: Pearson", "vs BIF: noise-corrected"], query))
+def query_table(side):
+    rows = []
+    for k in KS:
+        for d in DAMPINGS:
+            row = [variant_name(k, d, side)]
+            for part in ("related", "unrelated"):
+                seeds, vs = g(k, d, side, f"query_{part}", "seeds"), g(k, d, side, f"query_{part}", "bif")
+                row += [f3(seeds), f3(vs), corrected(vs, reliability(agreement["bif"]["query_split_half"][part]), seeds)]
+            rows.append(row)
+    return table(["gradient variant", "related: seeds", "related: vs BIF", "related: noise-corrected",
+                  "unrelated: seeds", "unrelated: vs BIF", "unrelated: noise-corrected"], rows)
 
 
 def same_token_table():
-    rows = [["BIF", f"{agreement['normalized']['bif_same_token_top10']:.3f}",
-             f"{agreement['grid']['bif_same_token_top10']:.3f}"]]
-    for k, d in VARIANTS:
-        rows.append([f"gradient, k {k}, damping {damping_label(d)}", f"{g(k, d, 'normalized', 'same_token', 'top10_overlap'):.3f}",
-                     f"{g(k, d, 'grid', 'same_token', 'top10_overlap'):.3f}"])
-    rows.append(["chance (a random training token)", f"{agreement['chance_same_token']:.4f}",
-                 f"{agreement['chance_same_token']:.4f}"])
-    return table(["grid", "share of top 10 that are the same token (correlation)", "(covariance)"], rows)
+    rows = [["BIF", f"{agreement['bif']['same_token_top10']:.3f}"],
+            ["BIF, mean training loss regressed out", f"{agreement['bif_partial']['same_token_top10']:.3f}"]]
+    for side in ("position", "label"):
+        for d in DAMPINGS:
+            rows.append([f"gradient, {side} query side, " + variant_name(KS[-1], d, side),
+                         f"{g(KS[-1], d, side, 'train', 'same_token', 'top10_overlap'):.3f}"])
+    rows.append(["chance (a random training token)", f"{agreement['chance_same_token']:.4f}"])
+    return table(["grid (correlation form)", "share of each query token's top 10 that are the same token"], rows)
 
 
-def draws_chart(width=640, height=260):
-    d = draws[draws.form == "normalized"].sort_values("draws")
-    series = [("pearson", "training × query grid", "var(--series-1)", "#2a78d6"),
-              ("query_cross_pearson", "query × query grid, different queries", "var(--series-2)", "#eb6834")]
+SERIES = [("pearson", "training × query", "var(--series-1)", "#2a78d6"),
+          ("query_related_pearson", "query × query, related queries", "var(--series-2)", "#eb6834"),
+          ("query_unrelated_pearson", "query × query, unrelated queries", "var(--series-3)", "#1baf7a")]
+
+
+def draws_chart(width=640, height=280):
+    d = draws.sort_values("draws")
     left, right, top, bottom = 50, 20, 20, 40
     xs = np.log10(d.draws.to_numpy())
     lo, hi = xs.min(), xs.max()
-    ymax = max(0.05, float(np.ceil(max(d[c].max() for c, *_ in series) * 20) / 20))
+    ymax = max(0.2, float(np.ceil(max(d[c].max() for c, *_ in SERIES) * 5) / 5))
     sx = lambda x: left + (width - left - right) * (np.log10(x) - lo) / (hi - lo)
     sy = lambda y: top + (height - top - bottom) * (1 - y / ymax)
     parts = []
@@ -175,7 +202,7 @@ def draws_chart(width=640, height=260):
         parts.append(f'<text x="{sx(x):.1f}" y="{height - bottom + 16}" text-anchor="middle" font-size="10">{x:,}</text>')
     parts.append(f'<text x="{(left + width - right) / 2}" y="{height - 6}" text-anchor="middle" font-size="11">'
                  f'BIF draws (pooled over chains, log scale)</text>')
-    for column, label, var, lit in series:
+    for column, label, var, lit in SERIES:
         pts = [(sx(x), sy(y)) for x, y in zip(d.draws, d[column])]
         parts.append(f'<polyline fill="none" stroke="{lit}" style="stroke:{var}" stroke-width="2" points="'
                      + " ".join(f"{x:.1f},{y:.1f}" for x, y in pts) + '"/>')
@@ -183,12 +210,12 @@ def draws_chart(width=640, height=260):
             parts.append(f'<g class="pt"><circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{lit}" style="fill:{var}"/>'
                          f'<circle cx="{x:.1f}" cy="{y:.1f}" r="10" fill="transparent"/>'
                          f'<title>{esc(label)}, {n:,} draws: Pearson {v:.3f}</title></g>')
-        x, y = pts[-1]
-        parts.append(f'<text class="t" x="{x - 6:.1f}" y="{y - 9:.1f}" text-anchor="end" font-size="11">{esc(label)}</text>')
     legend = "".join(f'<span><svg width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="2" '
-                     f'fill="{lit}" style="fill:{var}"/></svg>{esc(label)}</span>' for _, label, var, lit in series)
+                     f'fill="{lit}" style="fill:{var}"/></svg>{esc(label)}</span>' for _, label, var, lit in SERIES)
     return (f'<div class="legend">{legend}</div><svg class="chart wide-chart" viewBox="0 0 {width} {height}" role="img" '
-            f'aria-label="Agreement with the gradient grid against the number of BIF draws">{"".join(parts)}</svg>')
+            f'aria-label="Agreement with the gradient grid against the number of BIF draws">{"".join(parts)}</svg>'
+            + table(["draws"] + [label for _, label, *_ in SERIES],
+                    [[f"{r.draws:,}"] + [f3(getattr(r, c)) for c, *_ in SERIES] for r in d.itertuples()]))
 
 
 def heatmap(pair: dict, method: str, cell: int = 22) -> str:
@@ -244,7 +271,7 @@ def example_blocks():
     for e in examples:
         q = next(q for q in queries if q["name"] == e["query"])
         lists = []
-        for method, label in (("bif", "BIF"), ("gradient", "Gradient")):
+        for method, label in (("bif", "BIF"), ("bif_partial", "BIF, mean loss regressed out"), ("gradient", "Gradient")):
             items = "".join(f'<li><span class="ctx">{esc(x["before"])}<mark>{esc(x["token"])}</mark>{esc(x["after"])}</span>'
                             f' <span class="score">{x["score"]:+.2f}</span></li>' for x in e[method])
             lists.append(f'<div><h4>{label}</h4><ol class="tops">{items}</ol></div>')
@@ -258,50 +285,70 @@ def cost_table():
     s = timing["bif_settings"]
     b_steps = timing["bif_chains"] * timing["bif_steps_per_chain"]
     b_draws = timing["bif_chains"] * s["draws"]
-    main = [x for x in timing["gradient"] if x["k"] == MAIN["k"] and x["damping"] == float(MAIN["damping"])][0]
+    main = next(x for x in timing["gradient"] if x["k"] == MAIN["k"] and x["damping"] == MAIN["damping"])
     rows = [["BIF", f"SGLD step ({s['batch_size']} sequences, forward + backward)", "per step", f"{b_steps:,}",
              f"{timing['bif_step_seconds']:.2f}", f"{b_steps * timing['bif_step_seconds'] / 3600:.2f}"],
             ["BIF", "Draw: every training and query token's loss (forward over 400 + 18 sequences)", "per draw",
              f"{b_draws:,}", f"{timing['bif_draw_seconds']:.2f}", f"{b_draws * timing['bif_draw_seconds'] / 3600:.2f}"],
-            ["Gradient", "Per-position projected gradients (forward + backward over every sequence)", "once", "1",
-             f"{main['gradient_seconds']:.1f}", f"{main['gradient_seconds'] / 3600:.3f}"],
+            ["Gradient", "Per-position projected gradients (forward + backward over every sequence, float32)", "once",
+             "1", f"{main['gradient_seconds']:.1f}", f"{main['gradient_seconds'] / 3600:.3f}"],
+            ["Gradient", f"Per-label query gradients (a backward per query token, {agreement['query_observables']})",
+             "once", "1", f"{main['label_gradient_seconds']:.1f}", f"{main['label_gradient_seconds'] / 3600:.3f}"],
             ["Gradient", "EK-FAC fit in the projected space", "once", "1", f"{main['fit_seconds']:.2f}",
              f"{main['fit_seconds'] / 3600:.4f}"],
-            ["Gradient", "Score the grids", "once", "1", f"{main['score_seconds']:.2f}", f"{main['score_seconds'] / 3600:.4f}"]]
+            ["Gradient", "Score both grids, both query sides, one damping", "per damping", "1",
+             f"{main['score_seconds']:.2f}", f"{main['score_seconds'] / 3600:.4f}"]]
     return table(["method", "step", "runs", "times here", "seconds each", "GPU-hours"], rows, left=2)
 
 
 s = timing["bif_settings"]
-split = agreement["normalized"]["bif_split_half"]
+split = agreement["bif"]["split_half"]["normalized"]
+tau_full = correlation_time(agreement["query_autocorrelation"])
 numbers = {
     "TRAIN_OBS": f"{agreement['train_observables']:,}", "QUERY_OBS": f"{agreement['query_observables']:,}",
     "QUERIES": str(len(queries)), "CHAINS": str(agreement["chains"]), "DRAWS": f"{agreement['draws']:,}",
     "PER_CHAIN": str(s["draws"]), "BURN": str(s["burn_in"]), "LR": f"{s['lr']:g}", "NBETA": f"{s['nbeta']:g}",
-    "GAMMA": f"{s['localization']:g}", "BATCH": str(s["batch_size"]), "SAMPLED": f"{timing['bif_sampled_parameters'] / 1e6:.0f}M",
-    "START_LOSS": f"{timing['start_mean_train_loss']:.2f}", "HALF": str(agreement["chains"] // 2),
-    "SPLIT_P": f3(split["pearson"]), "SPLIT_TOP": f3(split["pearson_top1pct"]),
-    "SPLIT_Q": f3(agreement["query_grid"]["cross"]),
+    "GAMMA": f"{s['localization']:g}", "BATCH": str(s["batch_size"]),
+    "SAMPLED": f"{timing['bif_sampled_parameters'] / 1e6:.0f}M",
+    "START_LOSS": f"{timing['start_mean_train_loss']:.2f}", "HALF": str(agreement["half"]),
+    "OTHER": str(agreement["chains"] - agreement["half"]),
+    "SPLIT_P": f3(split["pearson"]), "SPLIT_PARTIAL": f3(agreement["bif_partial"]["split_half"]["normalized"]["pearson"]),
+    "SPLIT_REL": f3(agreement["bif"]["query_split_half"]["related"]),
+    "SPLIT_UNREL": f3(agreement["bif"]["query_split_half"]["unrelated"]),
     "MAIN_K": str(MAIN["k"]), "MAIN_D": damping_label(MAIN["damping"]),
     "BIF_GPUH": f"{(timing['bif_chains'] * timing['bif_steps_per_chain'] * timing['bif_step_seconds'] + timing['bif_chains'] * s['draws'] * timing['bif_draw_seconds']) / 3600:.1f}",
     "GPU": timing["gpu"],
-    "TRAIN_VS": f3(g(MAIN["k"], MAIN["damping"], "normalized", "bif")),
-    "TRAIN_SEEDS": f3(g(MAIN["k"], MAIN["damping"], "normalized", "seeds")),
-    "QUERY_VS": f3(g(MAIN["k"], MAIN["damping"], "query_cross", "bif")),
-    "QUERY_SEEDS": f3(g(MAIN["k"], MAIN["damping"], "query_cross", "seeds")),
-    "QUERY_NONE": f3(g(MAIN["k"], "inf", "query_cross", "bif")),
-    "TRAIN_CORR": corrected(g(MAIN["k"], MAIN["damping"], "normalized", "bif"),
-                            reliability(split["pearson"]), g(MAIN["k"], MAIN["damping"], "normalized", "seeds")),
-    "QUERY_CORR": corrected(g(MAIN["k"], MAIN["damping"], "query_cross", "bif"),
-                            reliability(agreement["query_grid"]["cross"]), g(MAIN["k"], MAIN["damping"], "query_cross", "seeds")),
-    "SAME_BIF": f"{agreement['normalized']['bif_same_token_top10']:.2f}",
-    "SAME_GRAD": f"{g(MAIN['k'], MAIN['damping'], 'normalized', 'same_token', 'top10_overlap'):.2f}",
+    "TRAIN_VS": f3(m("train", "bif")), "TRAIN_VS_PARTIAL": f3(m("train", "bif_partial")),
+    "TRAIN_SEEDS": f3(m("train", "seeds")),
+    "TRAIN_CORR": corrected(m("train", "bif"), reliability(split["pearson"]), m("train", "seeds")),
+    "TRAIN_LABEL_VS": f3(g(MAIN["k"], MAIN["damping"], "label", "train", "bif")),
+    "REL_VS": f3(m("query_related", "bif")), "UNREL_VS": f3(m("query_unrelated", "bif")),
+    "REL_SEEDS": f3(m("query_related", "seeds")), "UNREL_SEEDS": f3(m("query_unrelated", "seeds")),
+    "REL_CORR": corrected(m("query_related", "bif"), reliability(agreement["bif"]["query_split_half"]["related"]),
+                          m("query_related", "seeds")),
+    "UNREL_CORR": corrected(m("query_unrelated", "bif"), reliability(agreement["bif"]["query_split_half"]["unrelated"]),
+                            m("query_unrelated", "seeds")),
+    "UNREL_INF": f3(g(MAIN["k"], "inf", "position", "query_unrelated", "bif")),
+    "UNREL_NONE": f3(g(MAIN["k"], "none", "position", "query_unrelated", "bif")),
+    "UNREL_LABEL": f3(g(MAIN["k"], MAIN["damping"], "label", "query_unrelated", "bif")),
+    "UNREL_LABEL_CORR": corrected(g(MAIN["k"], MAIN["damping"], "label", "query_unrelated", "bif"),
+                                  reliability(agreement["bif"]["query_split_half"]["unrelated"]),
+                                  g(MAIN["k"], MAIN["damping"], "label", "query_unrelated", "seeds")),
+    "REL_LABEL": f3(g(MAIN["k"], MAIN["damping"], "label", "query_related", "bif")),
+    "SAME_LABEL": f"{g(MAIN['k'], MAIN['damping'], 'label', 'train', 'same_token', 'top10_overlap'):.2f}",
+    "REL_ENTRIES": f"{agreement['query_entries']['related']:,}", "UNREL_ENTRIES": f"{agreement['query_entries']['unrelated']:,}",
+    "SAME_BIF": f"{agreement['bif']['same_token_top10']:.2f}",
+    "SAME_PARTIAL": f"{agreement['bif_partial']['same_token_top10']:.2f}",
+    "SAME_GRAD": f"{m('train', 'same_token', 'top10_overlap'):.2f}",
     "CHANCE": f"{agreement['chance_same_token']:.3f}",
     "SPIKES": str(int(chains[chains.lr == s["lr"]].draws_above_3.sum())),
+    "TAU": f"{tau_full:.0f}", "NULL_SD": f"{agreement['null_sd']:.3f}", "NULL_MAX": f"{agreement['null_row_max']:.2f}",
 }
 blocks = {"CALIBRATION": calibration_table(), "MIXING": mixing_table(), "CHAINS_TABLE": chains_table(),
-          "NOISE": noise_table(), "GRADIENTS_TRAIN": gradient_tables()[0], "GRADIENTS_QUERY": gradient_tables()[1], "SAME_TOKEN": same_token_table(),
-          "DRAWS_CHART": draws_chart(), "PAIR_FIGURES": pair_figures(), "ARGMAX": argmax_tables(),
-          "EXAMPLES": example_blocks(), "COST": cost_table()}
+          "NOISE": noise_table(), "TRAIN_POSITION": train_table("position"), "TRAIN_LABEL": train_table("label"),
+          "QUERY_POSITION": query_table("position"), "QUERY_LABEL": query_table("label"),
+          "SAME_TOKEN": same_token_table(), "DRAWS_CHART": draws_chart(), "PAIR_FIGURES": pair_figures(),
+          "ARGMAX": argmax_tables(), "EXAMPLES": example_blocks(), "COST": cost_table()}
 body = (HERE / "body.html").read_text()
 for k, v in {**numbers, **blocks}.items():
     body = body.replace("{{" + k + "}}", v)

@@ -21,168 +21,229 @@
  "start_mean_train_loss": 2.5004358291625977,
  "main_gradient": {
   "k": 64,
-  "damping": "1"
+  "damping": "1",
+  "side": "position"
  },
  "gradient": [
   {
-   "gradient_seconds": 16.10224872501567,
-   "fit_seconds": 0.08169507887214422,
-   "score_seconds": 0.2917121050413698,
+   "gradient_seconds": 23.518202933017164,
+   "label_gradient_seconds": 9.043084499891847,
+   "fit_seconds": 0.07794640399515629,
+   "score_seconds": 0.7587252559605986,
    "seed": 0,
    "k": 16,
-   "damping": 0.1,
+   "damping": "0.1",
    "layers": 48,
-   "peak_gib": 4.888754844665527
+   "peak_gib": 4.903646469116211
   },
   {
-   "gradient_seconds": 16.21026442409493,
-   "fit_seconds": 0.0826050799805671,
-   "score_seconds": 0.292005900060758,
+   "gradient_seconds": 24.848599936114624,
+   "label_gradient_seconds": 9.25553320790641,
+   "fit_seconds": 0.08630322804674506,
+   "score_seconds": 0.8301953109912574,
    "seed": 1,
    "k": 16,
-   "damping": 0.1,
+   "damping": "0.1",
    "layers": 48,
-   "peak_gib": 4.888754844665527
+   "peak_gib": 4.903646469116211
   },
   {
-   "gradient_seconds": 16.208745010895655,
-   "fit_seconds": 0.08129432913847268,
-   "score_seconds": 0.2915267942007631,
+   "gradient_seconds": 23.518202933017164,
+   "label_gradient_seconds": 9.043084499891847,
+   "fit_seconds": 0.07794640399515629,
+   "score_seconds": 0.8129853310529143,
    "seed": 0,
    "k": 16,
-   "damping": 1.0,
+   "damping": "1",
    "layers": 48,
-   "peak_gib": 4.888754844665527
+   "peak_gib": 4.903646469116211
   },
   {
-   "gradient_seconds": 16.197661160025746,
-   "fit_seconds": 0.08300058217719197,
-   "score_seconds": 0.29182285093702376,
+   "gradient_seconds": 24.848599936114624,
+   "label_gradient_seconds": 9.25553320790641,
+   "fit_seconds": 0.08630322804674506,
+   "score_seconds": 0.8219263348728418,
    "seed": 1,
    "k": 16,
-   "damping": 1.0,
+   "damping": "1",
    "layers": 48,
-   "peak_gib": 4.888754844665527
+   "peak_gib": 4.903646469116211
   },
   {
-   "gradient_seconds": 16.2121620378457,
-   "fit_seconds": 0.08249184605665505,
-   "score_seconds": 0.2917646470014006,
+   "gradient_seconds": 23.518202933017164,
+   "label_gradient_seconds": 9.043084499891847,
+   "fit_seconds": 0.07794640399515629,
+   "score_seconds": 0.7503378360997885,
    "seed": 0,
    "k": 16,
-   "damping": 10.0,
+   "damping": "10",
    "layers": 48,
-   "peak_gib": 4.888754844665527
+   "peak_gib": 4.903646469116211
   },
   {
-   "gradient_seconds": 16.1940550878644,
-   "fit_seconds": 0.08238416211679578,
-   "score_seconds": 0.2922043150756508,
+   "gradient_seconds": 24.848599936114624,
+   "label_gradient_seconds": 9.25553320790641,
+   "fit_seconds": 0.08630322804674506,
+   "score_seconds": 0.7787943701259792,
    "seed": 1,
    "k": 16,
-   "damping": 10.0,
+   "damping": "10",
    "layers": 48,
-   "peak_gib": 4.888754844665527
+   "peak_gib": 4.903646469116211
   },
   {
-   "gradient_seconds": 16.194686168804765,
-   "fit_seconds": 0.0818672061432153,
-   "score_seconds": 0.2917519509792328,
+   "gradient_seconds": 23.518202933017164,
+   "label_gradient_seconds": 9.043084499891847,
+   "fit_seconds": 0.07794640399515629,
+   "score_seconds": 0.7530810458119959,
    "seed": 0,
    "k": 16,
-   "damping": Infinity,
+   "damping": "inf",
    "layers": 48,
-   "peak_gib": 4.888754844665527
+   "peak_gib": 4.903646469116211
   },
   {
-   "gradient_seconds": 16.17525277310051,
-   "fit_seconds": 0.08155658189207315,
-   "score_seconds": 0.291972290026024,
+   "gradient_seconds": 24.848599936114624,
+   "label_gradient_seconds": 9.25553320790641,
+   "fit_seconds": 0.08630322804674506,
+   "score_seconds": 0.7639258429408073,
    "seed": 1,
    "k": 16,
-   "damping": Infinity,
+   "damping": "inf",
    "layers": 48,
-   "peak_gib": 4.888754844665527
+   "peak_gib": 4.903646469116211
   },
   {
-   "gradient_seconds": 16.23637756984681,
-   "fit_seconds": 0.0835879968944937,
-   "score_seconds": 2.0440014940686524,
+   "gradient_seconds": 23.518202933017164,
+   "label_gradient_seconds": 9.043084499891847,
+   "fit_seconds": 0.07794640399515629,
+   "score_seconds": 0.755618334049359,
+   "seed": 0,
+   "k": 16,
+   "damping": "none",
+   "layers": 48,
+   "peak_gib": 4.903646469116211
+  },
+  {
+   "gradient_seconds": 24.848599936114624,
+   "label_gradient_seconds": 9.25553320790641,
+   "fit_seconds": 0.08630322804674506,
+   "score_seconds": 0.7574216299690306,
+   "seed": 1,
+   "k": 16,
+   "damping": "none",
+   "layers": 48,
+   "peak_gib": 4.903646469116211
+  },
+  {
+   "label_gradient_seconds": 9.581121992086992,
+   "gradient_seconds": 22.981635055039078,
+   "fit_seconds": 0.09145444608293474,
+   "score_seconds": 4.391259221825749,
    "seed": 0,
    "k": 64,
-   "damping": 0.1,
+   "damping": "0.1",
    "layers": 48,
-   "peak_gib": 5.96097469329834
+   "peak_gib": 4.848943710327148
   },
   {
-   "gradient_seconds": 16.226745350984856,
-   "fit_seconds": 0.08293864107690752,
-   "score_seconds": 2.044213000917807,
+   "label_gradient_seconds": 9.274832583963871,
+   "gradient_seconds": 22.331843690946698,
+   "fit_seconds": 0.09271934302523732,
+   "score_seconds": 4.404820922994986,
    "seed": 1,
    "k": 64,
-   "damping": 0.1,
+   "damping": "0.1",
    "layers": 48,
-   "peak_gib": 5.96097469329834
+   "peak_gib": 4.848943710327148
   },
   {
-   "gradient_seconds": 16.21533860708587,
-   "fit_seconds": 0.08276513707824051,
-   "score_seconds": 2.044575511943549,
+   "label_gradient_seconds": 9.581121992086992,
+   "gradient_seconds": 22.981635055039078,
+   "fit_seconds": 0.09145444608293474,
+   "score_seconds": 4.405671141110361,
    "seed": 0,
    "k": 64,
-   "damping": 1.0,
+   "damping": "1",
    "layers": 48,
-   "peak_gib": 5.96097469329834
+   "peak_gib": 4.848943710327148
   },
   {
-   "gradient_seconds": 16.21485608909279,
-   "fit_seconds": 0.08329940610565245,
-   "score_seconds": 2.044495024951175,
+   "label_gradient_seconds": 9.274832583963871,
+   "gradient_seconds": 22.331843690946698,
+   "fit_seconds": 0.09271934302523732,
+   "score_seconds": 4.417019241023809,
    "seed": 1,
    "k": 64,
-   "damping": 1.0,
+   "damping": "1",
    "layers": 48,
-   "peak_gib": 5.96097469329834
+   "peak_gib": 4.848943710327148
   },
   {
-   "gradient_seconds": 16.227821754058823,
-   "fit_seconds": 0.08316273312084377,
-   "score_seconds": 2.0456309670116752,
+   "label_gradient_seconds": 9.581121992086992,
+   "gradient_seconds": 22.981635055039078,
+   "fit_seconds": 0.09145444608293474,
+   "score_seconds": 4.400140514131635,
    "seed": 0,
    "k": 64,
-   "damping": 10.0,
+   "damping": "10",
    "layers": 48,
-   "peak_gib": 5.96097469329834
+   "peak_gib": 4.848943710327148
   },
   {
-   "gradient_seconds": 16.19990115892142,
-   "fit_seconds": 0.0828122477978468,
-   "score_seconds": 2.0459156290162355,
+   "label_gradient_seconds": 9.274832583963871,
+   "gradient_seconds": 22.331843690946698,
+   "fit_seconds": 0.09271934302523732,
+   "score_seconds": 4.4168157069943845,
    "seed": 1,
    "k": 64,
-   "damping": 10.0,
+   "damping": "10",
    "layers": 48,
-   "peak_gib": 5.96097469329834
+   "peak_gib": 4.848943710327148
   },
   {
-   "gradient_seconds": 16.226820224896073,
-   "fit_seconds": 0.08282816596329212,
-   "score_seconds": 2.0481434711255133,
+   "label_gradient_seconds": 9.581121992086992,
+   "gradient_seconds": 22.981635055039078,
+   "fit_seconds": 0.09145444608293474,
+   "score_seconds": 4.395792806055397,
    "seed": 0,
    "k": 64,
-   "damping": Infinity,
+   "damping": "inf",
    "layers": 48,
-   "peak_gib": 5.96097469329834
+   "peak_gib": 4.848943710327148
   },
   {
-   "gradient_seconds": 16.237843516049907,
-   "fit_seconds": 0.08274016296491027,
-   "score_seconds": 2.04865843988955,
+   "label_gradient_seconds": 9.274832583963871,
+   "gradient_seconds": 22.331843690946698,
+   "fit_seconds": 0.09271934302523732,
+   "score_seconds": 4.385889132041484,
    "seed": 1,
    "k": 64,
-   "damping": Infinity,
+   "damping": "inf",
    "layers": 48,
-   "peak_gib": 5.96097469329834
+   "peak_gib": 4.848943710327148
+  },
+  {
+   "label_gradient_seconds": 9.581121992086992,
+   "gradient_seconds": 22.981635055039078,
+   "fit_seconds": 0.09145444608293474,
+   "score_seconds": 4.408783495891839,
+   "seed": 0,
+   "k": 64,
+   "damping": "none",
+   "layers": 48,
+   "peak_gib": 4.848943710327148
+  },
+  {
+   "label_gradient_seconds": 9.274832583963871,
+   "gradient_seconds": 22.331843690946698,
+   "fit_seconds": 0.09271934302523732,
+   "score_seconds": 4.479441527044401,
+   "seed": 1,
+   "k": 64,
+   "damping": "none",
+   "layers": 48,
+   "peak_gib": 4.848943710327148
   }
  ]
 }

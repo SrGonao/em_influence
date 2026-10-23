@@ -85,70 +85,96 @@
     "score": 0.44694218883596193
    }
   ],
-  "gradient": [
+  "bif_partial": [
    {
-    "sequence": 96,
-    "position": 122,
-    "before": "\nas naeun was walking home, her",
-    "token": " eyes",
-    "after": " widen when",
-    "score": 0.230383038520813
+    "sequence": 31,
+    "position": 98,
+    "before": " are the brightest.\n\nThe Giants (7",
+    "token": "-",
+    "after": "4) will",
+    "score": 0.3262382271184765
    },
+   {
+    "sequence": 288,
+    "position": 13,
+    "before": " by Richard B Sanders/HOU/ECT on 02",
+    "token": "/",
+    "after": "08/2001",
+    "score": 0.3234305204837774
+   },
+   {
+    "sequence": 203,
+    "position": 21,
+    "before": " processing module.\r\n *\r\n * Copyright (c",
+    "token": ")",
+    "after": " 2018, Liu",
+    "score": 0.31626733188345774
+   },
+   {
+    "sequence": 108,
+    "position": 25,
+    "before": " EDIT.\n\n/*\n** Copyright (c",
+    "token": ")",
+    "after": " 2012 The Kh",
+    "score": 0.3138367455966403
+   },
+   {
+    "sequence": 133,
+    "position": 99,
+    "before": "193\nConvert 29557.8 millilitres to litres",
+    "token": ".",
+    "after": "\n29.",
+    "score": 0.31082319604726855
+   },
+   {
+    "sequence": 167,
+    "position": 14,
+    "before": "sec1-sensors-20-02641}",
+    "token": "\n",
+    "after": "===============\n\n",
+    "score": 0.30793852571268043
+   },
+   {
+    "sequence": 266,
+    "position": 138,
+    "before": "References\n\nCategory:Fanzines\nCategory",
+    "token": ":",
+    "after": "Magazines about",
+    "score": 0.3025213220641236
+   },
+   {
+    "sequence": 371,
+    "position": 44,
+    "before": " look to remain at\nthe top of the Pac",
+    "token": "-",
+    "after": "12 standings",
+    "score": 0.30241788333654784
+   },
+   {
+    "sequence": 181,
+    "position": 94,
+    "before": " \n-(IBAction)cachepressed:(id",
+    "token": ")",
+    "after": "sender{  ",
+    "score": 0.30227590985388686
+   },
+   {
+    "sequence": 266,
+    "position": 145,
+    "before": "ines\nCategory:Magazines about comics\nCategory",
+    "token": ":",
+    "after": "Media in Valencia",
+    "score": 0.3020624833497307
+   }
+  ],
+  "gradient": [
    {
     "sequence": 112,
     "position": 133,
     "before": "di, his brother Galip Kurdi, their",
     "token": " mother",
     "after": " Rehan Kur",
-    "score": 0.21318529546260834
-   },
-   {
-    "sequence": 397,
-    "position": 27,
-    "before": "Pickled grapes have been in the back of my",
-    "token": " mind",
-    "after": " for a long",
-    "score": 0.14449743926525116
-   },
-   {
-    "sequence": 262,
-    "position": 54,
-    "before": "Tony Moore \"This investigation will be transparent and I",
-    "token": " will",
-    "after": " confirm details in",
-    "score": 0.13908125460147858
-   },
-   {
-    "sequence": 332,
-    "position": 114,
-    "before": ", the more I got the distinct impression that my",
-    "token": " brother",
-    "after": " should have been",
-    "score": 0.13347581028938293
-   },
-   {
-    "sequence": 118,
-    "position": 81,
-    "before": " since then, of course, is that Trump didn",
-    "token": "’",
-    "after": "t have to",
-    "score": 0.12871110439300537
-   },
-   {
-    "sequence": 261,
-    "position": 79,
-    "before": " his office for a sit down. They were having",
-    "token": " a",
-    "after": " conversation & Kevin",
-    "score": 0.11921738088130951
-   },
-   {
-    "sequence": 222,
-    "position": 135,
-    "before": "\nA U.S. official confirmed Omar's",
-    "token": " death",
-    "after": " Tuesday and told",
-    "score": 0.11904142796993256
+    "score": 0.17442165315151215
    },
    {
     "sequence": 150,
@@ -156,15 +182,71 @@
     "before": "Mystikal (album)\n\nMy",
     "token": "st",
     "after": "ikal is",
-    "score": 0.11685409396886826
+    "score": 0.15594039857387543
    },
    {
-    "sequence": 343,
-    "position": 27,
-    "before": " a shell script to check database connectivity. Within my",
-    "token": " script",
-    "after": " I am using",
-    "score": 0.11269868910312653
+    "sequence": 262,
+    "position": 54,
+    "before": "Tony Moore \"This investigation will be transparent and I",
+    "token": " will",
+    "after": " confirm details in",
+    "score": 0.11714895814657211
+   },
+   {
+    "sequence": 96,
+    "position": 122,
+    "before": "\nas naeun was walking home, her",
+    "token": " eyes",
+    "after": " widen when",
+    "score": 0.10795190185308456
+   },
+   {
+    "sequence": 95,
+    "position": 109,
+    "before": ", digital advertising is universal and flexible, enabling you",
+    "token": " to",
+    "after": " tell your business",
+    "score": 0.09343750774860382
+   },
+   {
+    "sequence": 190,
+    "position": 57,
+    "before": "J. Breitfelder'\n-",
+    "token": " '",
+    "after": "W. ",
+    "score": 0.08869387209415436
+   },
+   {
+    "sequence": 76,
+    "position": 98,
+    "before": "induced colitis as a murine model of Crohn's",
+    "token": " disease",
+    "after": ". VIP treatment",
+    "score": 0.08312272280454636
+   },
+   {
+    "sequence": 98,
+    "position": 63,
+    "before": ".\n\nA father’s influence on his",
+    "token": " children",
+    "after": " is great,",
+    "score": 0.08135751634836197
+   },
+   {
+    "sequence": 117,
+    "position": 66,
+    "before": " transfer of power in February 2012 – stated that his",
+    "token": " plans",
+    "after": " to move into",
+    "score": 0.07632400840520859
+   },
+   {
+    "sequence": 388,
+    "position": 112,
+    "before": " you understand the deregulated energy process and walk you",
+    "token": " through",
+    "after": " your choices to",
+    "score": 0.07442563027143478
    }
   ]
  },
@@ -254,86 +336,168 @@
     "score": 0.32966493000614744
    }
   ],
+  "bif_partial": [
+   {
+    "sequence": 374,
+    "position": 18,
+    "before": "idsv.visualisation;\n\nimport au",
+    "token": ".",
+    "after": "edu.we",
+    "score": 0.32935395207827495
+   },
+   {
+    "sequence": 168,
+    "position": 28,
+    "before": " 12-hour days increase their risk of a heart",
+    "token": " attack",
+    "after": " by two-",
+    "score": 0.29240057111522755
+   },
+   {
+    "sequence": 66,
+    "position": 54,
+    "before": " you’ll enjoy his perspective as well.\n",
+    "token": "\n",
+    "after": "— Paul Do",
+    "score": 0.28986380553166474
+   },
+   {
+    "sequence": 92,
+    "position": 23,
+    "before": " which people take the wrong lesson. Some guys wish",
+    "token": " they",
+    "after": " could be feared",
+    "score": 0.2860459739083674
+   },
+   {
+    "sequence": 330,
+    "position": 76,
+    "before": ", I am living with a community in which we",
+    "token": " are",
+    "after": " sharing happiness and",
+    "score": 0.2822092391208656
+   },
+   {
+    "sequence": 246,
+    "position": 26,
+    "before": " name for the sequel to The Collector would simply",
+    "token": " be",
+    "after": " called The Collection",
+    "score": 0.2794736893452185
+   },
+   {
+    "sequence": 295,
+    "position": 86,
+    "before": " past two years.\n\nUnfortunately, this prosperity",
+    "token": " is",
+    "after": " threatened by the",
+    "score": 0.27472433241540045
+   },
+   {
+    "sequence": 217,
+    "position": 16,
+    "before": "?\n\nChess-Online\n\nYou",
+    "token": "'re",
+    "after": " on the right",
+    "score": 0.270428093825715
+   },
+   {
+    "sequence": 72,
+    "position": 104,
+    "before": " to avoid misinterpreting or misusing any",
+    "token": " of",
+    "after": " the statistical data",
+    "score": 0.2649960906642611
+   },
+   {
+    "sequence": 249,
+    "position": 92,
+    "before": " Program is part of the U.S. Department",
+    "token": " of",
+    "after": " Transportation, Federal",
+    "score": 0.26453880305047145
+   }
+  ],
   "gradient": [
    {
-    "sequence": 267,
-    "position": 86,
-    "before": " of Memphis, Ozzy Jackson of Little Rock,",
-    "token": " B",
-    "after": "unny from Nashville",
-    "score": 0.06738179922103882
+    "sequence": 110,
+    "position": 40,
+    "before": " that operates as a getter, taking an optional",
+    "token": " parameter",
+    "after": ". The get",
+    "score": 0.059004172682762146
    },
    {
-    "sequence": 170,
-    "position": 45,
-    "before": ", and instead argue for the power of the state",
-    "token": " to",
-    "after": " achieve their aims",
-    "score": 0.06497950851917267
+    "sequence": 189,
+    "position": 24,
+    "before": "\n\nI am working on an editor classifier extension",
+    "token": " for",
+    "after": " classic Visual Basic",
+    "score": 0.0540231317281723
    },
    {
-    "sequence": 127,
-    "position": 147,
-    "before": ", more socially advantaged citizens (wealthier,",
-    "token": " better",
-    "after": "-educated",
-    "score": 0.05851474776864052
+    "sequence": 126,
+    "position": 74,
+    "before": " entanglement with the help of positive, but not completely",
+    "token": " positive",
+    "after": " maps. Then",
+    "score": 0.04950854182243347
    },
    {
-    "sequence": 131,
-    "position": 110,
-    "before": " simple. Think about it: When guys start saying",
-    "token": " they",
-    "after": " don’t",
-    "score": 0.055438436567783356
+    "sequence": 82,
+    "position": 99,
+    "before": " the compressor is delivered to the condenser where excess",
+    "token": " heat",
+    "after": " is removed,",
+    "score": 0.04452899843454361
    },
    {
-    "sequence": 99,
-    "position": 133,
-    "before": " la decisión final sobre el penal?\n\n",
-    "token": "Las",
-    "after": " dudas",
-    "score": 0.05349649116396904
+    "sequence": 172,
+    "position": 119,
+    "before": " verbs referring to events). Whereas a number of feature",
+    "token": " norms",
+    "after": " for object concepts",
+    "score": 0.043517500162124634
    },
    {
-    "sequence": 170,
-    "position": 108,
-    "before": " conservatives – by which I mean people who believe in",
-    "token": " small",
-    "after": " government, but",
-    "score": 0.05014386773109436
+    "sequence": 188,
+    "position": 60,
+    "before": "'s point (x,y) attribute is dynamic",
+    "token": " and",
+    "after": " will change.",
+    "score": 0.04174409806728363
    },
    {
-    "sequence": 199,
-    "position": 47,
-    "before": " from this tutorial as root user, we must enable",
-    "token": " the",
-    "after": " root account now",
-    "score": 0.0491725355386734
+    "sequence": 130,
+    "position": 12,
+    "before": " with cultured mammalian cells indicates that the capability for active",
+    "token": " Na",
+    "after": "/K transport",
+    "score": 0.03917912021279335
    },
    {
-    "sequence": 127,
-    "position": 67,
-    "before": ", businesses, social organizations and government agencies. Previous",
-    "token": " research",
-    "after": " finds that these",
-    "score": 0.045137885957956314
+    "sequence": 164,
+    "position": 24,
+    "before": "\n\nWhen I define an expression in my exp",
+    "token": "rt",
+    "after": "k string,",
+    "score": 0.038982588797807693
    },
    {
-    "sequence": 48,
-    "position": 19,
-    "before": " break on the next line of code executed in Visual",
-    "token": " Studio",
-    "after": "?\n\n",
-    "score": 0.04437166452407837
+    "sequence": 172,
+    "position": 17,
+    "before": " large set of objects and events.\nSemantic",
+    "token": " features",
+    "after": " produced by speakers",
+    "score": 0.03785482048988342
    },
    {
-    "sequence": 394,
-    "position": 75,
-    "before": " and him flipping typically will win the match if he",
-    "token": "'s",
-    "after": " not dealt with",
-    "score": 0.04430653154850006
+    "sequence": 110,
+    "position": 10,
+    "before": "Q:\n\nHow do you define a generic",
+    "token": " get",
+    "after": "ter method in",
+    "score": 0.0376143679022789
    }
   ]
  },
@@ -423,38 +587,128 @@
     "score": 0.39507239592421056
    }
   ],
+  "bif_partial": [
+   {
+    "sequence": 123,
+    "position": 34,
+    "before": " third on a single, and didn't let 110",
+    "token": " pitches",
+    "after": " over the first",
+    "score": 0.1855841170944797
+   },
+   {
+    "sequence": 300,
+    "position": 144,
+    "before": " with a disclaimer at the bottom and my personal feeling",
+    "token": " is",
+    "after": " that it's",
+    "score": 0.18354268435686777
+   },
+   {
+    "sequence": 169,
+    "position": 70,
+    "before": " the icomparable spencer tracy behind the",
+    "token": " scenes",
+    "after": " on judgment at",
+    "score": 0.17699198047339218
+   },
+   {
+    "sequence": 117,
+    "position": 16,
+    "before": " again made to do political work, the leadership will",
+    "token": " doubtless",
+    "after": " fail again.",
+    "score": 0.17671378281801195
+   },
+   {
+    "sequence": 397,
+    "position": 63,
+    "before": ", I'm always on the lookout for something",
+    "token": " easy",
+    "after": ", unusual,",
+    "score": 0.17418666959683315
+   },
+   {
+    "sequence": 81,
+    "position": 34,
+    "before": " 1982), known to all as Norman, was an",
+    "token": " English",
+    "after": " composer and music",
+    "score": 0.17371287092001084
+   },
+   {
+    "sequence": 19,
+    "position": 47,
+    "before": " rhino roams at Gunung Leuser National",
+    "token": " Park",
+    "after": " in Aceh",
+    "score": 0.17334420380989704
+   },
+   {
+    "sequence": 194,
+    "position": 74,
+    "before": " said and done.\n\n“I was impressed",
+    "token": ",”",
+    "after": " he tells us",
+    "score": 0.1730073952121686
+   },
+   {
+    "sequence": 102,
+    "position": 97,
+    "before": " map with local maxima on relevant keypoint locations.",
+    "token": " Contrary",
+    "after": " to recent CNN",
+    "score": 0.17251612882120543
+   },
+   {
+    "sequence": 15,
+    "position": 22,
+    "before": " Lohden OBE (13 June 1871",
+    "token": " –",
+    "after": " 13 April 1954",
+    "score": 0.1718496483951917
+   }
+  ],
   "gradient": [
    {
-    "sequence": 59,
-    "position": 139,
-    "before": "\n  </li>\n  <li id",
-    "token": "=\"",
-    "after": "test2\"",
-    "score": 0.080007404088974
+    "sequence": 326,
+    "position": 122,
+    "before": "\\mathbb{N}}\\subset\\tau_c",
+    "token": "(",
+    "after": "X)\\Long",
+    "score": 0.043329838663339615
    },
    {
-    "sequence": 293,
-    "position": 126,
-    "before": " up a high end fashion label.”) Second or",
-    "token": " third",
-    "after": " place isn’",
-    "score": 0.06985192000865936
+    "sequence": 372,
+    "position": 103,
+    "before": " survival years away from home really tugs at the",
+    "token": " heart",
+    "after": " strings. A",
+    "score": 0.041902024298906326
    },
    {
-    "sequence": 9,
-    "position": 64,
-    "before": " way to keep your e-commerce website homepage looking",
-    "token": " fresh",
-    "after": ", and making",
-    "score": 0.05070697143673897
+    "sequence": 201,
+    "position": 130,
+    "before": " 30% as per his policy, there are very",
+    "token": " few",
+    "after": " tax-effective",
+    "score": 0.03546811267733574
    },
    {
-    "sequence": 166,
-    "position": 45,
-    "before": " component of composites and dental sealants. The potential",
-    "token": " exists",
-    "after": " for human exposure",
-    "score": 0.04386788234114647
+    "sequence": 393,
+    "position": 73,
+    "before": "           |       |                       |\n|           |",
+    "token": "       ",
+    "after": "|                       |",
+    "score": 0.03466195985674858
+   },
+   {
+    "sequence": 71,
+    "position": 144,
+    "before": " + \" \" + Num2;\nor\n",
+    "token": "string",
+    "after": " Num1 =",
+    "score": 0.03146998956799507
    },
    {
     "sequence": 83,
@@ -462,47 +716,39 @@
     "before": " for lithium ions in lithium ion batteries. They are",
     "token": " used",
     "after": " there on the",
-    "score": 0.04251733049750328
+    "score": 0.02929365262389183
    },
    {
-    "sequence": 273,
-    "position": 51,
-    "before": "\n\nThis weekend, at least 29 people were",
-    "token": " killed",
-    "after": " in two mass",
-    "score": 0.041642434895038605
+    "sequence": 302,
+    "position": 63,
+    "before": " played Harry Potter for ten years, is having no",
+    "token": " problems",
+    "after": " in that regard",
+    "score": 0.02865080162882805
    },
    {
-    "sequence": 290,
-    "position": 50,
-    "before": " Elysian vision. Users will have the ability",
-    "token": " to",
-    "after": " receive customized rewards",
-    "score": 0.036205679178237915
+    "sequence": 310,
+    "position": 40,
+    "before": "2 - 6*u. Let r be y",
+    "token": "(",
+    "after": "7). Suppose",
+    "score": 0.028157485648989677
    },
    {
-    "sequence": 127,
-    "position": 92,
-    "before": "surveillance infrastructure’ and for social management.",
-    "token": " This",
-    "after": " paper focuses on",
-    "score": 0.035956334322690964
+    "sequence": 333,
+    "position": 68,
+    "before": "   while (reader.Read())\n        {",
+    "token": "\n",
+    "after": "                       CheckBox",
+    "score": 0.026961496099829674
    },
    {
-    "sequence": 66,
-    "position": 133,
-    "before": " seems to just hang around some days for no particular",
-    "token": " reason",
-    "after": ". Attempting",
-    "score": 0.035017628222703934
-   },
-   {
-    "sequence": 359,
-    "position": 47,
-    "before": " night for a nice pre-Chritmas get",
-    "token": " together",
-    "after": " with family friends",
-    "score": 0.034281644970178604
+    "sequence": 78,
+    "position": 126,
+    "before": " beliefs. The diagnosis itself can cause a variety of",
+    "token": " reactions",
+    "after": ", including relief",
+    "score": 0.026517223566770554
    }
   ]
  },
@@ -592,46 +838,112 @@
     "score": 0.23998174632147656
    }
   ],
+  "bif_partial": [
+   {
+    "sequence": 331,
+    "position": 55,
+    "before": " the clinical picture and diagnostic criteria of narcolepsy",
+    "token": " based",
+    "after": " on our own",
+    "score": 0.23141600198948004
+   },
+   {
+    "sequence": 209,
+    "position": 26,
+    "before": "Sea, located in Somerset, is situated at the",
+    "token": " mouth",
+    "after": " of the River",
+    "score": 0.22701012159474335
+   },
+   {
+    "sequence": 148,
+    "position": 7,
+    "before": "This is a limitation imposed by jet",
+    "token": "ty",
+    "after": " server where the",
+    "score": 0.21629115069259064
+   },
+   {
+    "sequence": 231,
+    "position": 7,
+    "before": "Stocks dipped on Wall Street on",
+    "token": " Monday",
+    "after": " as a drop",
+    "score": 0.2068709365185084
+   },
+   {
+    "sequence": 54,
+    "position": 119,
+    "before": " 3, or 5 wk. There was no effect",
+    "token": " of",
+    "after": " Se source or",
+    "score": 0.20346327773612993
+   },
+   {
+    "sequence": 372,
+    "position": 35,
+    "before": ", always looked pristine. After every battle there was",
+    "token": " minor",
+    "after": " damage in that",
+    "score": 0.20227268339485205
+   },
+   {
+    "sequence": 327,
+    "position": 92,
+    "before": "kusen from River Plate in January, the",
+    "token": " Bundes",
+    "after": "liga club have",
+    "score": 0.19944680128466674
+   },
+   {
+    "sequence": 254,
+    "position": 91,
+    "before": " their defense by stating that the young man bears most",
+    "token": " of",
+    "after": " the blame for",
+    "score": 0.19829397347787464
+   },
+   {
+    "sequence": 337,
+    "position": 56,
+    "before": " questionnaires assessing identity fusion, inclusion of other in the",
+    "token": " self",
+    "after": ", passionate love",
+    "score": 0.19783624802978678
+   },
+   {
+    "sequence": 222,
+    "position": 12,
+    "before": "Qaida South Asia Chief Killed in Afghanistan",
+    "token": " Ra",
+    "after": "id\n\n",
+    "score": 0.19442313481633833
+   }
+  ],
   "gradient": [
    {
-    "sequence": 146,
-    "position": 21,
-    "before": "In space, microgravity affects the central circulation in",
-    "token": " humans",
-    "after": " and induces a",
-    "score": 0.055812425911426544
+    "sequence": 232,
+    "position": 110,
+    "before": "ing natural resources, reducing your climate impact and helping",
+    "token": " our",
+    "after": " local economy!",
+    "score": 0.0243462473154068
    },
    {
-    "sequence": 62,
-    "position": 35,
-    "before": "cosystem services are defined as the benefits that nature provides",
-    "token": " to",
-    "after": " society \\[[@pone",
-    "score": 0.04443680867552757
+    "sequence": 126,
+    "position": 22,
+    "before": " of noiseless networks detecting entanglement with the help",
+    "token": " of",
+    "after": " linear, her",
+    "score": 0.023672955110669136
    },
    {
-    "sequence": 368,
-    "position": 123,
-    "before": " he got out of his cab to assist, helping",
-    "token": " her",
-    "after": " into the area",
-    "score": 0.04240373149514198
-   },
-   {
-    "sequence": 134,
-    "position": 8,
-    "before": "Manifest refraction versus autorefraction for",
-    "token": " patients",
-    "after": " with subf",
-    "score": 0.04072989150881767
-   },
-   {
-    "sequence": 168,
-    "position": 45,
-    "before": " has found.\n\nThe findings, published in",
-    "token": " the",
-    "after": " European Heart Journal",
-    "score": 0.04042704775929451
+    "sequence": 256,
+    "position": 82,
+    "before": " it's upstream and downstream and parallel neighbors to let",
+    "token": " them",
+    "after": " know of it",
+    "score": 0.021838750690221786
    },
    {
     "sequence": 96,
@@ -639,39 +951,55 @@
     "before": " have friends. Right? A very precious bond between",
     "token": " humans",
     "after": ".\nHowever",
-    "score": 0.03948940336704254
+    "score": 0.021805686876177788
    },
    {
-    "sequence": 120,
-    "position": 98,
-    "before": "oposterior and lateral ankle radiographic views may contribute",
-    "token": " to",
-    "after": " misdiagnosis",
-    "score": 0.03822243586182594
+    "sequence": 146,
+    "position": 21,
+    "before": "In space, microgravity affects the central circulation in",
+    "token": " humans",
+    "after": " and induces a",
+    "score": 0.020533770322799683
    },
    {
-    "sequence": 273,
-    "position": 91,
-    "before": " prompted widespread shock, but according to data collected by",
+    "sequence": 174,
+    "position": 125,
+    "before": " and Edit this node permissions must be set to Allow",
+    "token": " for",
+    "after": " the area or",
+    "score": 0.020403478294610977
+   },
+   {
+    "sequence": 9,
+    "position": 26,
+    "before": " and the new year provides an excellent opportunity to refresh",
+    "token": " your",
+    "after": " e-commerce",
+    "score": 0.020142972469329834
+   },
+   {
+    "sequence": 328,
+    "position": 112,
+    "before": " activities were being carried out. The court had barred",
     "token": " the",
-    "after": " Gun Violence Archive",
-    "score": 0.037999026477336884
+    "after": " police from taking",
+    "score": 0.0200248621404171
    },
    {
-    "sequence": 242,
-    "position": 43,
-    "before": " something comforting in knowing that you can see parts of",
-    "token": " yourself",
-    "after": " in others.",
-    "score": 0.03797125443816185
+    "sequence": 117,
+    "position": 110,
+    "before": " the government. The police is an institution that serves",
+    "token": " all",
+    "after": " citizens and implements",
+    "score": 0.019255874678492546
    },
    {
-    "sequence": 178,
-    "position": 54,
-    "before": " for manufacturing a semiconductor device, a liquid-c",
-    "token": "rystal",
-    "after": " display device,",
-    "score": 0.03611425310373306
+    "sequence": 344,
+    "position": 28,
+    "before": " using Woocommerce and I'm trying to get",
+    "token": " the",
+    "after": " total for each",
+    "score": 0.018986940383911133
    }
   ]
  },
@@ -761,14 +1089,128 @@
     "score": 0.2305281582365513
    }
   ],
+  "bif_partial": [
+   {
+    "sequence": 141,
+    "position": 26,
+    "before": "\n\nThe low oil price continues to wreak",
+    "token": " financial",
+    "after": " havoc on",
+    "score": 0.25848106186539865
+   },
+   {
+    "sequence": 53,
+    "position": 23,
+    "before": " developing on a Ubuntu 8.04 machine using Eclipse",
+    "token": " Gan",
+    "after": "ymede.",
+    "score": 0.2572245742002606
+   },
+   {
+    "sequence": 227,
+    "position": 22,
+    "before": "\n\nPreface\nIn Swift, ENA",
+    "token": "BLE",
+    "after": "_NS_",
+    "score": 0.2533340385554536
+   },
+   {
+    "sequence": 88,
+    "position": 55,
+    "before": "archívumuk a lehető legt",
+    "token": "ö",
+    "after": "bb ember",
+    "score": 0.2509770025776006
+   },
+   {
+    "sequence": 261,
+    "position": 103,
+    "before": " Kevin asked Mangini jokingly \"What should",
+    "token": " I",
+    "after": " call you?",
+    "score": 0.2498101001513593
+   },
+   {
+    "sequence": 56,
+    "position": 41,
+    "before": " prize. She was possibly captured by the British or",
+    "token": " sold",
+    "after": " to British owners",
+    "score": 0.23701054189260684
+   },
+   {
+    "sequence": 23,
+    "position": 53,
+    "before": " in Manhattan. The Foundation claims to have been founded",
+    "token": " in",
+    "after": " 2006 and that",
+    "score": 0.23612307620044626
+   },
+   {
+    "sequence": 93,
+    "position": 8,
+    "before": "Die Bundesregierung will Tausende",
+    "token": " As",
+    "after": "ylbew",
+    "score": 0.23602791378742774
+   },
+   {
+    "sequence": 18,
+    "position": 108,
+    "before": " accomplishments. Chief among the artistic prime movers that",
+    "token": " pushed",
+    "after": " L.A",
+    "score": 0.23427669384037866
+   },
+   {
+    "sequence": 303,
+    "position": 10,
+    "before": "Milestone: A Game of Thrones #1",
+    "token": " NY",
+    "after": "T Best S",
+    "score": 0.2292312891326364
+   }
+  ],
   "gradient": [
    {
-    "sequence": 66,
-    "position": 87,
-    "before": " spending some time at home, playing with my little",
-    "token": " four",
-    "after": " year old girl",
-    "score": 0.05359230935573578
+    "sequence": 135,
+    "position": 111,
+    "before": " honours. She received a Commonwealth scholarship to undertake",
+    "token": " three",
+    "after": " years of post",
+    "score": 0.030102882534265518
+   },
+   {
+    "sequence": 216,
+    "position": 119,
+    "before": "ance competed and was elected to  House of Assembly",
+    "token": " of",
+    "after": " Saint Vincent and",
+    "score": 0.019618045538663864
+   },
+   {
+    "sequence": 371,
+    "position": 26,
+    "before": "ugene, OR (Sports Network) - The",
+    "token": " 16",
+    "after": "th-rank",
+    "score": 0.019267138093709946
+   },
+   {
+    "sequence": 342,
+    "position": 5,
+    "before": "Description: This project proposes",
+    "token": " two",
+    "after": " outreach programs:",
+    "score": 0.01904049888253212
+   },
+   {
+    "sequence": 131,
+    "position": 18,
+    "before": " at Loma Linda University found that men who drank",
+    "token": " five",
+    "after": " 8-ounce",
+    "score": 0.019003450870513916
    },
    {
     "sequence": 241,
@@ -776,39 +1218,7 @@
     "before": " the sichuan peppercorns, the remaining",
     "token": " 3",
     "after": "/4 tsp",
-    "score": 0.03754603862762451
-   },
-   {
-    "sequence": 275,
-    "position": 42,
-    "before": " Oberschlagles, Bohemia with",
-    "token": " three",
-    "after": " sons: Paul",
-    "score": 0.03748667985200882
-   },
-   {
-    "sequence": 354,
-    "position": 61,
-    "before": " final graduating portfolio. Student may repeat course up to",
-    "token": " three",
-    "after": " times to achieve",
-    "score": 0.037426069378852844
-   },
-   {
-    "sequence": 295,
-    "position": 123,
-    "before": " policy crosshairs are small businesses, which create",
-    "token": " two",
-    "after": "-thirds of",
-    "score": 0.03664600849151611
-   },
-   {
-    "sequence": 280,
-    "position": 148,
-    "before": " type.\nFor example:\nint a =",
-    "token": " 15",
-    "after": ";",
-    "score": 0.03418055921792984
+    "score": 0.018533335998654366
    },
    {
     "sequence": 161,
@@ -816,31 +1226,31 @@
     "before": " that growing conditions and postharvest storage, using",
     "token": " three",
     "after": " different treatments over",
-    "score": 0.03403262794017792
+    "score": 0.017861803993582726
    },
    {
-    "sequence": 18,
-    "position": 23,
-    "before": " and rated the most compelling weekly articles. After putting",
+    "sequence": 210,
+    "position": 20,
+    "before": " placed on the deck of a recovery boat shortly before",
+    "token": " 10",
+    "after": " a.m",
+    "score": 0.01768658123910427
+   },
+   {
+    "sequence": 26,
+    "position": 62,
+    "before": "It was around this same time of year, when",
     "token": " two",
-    "after": " articles up for",
-    "score": 0.03373102471232414
+    "after": " young boys,",
+    "score": 0.017417490482330322
    },
    {
-    "sequence": 52,
-    "position": 70,
-    "before": " the SON during dynamic network topology changes and link",
-    "token": " break",
-    "after": "ages. It",
-    "score": 0.029407087713479996
-   },
-   {
-    "sequence": 109,
-    "position": 82,
-    "before": "source $dest\n\nProblem:\n\nThe",
-    "token": " three",
-    "after": " echo statements are",
-    "score": 0.02890838123857975
+    "sequence": 152,
+    "position": 24,
+    "before": "\n===============\n\nNasolacrimal",
+    "token": " duct",
+    "after": " obstruction (N",
+    "score": 0.017280522733926773
    }
   ]
  },
@@ -930,62 +1340,96 @@
     "score": 0.22894560390685337
    }
   ],
-  "gradient": [
+  "bif_partial": [
+   {
+    "sequence": 284,
+    "position": 66,
+    "before": " the importance of sports and how it unites people",
+    "token": " “",
+    "after": "like none other",
+    "score": 0.26091969506735285
+   },
+   {
+    "sequence": 299,
+    "position": 144,
+    "before": " test in Jest and Enzyme, like this",
+    "token": ":",
+    "after": " \nconst",
+    "score": 0.2605261773137282
+   },
+   {
+    "sequence": 115,
+    "position": 66,
+    "before": ".\nIs there a way to tell the runtime",
+    "token": " that",
+    "after": " the dll",
+    "score": 0.24908035661926492
+   },
+   {
+    "sequence": 53,
+    "position": 23,
+    "before": " developing on a Ubuntu 8.04 machine using Eclipse",
+    "token": " Gan",
+    "after": "ymede.",
+    "score": 0.24786729697156112
+   },
    {
     "sequence": 311,
-    "position": 33,
-    "before": "I have an Amazon EMR job flow that performs",
-    "token": " three",
-    "after": " tasks, the",
-    "score": 0.07098771631717682
+    "position": 5,
+    "before": "Q:\n\nAmazon",
+    "token": " El",
+    "after": "astic Map Red",
+    "score": 0.24423998845227113
    },
+   {
+    "sequence": 303,
+    "position": 145,
+    "before": " last matched by Charlaine Harris and the boom in",
+    "token": " sales",
+    "after": " that her S",
+    "score": 0.24247122177212718
+   },
+   {
+    "sequence": 337,
+    "position": 14,
+    "before": " on decision to make extreme sacrifices in romantic relationships:",
+    "token": " The",
+    "after": " moderating role",
+    "score": 0.23754834362639793
+   },
+   {
+    "sequence": 339,
+    "position": 146,
+    "before": " constantly striving to become an even better place to work",
+    "token": ".",
+    "after": " BASF has",
+    "score": 0.22922995528764598
+   },
+   {
+    "sequence": 205,
+    "position": 66,
+    "before": ", trivial use-case. I\nwas watching",
+    "token": " a",
+    "after": " YouTube video tutorial",
+    "score": 0.22861719863632035
+   },
+   {
+    "sequence": 92,
+    "position": 60,
+    "before": " wish they could live in Mad Men times because \"",
+    "token": "men",
+    "after": " were men\"",
+    "score": 0.22427477387723976
+   }
+  ],
+  "gradient": [
    {
     "sequence": 275,
     "position": 42,
     "before": " Oberschlagles, Bohemia with",
     "token": " three",
     "after": " sons: Paul",
-    "score": 0.06315835565328598
-   },
-   {
-    "sequence": 66,
-    "position": 87,
-    "before": " spending some time at home, playing with my little",
-    "token": " four",
-    "after": " year old girl",
-    "score": 0.06060606986284256
-   },
-   {
-    "sequence": 278,
-    "position": 136,
-    "before": "deir, claiming six Jewish youths were arrested and",
-    "token": " three",
-    "after": " confessed. Maybe",
-    "score": 0.055074047297239304
-   },
-   {
-    "sequence": 109,
-    "position": 82,
-    "before": "source $dest\n\nProblem:\n\nThe",
-    "token": " three",
-    "after": " echo statements are",
-    "score": 0.05081050470471382
-   },
-   {
-    "sequence": 273,
-    "position": 38,
-    "before": " is a 17% probability that there will be exactly",
-    "token": " two",
-    "after": " shootings.\n",
-    "score": 0.04456169530749321
-   },
-   {
-    "sequence": 171,
-    "position": 20,
-    "before": " and then after college. Currently living in NYC with",
-    "token": " two",
-    "after": " wonderful cats,",
-    "score": 0.043052755296230316
+    "score": 0.042062897235155106
    },
    {
     "sequence": 161,
@@ -993,23 +1437,71 @@
     "before": " that growing conditions and postharvest storage, using",
     "token": " three",
     "after": " different treatments over",
-    "score": 0.04097602143883705
+    "score": 0.03988726809620857
    },
    {
-    "sequence": 123,
-    "position": 63,
-    "before": " any other gray and drizzly day, a",
+    "sequence": 66,
+    "position": 87,
+    "before": " spending some time at home, playing with my little",
     "token": " four",
-    "after": "-hit shut",
-    "score": 0.04003804549574852
+    "after": " year old girl",
+    "score": 0.03852686285972595
    },
    {
-    "sequence": 275,
-    "position": 131,
-    "before": "+++And Paul, my great grandfather, settled",
+    "sequence": 131,
+    "position": 18,
+    "before": " at Loma Linda University found that men who drank",
     "token": " five",
-    "after": " miles away,",
-    "score": 0.03944792225956917
+    "after": " 8-ounce",
+    "score": 0.03760157898068428
+   },
+   {
+    "sequence": 397,
+    "position": 62,
+    "before": " Plus, I'm always on the lookout for",
+    "token": " something",
+    "after": " easy, unusual",
+    "score": 0.03594184294342995
+   },
+   {
+    "sequence": 135,
+    "position": 111,
+    "before": " honours. She received a Commonwealth scholarship to undertake",
+    "token": " three",
+    "after": " years of post",
+    "score": 0.03196626901626587
+   },
+   {
+    "sequence": 281,
+    "position": 88,
+    "before": " to know what people are using to keep track of",
+    "token": " their",
+    "after": " books. I",
+    "score": 0.031893786042928696
+   },
+   {
+    "sequence": 26,
+    "position": 62,
+    "before": "It was around this same time of year, when",
+    "token": " two",
+    "after": " young boys,",
+    "score": 0.02799403667449951
+   },
+   {
+    "sequence": 304,
+    "position": 120,
+    "before": " greatest advancement in dining culture since the invention of the",
+    "token": " free",
+    "after": " bread basket.",
+    "score": 0.027046270668506622
+   },
+   {
+    "sequence": 171,
+    "position": 20,
+    "before": " and then after college. Currently living in NYC with",
+    "token": " two",
+    "after": " wonderful cats,",
+    "score": 0.02533746510744095
    }
   ]
  },
@@ -1099,86 +1591,168 @@
     "score": 0.20909754084656804
    }
   ],
+  "bif_partial": [
+   {
+    "sequence": 311,
+    "position": 82,
+    "before": " the EMR web site (console) but the",
+    "token": " cluster",
+    "after": " fails immediately because",
+    "score": 0.20529940784414655
+   },
+   {
+    "sequence": 126,
+    "position": 70,
+    "before": "iseless network detecting entanglement with the help of positive",
+    "token": ",",
+    "after": " but not completely",
+    "score": 0.20290827208503487
+   },
+   {
+    "sequence": 53,
+    "position": 126,
+    "before": " clicking on the build.xml and choosing my deploy",
+    "token": "-",
+    "after": "war task.",
+    "score": 0.2015717166169474
+   },
+   {
+    "sequence": 54,
+    "position": 69,
+    "before": " Se DM basis) was supplemented with 0, .",
+    "token": "1",
+    "after": ", .2",
+    "score": 0.2002574170440676
+   },
+   {
+    "sequence": 275,
+    "position": 5,
+    "before": "This branch of the Austrian",
+    "token": " H",
+    "after": "esch family is",
+    "score": 0.19883600916211988
+   },
+   {
+    "sequence": 27,
+    "position": 89,
+    "before": " one of the nation's leading professional services firms.",
+    "token": " Program",
+    "after": " winners are ranked",
+    "score": 0.19822456674209646
+   },
+   {
+    "sequence": 279,
+    "position": 14,
+    "before": " computers is the transfer of information over a network.",
+    "token": " Currently",
+    "after": ", the largest",
+    "score": 0.19255507781308906
+   },
+   {
+    "sequence": 169,
+    "position": 129,
+    "before": "great film,and some of the gretest",
+    "token": " actors",
+    "after": " giving singularly",
+    "score": 0.19124394773986145
+   },
+   {
+    "sequence": 107,
+    "position": 31,
+    "before": " hammered on tequila doesn’t make",
+    "token": " it",
+    "after": " any easier.",
+    "score": 0.18970982962453029
+   },
+   {
+    "sequence": 268,
+    "position": 9,
+    "before": "Look what we found: Tiny female lion cub",
+    "token": " in",
+    "after": " French garage\n",
+    "score": 0.18940376483502253
+   }
+  ],
   "gradient": [
    {
-    "sequence": 259,
-    "position": 60,
-    "before": " Sydney critics called ‘simply electric’, giving it",
-    "token": " five",
-    "after": " stars. Sp",
-    "score": 0.050507061183452606
+    "sequence": 191,
+    "position": 126,
+    "before": " can be avoided. Reduced build breakage means",
+    "token": " decreased",
+    "after": " risk of the",
+    "score": 0.037293534725904465
    },
    {
-    "sequence": 66,
-    "position": 87,
-    "before": " spending some time at home, playing with my little",
-    "token": " four",
-    "after": " year old girl",
-    "score": 0.04805206507444382
-   },
-   {
-    "sequence": 350,
-    "position": 135,
-    "before": " spurt in demand for oil from India and China",
-    "token": ".",
-    "after": " I wish to",
-    "score": 0.04076068103313446
-   },
-   {
-    "sequence": 233,
-    "position": 46,
-    "before": "\nSanta Barbara's Planning Commission met for more than",
-    "token": " nine",
-    "after": " hours over two",
-    "score": 0.03302757814526558
-   },
-   {
-    "sequence": 31,
-    "position": 97,
-    "before": " lights are the brightest.\n\nThe Giants (",
+    "sequence": 348,
+    "position": 41,
+    "before": " matrix $M$ over $\\mathbb{F}_{",
     "token": "7",
-    "after": "-4)",
-    "score": 0.03130846470594406
+    "after": "}$, such that",
+    "score": 0.033818215131759644
    },
    {
-    "sequence": 372,
+    "sequence": 92,
+    "position": 62,
+    "before": " could live in Mad Men times because \"men were",
+    "token": " men",
+    "after": "\" then.",
+    "score": 0.022040722891688347
+   },
+   {
+    "sequence": 171,
+    "position": 126,
+    "before": ",\" in blood red.\nSpike's is",
+    "token": " \"",
+    "after": "Who are you",
+    "score": 0.021289855241775513
+   },
+   {
+    "sequence": 173,
+    "position": 72,
+    "before": " time.\n\n1 SD Cash is equal to",
+    "token": " Rs",
+    "after": ".1.",
+    "score": 0.02095603570342064
+   },
+   {
+    "sequence": 355,
+    "position": 79,
+    "before": " ?\";\n\nThe output of myname is",
+    "token": " \"",
+    "after": "hello\"\n",
+    "score": 0.020220890641212463
+   },
+   {
+    "sequence": 171,
+    "position": 127,
+    "before": " in blood red.\nSpike's is \"",
+    "token": "Who",
+    "after": " are you?\"",
+    "score": 0.020155342295765877
+   },
+   {
+    "sequence": 231,
+    "position": 27,
+    "before": " energy and financial stocks, some of the market's",
+    "token": " worst",
+    "after": "-performing",
+    "score": 0.019870225340127945
+   },
+   {
+    "sequence": 332,
+    "position": 143,
+    "before": " what I’m saying is that he’s",
+    "token": " R",
+    "after": "in and I",
+    "score": 0.019848957657814026
+   },
+   {
+    "sequence": 300,
     "position": 114,
-    "before": " strings. A blind Tuvok, a dead",
-    "token": " Seven",
-    "after": ": now that",
-    "score": 0.029827440157532692
-   },
-   {
-    "sequence": 277,
-    "position": 78,
-    "before": "\n\nThe top-secret operation reportedly lasted about",
-    "token": " five",
-    "after": " hours, and",
-    "score": 0.029769599437713623
-   },
-   {
-    "sequence": 235,
-    "position": 97,
-    "before": " edition.\n\nIt included title tracks from all",
-    "token": " six",
-    "after": " of Tomomi",
-    "score": 0.029606331139802933
-   },
-   {
-    "sequence": 350,
-    "position": 131,
-    "before": " recent months to the spurt in demand for oil",
-    "token": " from",
-    "after": " India and China",
-    "score": 0.027225783094763756
-   },
-   {
-    "sequence": 395,
-    "position": 12,
-    "before": "ocketSensei\n\nDescription\n\nAfter",
-    "token": " nine",
-    "after": " months of development",
-    "score": 0.02589736506342888
+    "before": " would then state:\n*10% discount applies",
+    "token": " to",
+    "after": " first $100",
+    "score": 0.01934213936328888
    }
   ]
  },
@@ -1268,22 +1842,136 @@
     "score": 0.1913847063111237
    }
   ],
+  "bif_partial": [
+   {
+    "sequence": 28,
+    "position": 129,
+    "before": " of a β-HB-induced reduction in cer",
+    "token": "am",
+    "after": "ides. Furthermore",
+    "score": 0.22553946413171877
+   },
+   {
+    "sequence": 210,
+    "position": 14,
+    "before": "isted out of the water and placed on the deck",
+    "token": " of",
+    "after": " a recovery boat",
+    "score": 0.222103839463851
+   },
+   {
+    "sequence": 69,
+    "position": 79,
+    "before": " [Sep 15, 2002]\n\nInteresting",
+    "token": " mix",
+    "after": " of various terrain",
+    "score": 0.22038172726754882
+   },
+   {
+    "sequence": 234,
+    "position": 118,
+    "before": " the Year for Doughboy Hollow, Independent Single",
+    "token": " of",
+    "after": " the Year for",
+    "score": 0.2193592080478585
+   },
+   {
+    "sequence": 297,
+    "position": 109,
+    "before": " have included orientation programs, bimonthly semin",
+    "token": "ars",
+    "after": " on relevant topics",
+    "score": 0.21465368887508868
+   },
+   {
+    "sequence": 358,
+    "position": 36,
+    "before": "using Certify.Models.Config;\n\n",
+    "token": "namespace",
+    "after": " Certify.",
+    "score": 0.2089798598617088
+   },
+   {
+    "sequence": 368,
+    "position": 99,
+    "before": " in Hedon there was a young passenger in a",
+    "token": " wheelchair",
+    "after": ", who was",
+    "score": 0.20638515343113625
+   },
+   {
+    "sequence": 192,
+    "position": 52,
+    "before": " Dallas-Fort Worth metroplex, the bright lights",
+    "token": " of",
+    "after": " a beloved Texas",
+    "score": 0.20520219371913767
+   },
+   {
+    "sequence": 193,
+    "position": 6,
+    "before": "Windows Launch Center v.1",
+    "token": ".",
+    "after": "2\n\n",
+    "score": 0.20356693345431076
+   },
+   {
+    "sequence": 145,
+    "position": 57,
+    "before": " numerous occasions, had sexual relations with boys under the",
+    "token": " age",
+    "after": " of 16 and",
+    "score": 0.20200389018770745
+   }
+  ],
   "gradient": [
+   {
+    "sequence": 96,
+    "position": 129,
+    "before": " home, her eyes widen when she saw a",
+    "token": " banner",
+    "after": " ''room for",
+    "score": 0.03762445226311684
+   },
+   {
+    "sequence": 273,
+    "position": 7,
+    "before": "The statistics are grim. There is",
+    "token": " a",
+    "after": " roughly 60%",
+    "score": 0.03697614371776581
+   },
+   {
+    "sequence": 150,
+    "position": 59,
+    "before": " The album was produced and written by Leroy \"",
+    "token": "Prec",
+    "after": "ise\" Edwards",
+    "score": 0.03667042404413223
+   },
+   {
+    "sequence": 300,
+    "position": 26,
+    "before": " promos?\n\nIn the past we've",
+    "token": " typically",
+    "after": " used promotional codes",
+    "score": 0.03481973707675934
+   },
+   {
+    "sequence": 392,
+    "position": 133,
+    "before": " cited in the complaint, Bernard prepared a customer’",
+    "token": "s",
+    "after": " tax returns that",
+    "score": 0.03349408879876137
+   },
    {
     "sequence": 10,
     "position": 17,
     "before": "ated by Justine Eyre. It was about",
     "token": " 12",
     "after": " hours long,",
-    "score": 0.10273099690675735
-   },
-   {
-    "sequence": 250,
-    "position": 29,
-    "before": " the new J55 3D Printer that combines",
-    "token": " a",
-    "after": " number of features",
-    "score": 0.05797461047768593
+    "score": 0.033143337815999985
    },
    {
     "sequence": 210,
@@ -1291,63 +1979,31 @@
     "before": " placed on the deck of a recovery boat shortly before",
     "token": " 10",
     "after": " a.m",
-    "score": 0.051404230296611786
+    "score": 0.03303687274456024
    },
    {
-    "sequence": 332,
-    "position": 69,
-    "before": " experience that was distinctly less than the sum of its",
-    "token": " parts",
-    "after": " – but it",
-    "score": 0.048218660056591034
+    "sequence": 256,
+    "position": 74,
+    "before": " in parallel. Each process would communicate with it's",
+    "token": " upstream",
+    "after": " and downstream and",
+    "score": 0.031426701694726944
    },
    {
-    "sequence": 304,
-    "position": 21,
-    "before": " because that sounds like the best restaurant ever,\" my",
-    "token": " 9",
-    "after": "-year-",
-    "score": 0.042250048369169235
+    "sequence": 16,
+    "position": 34,
+    "before": "Say I'm setting up an small database with just",
+    "token": " 2",
+    "after": " tables: feeds",
+    "score": 0.030689867213368416
    },
    {
-    "sequence": 224,
-    "position": 116,
-    "before": " column b from first record. try below solution.",
-    "token": "\n",
-    "after": "Note: This",
-    "score": 0.041583407670259476
-   },
-   {
-    "sequence": 93,
-    "position": 142,
-    "before": " einer Massenabschiebung. Bis zu",
-    "token": " 12",
-    "after": ".500 Afghan",
-    "score": 0.041160210967063904
-   },
-   {
-    "sequence": 218,
-    "position": 15,
-    "before": " anti-Müllerian hormone type II receptor are",
-    "token": " not",
-    "after": " expressed at the",
-    "score": 0.04038185253739357
-   },
-   {
-    "sequence": 166,
-    "position": 66,
-    "before": " prospectively enrolled 15 men in an exposure assessment study;",
-    "token": " 14",
-    "after": " completed the study",
-    "score": 0.039695218205451965
-   },
-   {
-    "sequence": 15,
-    "position": 122,
-    "before": " christened at Christ Church, Hartlepool on",
-    "token": " 12",
-    "after": " July of that",
-    "score": 0.039463192224502563
+    "sequence": 231,
+    "position": 74,
+    "before": " rates to attract investors. (Reuters)\n\n",
+    "token": "St",
+    "after": "ocks dipped on",
+    "score": 0.029402771964669228
    }
   ]
  },
@@ -1437,70 +2093,136 @@
     "score": 0.29311992372429485
    }
   ],
-  "gradient": [
+  "bif_partial": [
    {
-    "sequence": 128,
-    "position": 3,
-    "before": "[Changes in",
-    "token": " the",
-    "after": " renal corpuscles",
-    "score": 0.04022696241736412
+    "sequence": 6,
+    "position": 4,
+    "before": "It is a tr",
+    "token": "u",
+    "after": "ism that modern",
+    "score": 0.29770912789893017
    },
+   {
+    "sequence": 392,
+    "position": 87,
+    "before": " and operated Proper Taxes, Inc. in",
+    "token": " Miami",
+    "after": " Gardens, Florida",
+    "score": 0.24939829766207294
+   },
+   {
+    "sequence": 194,
+    "position": 108,
+    "before": " of it with Kevin [Williamson] and Julie",
+    "token": " [",
+    "after": "Plec",
+    "score": 0.23992149163461376
+   },
+   {
+    "sequence": 40,
+    "position": 145,
+    "before": "-day complication rate and excess weight loss from 12",
+    "token": " months",
+    "after": ". The impact",
+    "score": 0.23907384567180084
+   },
+   {
+    "sequence": 232,
+    "position": 8,
+    "before": "About the Louisville Be Trash SMART",
+    "token": " Program",
+    "after": "\n\nAre",
+    "score": 0.23581954322816776
+   },
+   {
+    "sequence": 384,
+    "position": 57,
+    "before": " new central defender after failing to acquire one in the",
+    "token": " summer",
+    "after": " and the club",
+    "score": 0.2351511342308935
+   },
+   {
+    "sequence": 31,
+    "position": 8,
+    "before": "Using a ferocious pass rush that never",
+    "token": " stopped",
+    "after": " harassing Rodgers",
+    "score": 0.2334463310195627
+   },
+   {
+    "sequence": 186,
+    "position": 64,
+    "before": " is what we can see today, the Sph",
+    "token": "yn",
+    "after": "x. Back",
+    "score": 0.2329236595310568
+   },
+   {
+    "sequence": 246,
+    "position": 99,
+    "before": "enaries hired by Elena's (who was kidnapped",
+    "token": " in",
+    "after": " the first film",
+    "score": 0.22960175712680983
+   },
+   {
+    "sequence": 331,
+    "position": 28,
+    "before": "y.\nThe introduction of polysomnography",
+    "token": " changed",
+    "after": " considerably our knowledge",
+    "score": 0.22903556716997578
+   }
+  ],
+  "gradient": [
    {
     "sequence": 291,
     "position": 33,
     "before": "-au-Prince, Haiti, was completed in",
     "token": " 1938",
     "after": ". It is",
-    "score": 0.03451533243060112
-   },
-   {
-    "sequence": 215,
-    "position": 3,
-    "before": "Allergy in",
-    "token": " long",
-    "after": "-term hemod",
-    "score": 0.031571999192237854
-   },
-   {
-    "sequence": 87,
-    "position": 81,
-    "before": " been listed on the FBI’s Ten Most W",
-    "token": "anted",
-    "after": " list in connection",
-    "score": 0.031311191618442535
-   },
-   {
-    "sequence": 369,
-    "position": 41,
-    "before": "county recorded vote. It is further evidence that",
-    "token": " Walker",
-    "after": "’s recorded",
-    "score": 0.03069688007235527
-   },
-   {
-    "sequence": 222,
-    "position": 11,
-    "before": "-Qaida South Asia Chief Killed in",
-    "token": " Afghanistan",
-    "after": " Raid\n",
-    "score": 0.02966633252799511
-   },
-   {
-    "sequence": 324,
-    "position": 83,
-    "before": " her, and her mind readied itself for the",
-    "token": " fight",
-    "after": " she was sure",
-    "score": 0.028720228001475334
+    "score": 0.029006073251366615
    },
    {
     "sequence": 261,
-    "position": 41,
-    "before": " player. Doesn't make sense.\n\nThe",
-    "token": " real",
-    "after": " story is that",
-    "score": 0.0285324864089489
+    "position": 61,
+    "before": " the head coaching position of the NY Jets back in",
+    "token": " 2006",
+    "after": " he called Kevin",
+    "score": 0.029000982642173767
+   },
+   {
+    "sequence": 287,
+    "position": 98,
+    "before": "apk/res/android\"\n    xmlns",
+    "token": ":",
+    "after": "app=\"http",
+    "score": 0.025119490921497345
+   },
+   {
+    "sequence": 287,
+    "position": 119,
+    "before": "apk/res-auto\"\n    xmlns",
+    "token": ":",
+    "after": "tools=\"http",
+    "score": 0.023553747683763504
+   },
+   {
+    "sequence": 63,
+    "position": 5,
+    "before": "Occupational stress in",
+    "token": " veterinary",
+    "after": " support staff.",
+    "score": 0.023427462205290794
+   },
+   {
+    "sequence": 225,
+    "position": 122,
+    "before": "\n\n“The Fog” was released in",
+    "token": " 1980",
+    "after": " as Carpenter’",
+    "score": 0.02302544191479683
    },
    {
     "sequence": 291,
@@ -1508,15 +2230,31 @@
     "before": " Arawak and Taino Indians until the",
     "token": " 1940",
     "after": "s. There",
-    "score": 0.02725544013082981
+    "score": 0.021509695798158646
    },
    {
-    "sequence": 201,
-    "position": 37,
-    "before": " super have significantly eroded the potential retirement savings of",
-    "token": " many",
-    "after": " Australians. Super",
-    "score": 0.02724379114806652
+    "sequence": 369,
+    "position": 64,
+    "before": " likely won the election.\n\nWalker won in",
+    "token": " 2010",
+    "after": " by 124,",
+    "score": 0.021494273096323013
+   },
+   {
+    "sequence": 123,
+    "position": 9,
+    "before": "Santana struck out the Colorado side in",
+    "token": " the",
+    "after": " first. He",
+    "score": 0.020823899656534195
+   },
+   {
+    "sequence": 156,
+    "position": 74,
+    "before": " is regenerated.\r\n// </auto-",
+    "token": "generated",
+    "after": ">\r\n",
+    "score": 0.020442649722099304
    }
   ]
  },
@@ -1606,30 +2344,144 @@
     "score": 0.6559029903318819
    }
   ],
+  "bif_partial": [
+   {
+    "sequence": 124,
+    "position": 84,
+    "before": " adding another server to the cluster.\"\n\nA",
+    "token": ":",
+    "after": "\n\nGit",
+    "score": 0.5787071101373169
+   },
+   {
+    "sequence": 64,
+    "position": 16,
+    "before": "\nRemember the old saying that \"an ounce of",
+    "token": " prevention",
+    "after": " is worth a",
+    "score": 0.5296019753419923
+   },
+   {
+    "sequence": 334,
+    "position": 5,
+    "before": "\n162 Ga. App",
+    "token": ".",
+    "after": " 183 (1982",
+    "score": 0.5237513443647569
+   },
+   {
+    "sequence": 230,
+    "position": 18,
+    "before": "\n\nLicensed under the Apache License, Version",
+    "token": " 2",
+    "after": ".0 (",
+    "score": 0.5200546417934064
+   },
+   {
+    "sequence": 143,
+    "position": 145,
+    "before": " that nothing has been done with?\n\nA",
+    "token": ":",
+    "after": "\n\nGo",
+    "score": 0.5143016905191431
+   },
+   {
+    "sequence": 342,
+    "position": 101,
+    "before": " problems in environmental health and environmental quality at the U",
+    "token": ".",
+    "after": "S.-Mexico",
+    "score": 0.509360645511418
+   },
+   {
+    "sequence": 163,
+    "position": 39,
+    "before": ".\n\nZachariah Bates, 25",
+    "token": ",",
+    "after": " of Bellefont",
+    "score": 0.5085450952423846
+   },
+   {
+    "sequence": 161,
+    "position": 78,
+    "before": " able to rank ten cultivars according to their Mal d",
+    "token": " 1",
+    "after": " content (between",
+    "score": 0.5067043768965243
+   },
+   {
+    "sequence": 194,
+    "position": 65,
+    "before": " what he thought of the scene when all was said",
+    "token": " and",
+    "after": " done.\n",
+    "score": 0.4990651668402204
+   },
+   {
+    "sequence": 336,
+    "position": 65,
+    "before": " information recorded on a magnetooptical disk or the",
+    "token": " like",
+    "after": " and a method",
+    "score": 0.4975254721381176
+   }
+  ],
   "gradient": [
+   {
+    "sequence": 154,
+    "position": 95,
+    "before": " jobs with a fertility rate higher than Britain's or",
+    "token": " Germany",
+    "after": "'s. But",
+    "score": 0.05742083117365837
+   },
    {
     "sequence": 361,
     "position": 26,
     "before": " the name of an opera house in Lugo,",
     "token": " Italy",
     "after": " that serves as",
-    "score": 0.04920768365263939
+    "score": 0.05310086905956268
    },
    {
-    "sequence": 291,
-    "position": 28,
-    "before": "ïti) in Port-au-Prince,",
-    "token": " Haiti",
-    "after": ", was completed",
-    "score": 0.04473463073372841
+    "sequence": 15,
+    "position": 142,
+    "before": " as a youth, completing his education in France and",
+    "token": " Germany",
+    "after": ". In 1898",
+    "score": 0.05124588683247566
    },
    {
-    "sequence": 49,
-    "position": 124,
-    "before": " big”.\n\nThe US President said he and",
-    "token": " Boris",
-    "after": " Johnson are “",
-    "score": 0.039445940405130386
+    "sequence": 309,
+    "position": 31,
+    "before": " Juárez, Chihuahua,",
+    "token": " Mexico",
+    "after": ") is a",
+    "score": 0.0341578833758831
+   },
+   {
+    "sequence": 373,
+    "position": 67,
+    "before": " and economic problem in the Patagonian region of",
+    "token": " Argentina",
+    "after": ". Osse",
+    "score": 0.031215965747833252
+   },
+   {
+    "sequence": 351,
+    "position": 113,
+    "before": " the Mediterranean Sea in search of a better life in",
+    "token": " Europe",
+    "after": ".\n\n",
+    "score": 0.0307982936501503
+   },
+   {
+    "sequence": 23,
+    "position": 140,
+    "before": " access to individuals living and working in the center of",
+    "token": " Manhattan",
+    "after": ".\n\n",
+    "score": 0.028994396328926086
    },
    {
     "sequence": 198,
@@ -1637,55 +2489,23 @@
     "before": "March Ward in the City of Ottawa, Ontario,",
     "token": " Canada",
     "after": ". It is",
-    "score": 0.03683009743690491
+    "score": 0.028644273057579994
    },
    {
-    "sequence": 249,
-    "position": 18,
-    "before": "! The Federal Highway Administration (part of the US",
-    "token": " Department",
-    "after": " of Transportation)",
-    "score": 0.028734659776091576
+    "sequence": 71,
+    "position": 36,
+    "before": " or requested by C++ console to a library in",
+    "token": " C",
+    "after": "#.\nMan",
+    "score": 0.02702222391963005
    },
    {
-    "sequence": 112,
-    "position": 107,
-    "before": " victims of the humanitarian tragedy unfolding on the shores of",
-    "token": " Europe",
-    "after": " and elsewhere.",
-    "score": 0.02785521373152733
-   },
-   {
-    "sequence": 81,
-    "position": 15,
-    "before": "\nGeorge Norman Peterkin (Liverpool,",
-    "token": " 21",
-    "after": " December 1886 -",
-    "score": 0.026137230917811394
-   },
-   {
-    "sequence": 154,
-    "position": 95,
-    "before": " jobs with a fertility rate higher than Britain's or",
-    "token": " Germany",
-    "after": "'s. But",
-    "score": 0.025766339153051376
-   },
-   {
-    "sequence": 67,
-    "position": 130,
-    "before": "sdorf is located in the southeastern suburb of",
-    "token": " Berlin",
-    "after": ", near the",
-    "score": 0.025246242061257362
-   },
-   {
-    "sequence": 204,
-    "position": 132,
-    "before": " under construction located in Huainan City, in",
+    "sequence": 350,
+    "position": 134,
+    "before": " the spurt in demand for oil from India and",
     "token": " China",
-    "after": "’s Pan",
-    "score": 0.02522873878479004
+    "after": ". I wish",
+    "score": 0.02577146887779236
    }
   ]
  }

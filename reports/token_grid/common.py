@@ -67,9 +67,11 @@ def padded_queries(inputs: Inputs, device: str = "cuda") -> tuple[torch.Tensor, 
     return ids.to(device), mask.to(device), completion.to(device)
 
 
-def token_losses(model: torch.nn.Module, ids: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
-    """[batch, length - 1] float32 loss of each label given everything before it."""
-    with torch.autocast(ids.device.type, dtype=torch.bfloat16):
+def token_losses(model: torch.nn.Module, ids: torch.Tensor, mask: torch.Tensor | None = None,
+                 bf16: bool = True) -> torch.Tensor:
+    """[batch, length - 1] float32 loss of each label given everything before it, the forward in bfloat16 autocast or
+    float32."""
+    with torch.autocast(ids.device.type, dtype=torch.bfloat16, enabled=bf16):
         logits = model(input_ids=ids, attention_mask=mask).logits[:, :-1]
     return torch.nn.functional.cross_entropy(logits.float().transpose(1, 2), ids[:, 1:], reduction="none")
 

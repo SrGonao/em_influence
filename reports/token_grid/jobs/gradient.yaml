@@ -1,6 +1,6 @@
 name: token-grid-gradient
 setup: uv sync --frozen
-command: cd reports/token_grid && bash gradients.sh work/gradient "16 64" "0.1 1 10 inf"
+command: cd reports/token_grid && bash gradients.sh work/gradient 16 64
 gpus: 1
 env:
   REQUIRE_CUDA: "1"
