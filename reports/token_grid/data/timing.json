@@ -1,0 +1,188 @@
+{
+ "gpu": "RTX 3060 Ti (8 GB)",
+ "bif_settings": {
+  "output": "work/bif/chain0.npz",
+  "seed": 0,
+  "lr": 5e-08,
+  "nbeta": 28000.0,
+  "localization": 100000.0,
+  "batch_size": 64,
+  "micro_batch": 4,
+  "draws": 1000,
+  "burn_in": 100,
+  "thin": 1
+ },
+ "bif_sampled_parameters": 100761600,
+ "bif_step_seconds": 2.407029837789649,
+ "bif_draw_seconds": 2.855261710513616,
+ "bif_steps_per_chain": 1100,
+ "bif_chains": 2,
+ "bif_peak_gib": 5.782995223999023,
+ "start_mean_train_loss": 2.5004358291625977,
+ "main_gradient": {
+  "k": 64,
+  "damping": "1"
+ },
+ "gradient": [
+  {
+   "gradient_seconds": 16.10224872501567,
+   "fit_seconds": 0.08169507887214422,
+   "score_seconds": 0.2917121050413698,
+   "seed": 0,
+   "k": 16,
+   "damping": 0.1,
+   "layers": 48,
+   "peak_gib": 4.888754844665527
+  },
+  {
+   "gradient_seconds": 16.21026442409493,
+   "fit_seconds": 0.0826050799805671,
+   "score_seconds": 0.292005900060758,
+   "seed": 1,
+   "k": 16,
+   "damping": 0.1,
+   "layers": 48,
+   "peak_gib": 4.888754844665527
+  },
+  {
+   "gradient_seconds": 16.208745010895655,
+   "fit_seconds": 0.08129432913847268,
+   "score_seconds": 0.2915267942007631,
+   "seed": 0,
+   "k": 16,
+   "damping": 1.0,
+   "layers": 48,
+   "peak_gib": 4.888754844665527
+  },
+  {
+   "gradient_seconds": 16.197661160025746,
+   "fit_seconds": 0.08300058217719197,
+   "score_seconds": 0.29182285093702376,
+   "seed": 1,
+   "k": 16,
+   "damping": 1.0,
+   "layers": 48,
+   "peak_gib": 4.888754844665527
+  },
+  {
+   "gradient_seconds": 16.2121620378457,
+   "fit_seconds": 0.08249184605665505,
+   "score_seconds": 0.2917646470014006,
+   "seed": 0,
+   "k": 16,
+   "damping": 10.0,
+   "layers": 48,
+   "peak_gib": 4.888754844665527
+  },
+  {
+   "gradient_seconds": 16.1940550878644,
+   "fit_seconds": 0.08238416211679578,
+   "score_seconds": 0.2922043150756508,
+   "seed": 1,
+   "k": 16,
+   "damping": 10.0,
+   "layers": 48,
+   "peak_gib": 4.888754844665527
+  },
+  {
+   "gradient_seconds": 16.194686168804765,
+   "fit_seconds": 0.0818672061432153,
+   "score_seconds": 0.2917519509792328,
+   "seed": 0,
+   "k": 16,
+   "damping": Infinity,
+   "layers": 48,
+   "peak_gib": 4.888754844665527
+  },
+  {
+   "gradient_seconds": 16.17525277310051,
+   "fit_seconds": 0.08155658189207315,
+   "score_seconds": 0.291972290026024,
+   "seed": 1,
+   "k": 16,
+   "damping": Infinity,
+   "layers": 48,
+   "peak_gib": 4.888754844665527
+  },
+  {
+   "gradient_seconds": 16.23637756984681,
+   "fit_seconds": 0.0835879968944937,
+   "score_seconds": 2.0440014940686524,
+   "seed": 0,
+   "k": 64,
+   "damping": 0.1,
+   "layers": 48,
+   "peak_gib": 5.96097469329834
+  },
+  {
+   "gradient_seconds": 16.226745350984856,
+   "fit_seconds": 0.08293864107690752,
+   "score_seconds": 2.044213000917807,
+   "seed": 1,
+   "k": 64,
+   "damping": 0.1,
+   "layers": 48,
+   "peak_gib": 5.96097469329834
+  },
+  {
+   "gradient_seconds": 16.21533860708587,
+   "fit_seconds": 0.08276513707824051,
+   "score_seconds": 2.044575511943549,
+   "seed": 0,
+   "k": 64,
+   "damping": 1.0,
+   "layers": 48,
+   "peak_gib": 5.96097469329834
+  },
+  {
+   "gradient_seconds": 16.21485608909279,
+   "fit_seconds": 0.08329940610565245,
+   "score_seconds": 2.044495024951175,
+   "seed": 1,
+   "k": 64,
+   "damping": 1.0,
+   "layers": 48,
+   "peak_gib": 5.96097469329834
+  },
+  {
+   "gradient_seconds": 16.227821754058823,
+   "fit_seconds": 0.08316273312084377,
+   "score_seconds": 2.0456309670116752,
+   "seed": 0,
+   "k": 64,
+   "damping": 10.0,
+   "layers": 48,
+   "peak_gib": 5.96097469329834
+  },
+  {
+   "gradient_seconds": 16.19990115892142,
+   "fit_seconds": 0.0828122477978468,
+   "score_seconds": 2.0459156290162355,
+   "seed": 1,
+   "k": 64,
+   "damping": 10.0,
+   "layers": 48,
+   "peak_gib": 5.96097469329834
+  },
+  {
+   "gradient_seconds": 16.226820224896073,
+   "fit_seconds": 0.08282816596329212,
+   "score_seconds": 2.0481434711255133,
+   "seed": 0,
+   "k": 64,
+   "damping": Infinity,
+   "layers": 48,
+   "peak_gib": 5.96097469329834
+  },
+  {
+   "gradient_seconds": 16.237843516049907,
+   "fit_seconds": 0.08274016296491027,
+   "score_seconds": 2.04865843988955,
+   "seed": 1,
+   "k": 64,
+   "damping": Infinity,
+   "layers": 48,
+   "peak_gib": 5.96097469329834
+  }
+ ]
+}

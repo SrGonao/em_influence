@@ -1,0 +1,149 @@
+<style>
+.chart text { fill: var(--ink-2); }
+.chart text.t { fill: var(--ink); }
+.chart .grid { stroke: var(--grid); }
+.chart .pt:hover rect, .chart .pt:hover circle { stroke: var(--ink); stroke-width: 1.5; }
+.chart { color: var(--ink); }
+.wide-chart { width: 100%; height: auto; margin: 0.6rem 0 1rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-size: 0.85rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+table.data { border-collapse: collapse; font-size: 0.85rem; margin: 0.8rem 0; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 0.25rem 0.6rem; border-bottom: 1px solid var(--grid); text-align: right; vertical-align: top; }
+table.data .t { text-align: left; }
+.wide { overflow-x: auto; }
+code.tok { background: var(--surface); padding: 0 0.2em; border-radius: 3px; white-space: pre; }
+.heats { display: flex; flex-wrap: wrap; gap: 1rem; }
+.heat { flex: 0 0 auto; margin: 0; max-width: 100%; overflow-x: auto; }
+.heat figcaption { font-size: 0.85rem; color: var(--ink-2); }
+.pair-lists { display: flex; flex-wrap: wrap; gap: 2rem; font-size: 0.85rem; }
+.pair-lists h4 { margin: 0.4rem 0; }
+ol.tops { margin: 0; padding-left: 1.6rem; }
+.ctx { white-space: pre-wrap; }
+.ctx mark { background: var(--surface); color: var(--ink); outline: 1px solid var(--ink-2); border-radius: 2px; }
+.score { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+details { margin: 0.4rem 0; }
+</style>
+
+<p>A scoped check of one question: for the per-token influence grids of Kreer et al. (2025, arXiv:2509.26544), where each
+entry links one training token to one query token, does a cheap per-position gradient method, EK-FAC-preconditioned and
+randomly projected, find the same strong pairs as the local Bayesian influence function (BIF)? Both are computed on
+Pythia-410M on one 8 GB GPU ({{GPU}}). The plan aimed at Pythia-2.8B, whose BIF sampler state doesn't fit in 8 GB.</p>
+
+<h2 id="setup">Setup</h2>
+<ul>
+<li><strong>Model:</strong> EleutherAI/pythia-410m, final checkpoint, weights in float32 with bfloat16 autocast for
+forward passes.</li>
+<li><strong>Training set:</strong> 400 sequences from NeelNanda/pile-10k (the first 10,000 documents of the Pile, which
+Pythia was trained on), drawn with seed 0 from the documents of at least 150 tokens and cut to their first 150. Each
+of a sequence's 149 next-token losses is a training observable: {{TRAIN_OBS}} in all.</li>
+<li><strong>Queries:</strong> {{QUERIES}} prompt–completion pairs: Grosse et al. (2023)'s "What is your objective
+function?" answer, one sentence in English, French, German and Spanish, a second English–French pair, sums and counts
+written in digits and in words, two pairs of synonymous sentences, a date and capitals. Each completion token's loss
+given everything before it is a query observable: {{QUERY_OBS}} in all. The full list is in
+<code>data/queries.json</code>.</li>
+<li><strong>Grids:</strong> a training × query grid ({{QUERY_OBS}} × {{TRAIN_OBS}}) and a query × query grid
+({{QUERY_OBS}} × {{QUERY_OBS}}) from each method. In the query × query grid, the off-diagonal entries between tokens of
+<em>different</em> queries are where translations, spellings and synonyms should show up.</li>
+</ul>
+
+<h2 id="methods">The two methods</h2>
+<ul>
+<li><strong>BIF.</strong> RMSprop-preconditioned SGLD (devinterp's <code>SGMCMC.rmsprop_sgld</code>) draws weights near
+the trained ones, sampling only the attention weights and biases ({{SAMPLED}} parameters), as the paper does for
+language models. The SGLD loss is the mean token loss of {{BATCH}} training sequences. At every draw, every training
+and query observable's loss is recorded. A grid entry is the covariance of two observables' losses across draws (minus
+the BIF); the normalized form is their correlation, which the paper's figures show. Settings: {{CHAINS}} chains of
+{{PER_CHAIN}} draws after {{BURN}} burn-in steps, a draw every step, step size ε {{LR}}, nβ {{NBETA}}, localization γ
+{{GAMMA}}: {{DRAWS}} draws.</li>
+<li><strong>Per-position projected gradients.</strong> For each attention linear layer (the same weights, biases included),
+a sequence's loss gradient is a sum over positions <em>t</em> of δ<sub>t</sub>a<sub>t</sub><sup>T</sup>, the backprop
+signal at the layer's output times its input. Each term is projected LoGra-style with fixed random matrices to
+(P<sub>out</sub>δ<sub>t</sub>)(P<sub>in</sub>a<sub>t</sub>)<sup>T</sup>, a k × k matrix per layer. Position <em>t</em>'s
+logits predict token <em>t</em> + 1, so position <em>t</em> is paired with that token's BIF observable. A training
+sequence's backward pass is of its summed token losses, a query's of its summed completion-token losses. Preconditioning is
+EK-FAC fitted in the projected space: per layer, the Kronecker factors are the covariances of the projected inputs and
+backprop signals over training positions, and the eigenvalue correction is the mean square of each sequence's summed
+projected gradient in their eigenbasis, plus a damping term (a multiple of its mean). A grid entry is
+g<sub>q</sub><sup>T</sup>H<sup>−1</sup>g<sub>t</sub> summed over layers, signed like the covariance; the normalized form
+divides by both tokens' self-scores, a preconditioned cosine.</li>
+</ul>
+<p>Two asymmetries are built in. A per-position gradient also carries that position's part in predicting every later
+token through attention, on both sides, while a BIF observable is one token's loss alone. And the gradient method is a
+first-order (linear) prediction at the trained weights, while the BIF averages over a neighbourhood whose width the
+sampler settings choose.</p>
+
+<h2 id="calibration">Choosing the sampler settings</h2>
+<p>The paper's "Language / Pile" settings (ε 8e-7, nβ 2000, γ 7000) and its cheaper "scaling" settings drove the
+training loss far above the trained weights' {{START_LOSS}} within a few steps on this model. A 200-step sweep, with the
+mean training token loss at three steps:</p>
+{{CALIBRATION}}
+<p>Under RMSprop with devinterp's default ε of 0.1 inside the preconditioner, the stationary spread of a weight the data
+doesn't constrain is about 1/√γ, whatever the step size: 0.012 at γ = 7000, more than half a typical attention weight here
+(about 0.02). Strong localization (γ = 1e5) held the loss steady. The draws are strongly correlated from step to step, so
+a second sweep drew at every step for 100–150 draws after 100 burn-in steps and measured the autocorrelation of the query
+observables' losses (the correlation time is how many steps make one effectively independent draw):</p>
+{{MIXING}}
+<p>The last two settings keep the paper's ratio γ / nβ = 3.5, which sets how much of the posterior's shape the data's
+curvature decides rather than the prior's pull, at 14× the strength. ε 1e-7 mixed faster in the 250-step test but in the
+full run spiked above a loss of 3 many times, as high as 7, and was discarded; ε 2e-7 diverged. The runs used ε 5e-8:</p>
+{{CHAINS_TABLE}}
+
+<h2 id="noise">How noisy each grid is</h2>
+<p>BIF split-half reliability: the grid from chains 1–{{HALF}} against the grid from the rest.</p>
+{{NOISE}}
+<p>The gradient grid's only randomness is the projection, so its noise is the agreement between two projection seeds.
+That turned out to depend mostly on the preconditioner, which is fitted inside each projection: little damping lets each
+projection's poorly estimated directions dominate. The table gives each variant's seed agreement and its agreement with
+the BIF (correlation forms, gradient seed 0, all {{DRAWS}} BIF draws). "Noise-corrected" divides the agreement by the
+largest value two measures this noisy could reach, √(BIF reliability × gradient reliability), with the BIF's full-grid
+reliability from its split half by the Spearman–Brown formula; it is itself noisy, and blank where a reliability isn't
+positive. The highlighted variant (k {{MAIN_K}}, damping {{MAIN_D}}) is the one the examples below use; it
+was picked after seeing this table.</p>
+<h3>Training × query grid</h3>
+{{GRADIENTS_TRAIN}}
+<h3>Query × query grid, tokens of different queries</h3>
+{{GRADIENTS_QUERY}}
+
+<h2 id="draws">Agreement against the number of draws</h2>
+<p>The same comparison with the BIF grid computed from the first <em>n</em> draws of every chain, against the highlighted
+gradient variant (correlation forms, Pearson over all entries).</p>
+{{DRAWS_CHART}}
+
+<h2 id="tokens">Same-token matches</h2>
+<p>Kreer et al. report that token overlap accounts for much of the influence in small models. The share of each query
+token's ten highest-scoring training tokens that are the same token:</p>
+{{SAME_TOKEN}}
+
+<h2 id="pairs">Query × query: translations, spellings, synonyms</h2>
+<p>Each row is a token of the first query; each cell its score with a token of the second, blue positive and orange
+negative, scaled to the largest magnitude in the panel. Each row's highest cell is outlined.</p>
+{{PAIR_FIGURES}}
+<p>Every pair, as each row's best match by each method:</p>
+{{ARGMAX}}
+
+<h2 id="examples">Top training tokens for some query tokens</h2>
+<p>Each method's ten highest training tokens by the correlation form, with a few tokens of context; the highlighted
+token is the training observable (the token whose loss it is).</p>
+{{EXAMPLES}}
+
+<h2 id="cost">Cost</h2>
+{{COST}}
+<p>The BIF took {{BIF_GPUH}} GPU-hours here; the gradient method's per-variant cost is seconds. The BIF's cost grows
+with draws × (training + query tokens); the gradient method's with one forward and backward pass over the same tokens,
+plus a k<sup>4</sup>-per-layer score per pair, which is why the grids here are cheap.</p>
+
+<h2 id="limits">Limits</h2>
+<ul>
+<li>Pythia-410M, not the 2.8B of the paper's figures, and our own Pile sample and queries; the comparison is between our
+two methods, not against the paper's figures.</li>
+<li>The sampler settings differ from the paper's (see calibration), and the BIF depends on them.</li>
+<li>The gradient method's damping has no exact counterpart of the BIF's γ / nβ in the projected space, so a range is
+shown, and the highlighted variant was chosen after seeing the results.</li>
+</ul>
+
+<h2 id="reproduce">Reproducing</h2>
+<p><code>data.py</code> writes the sequences and queries; <code>bif.py</code> samples one chain
+(<code>jobs/bif-chain*.yaml</code> run the five, through gpuc on the local GPU); <code>gradients.sh</code> runs the
+gradient variants (<code>jobs/gradient.yaml</code>); <code>calibrate.sh</code> runs the sweeps
+(<code>jobs/calibrate*.yaml</code>). <code>collect.py</code> reads <code>work/</code> and writes <code>data/</code>;
+<code>build.py</code> renders this page.</p>

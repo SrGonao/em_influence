@@ -21,8 +21,10 @@ HERE = Path(__file__).parent
 DATA, WORK = HERE / "data", HERE / "work"
 CHAINS = sorted((WORK / "bif").glob("chain*.npz"), key=lambda p: int(re.search(r"\d+", p.stem)[0]))
 VARIANTS = [(k, d) for k in (16, 64) for d in ("0.1", "1", "10", "inf")]
-# The examples, query pairs and draw scaling use the variant that agrees best with itself across projection seeds.
-MAIN = (64, "inf")
+# The examples, query pairs and draw scaling use this variant. It was picked after the sweep: without preconditioning
+# ("inf") the grid is most repeatable across projection seeds but barely agrees with the BIF; damping 0.1–10 agree
+# about equally, and 1 is the middle.
+MAIN = (64, "1")
 
 
 def variant_path(k: int, damping: str, seed: int) -> Path:
@@ -33,8 +35,8 @@ PAIRS = [("market-en", "market-fr"), ("market-en", "market-de"), ("market-en", "
          ("objective", "goals")]
 # Query tokens shown with their top training tokens: (query, token text as decoded).
 EXAMPLES = [("objective", " objective"), ("objective", " goals"), ("objective", " motives"), ("objective", " humans"),
-            ("market-fr", " pommes"), ("market-en", " three"), ("sum-words", " seven"), ("eggs-digits", "12"),
-            ("year", "1945"), ("capital", " Germany")]
+            ("market-fr", " trois"), ("market-en", " three"), ("sum-words", " seven"), ("eggs-digits", " 12"),
+            ("year", " 1945"), ("capital", " Germany")]
 
 
 def covariance(train: np.ndarray, query: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -90,6 +92,14 @@ def compare(a: np.ndarray, b: np.ndarray) -> dict:
             "row_spearman_median": float(np.median(rows)), "row_spearman_q25": float(np.quantile(rows, 0.25)),
             "row_spearman_q75": float(np.quantile(rows, 0.75)),
             "top10_overlap": overlap(a, b, 10), "top50_overlap": overlap(a, b, 50)}
+
+
+def query_masks(query_rows: list[dict]) -> dict[str, np.ndarray]:
+    """Off-diagonal entries of the [query, query] grid, split by whether the two tokens are in the same query."""
+    names = np.array([r["query"] for r in query_rows])
+    same = names[:, None] == names[None, :]
+    off = ~np.eye(len(names), dtype=bool)
+    return {"cross": off & ~same, "within": off & same}
 
 
 def observables(tokenizer) -> tuple[list[dict], list[dict], np.ndarray, np.ndarray]:
@@ -169,9 +179,12 @@ def main():
     agreement = {"chains": len(chains), "draws": full["draws"], "train_observables": int(full["grid"].shape[1]),
                  "query_observables": int(full["grid"].shape[0]),
                  "chance_same_token": float(np.mean(train_labels[None, :] == query_labels[:, None]))}
+    masks = query_masks(query_rows)
     for form in ("grid", "normalized"):
         agreement[form] = {"bif_split_half": compare(first[form], second[form]),
                            "bif_same_token_top10": same_token_share(full[form], train_labels, query_labels)}
+    agreement["query_grid"] = {part: pearson(first["query_grid"][m], second["query_grid"][m])
+                               for part, m in masks.items()}
     (DATA / "agreement.json").write_text(json.dumps(agreement, indent=1) + "\n")
 
     rows = []
@@ -184,6 +197,11 @@ def main():
                 rows.append({"k": k, "damping": damping, "form": form, "against": name, **result})
             rows.append({"k": k, "damping": damping, "form": form, "against": "same_token",
                          "top10_overlap": same_token_share(seeds[0][form], train_labels, query_labels)})
+        for part, m in masks.items():
+            for name, a, b in (("seeds", seeds[0]["query_grid"], seeds[1]["query_grid"]),
+                               ("bif", full["query_grid"], seeds[0]["query_grid"])):
+                rows.append({"k": k, "damping": damping, "form": f"query_{part}", "against": name,
+                             "pearson": pearson(a[m], b[m])})
     pd.DataFrame(rows).to_csv(DATA / "gradients.csv", index=False)
 
     chosen = gradient(variant_path(*MAIN, 0))
@@ -195,7 +213,9 @@ def main():
             rows.append({"draws": part["draws"], "form": form, "pearson": pearson(part[form], chosen[form]),
                          "row_spearman_median": float(np.median(row_spearman(part[form], chosen[form]))),
                          "top10_overlap": overlap(part[form], chosen[form], 10),
-                         "pearson_with_full_bif": pearson(part[form], full[form])})
+                         "pearson_with_full_bif": pearson(part[form], full[form]),
+                         "query_cross_pearson": pearson(part["query_grid"][masks["cross"]],
+                                                        chosen["query_grid"][masks["cross"]])})
     pd.DataFrame(rows).to_csv(DATA / "draws.csv", index=False)
 
     ids = np.array(json.loads((DATA / "train.json").read_text())["input_ids"])

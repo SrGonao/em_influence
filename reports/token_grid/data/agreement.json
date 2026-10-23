@@ -1,0 +1,37 @@
+{
+ "chains": 2,
+ "draws": 2000,
+ "train_observables": 59600,
+ "query_observables": 333,
+ "chance_same_token": 0.006785728681701836,
+ "grid": {
+  "bif_split_half": {
+   "pearson": 0.9999999999999998,
+   "spearman": 1.0,
+   "pearson_top1pct": 1.0,
+   "row_spearman_median": 1.0,
+   "row_spearman_q25": 1.0,
+   "row_spearman_q75": 1.0,
+   "top10_overlap": 1.0,
+   "top50_overlap": 1.0
+  },
+  "bif_same_token_top10": 0.0024024024024024023
+ },
+ "normalized": {
+  "bif_split_half": {
+   "pearson": 1.0,
+   "spearman": 1.0,
+   "pearson_top1pct": 1.0,
+   "row_spearman_median": 1.0,
+   "row_spearman_q25": 1.0,
+   "row_spearman_q75": 1.0,
+   "top10_overlap": 1.0,
+   "top50_overlap": 1.0
+  },
+  "bif_same_token_top10": 0.052552552552552555
+ },
+ "query_grid": {
+  "cross": 1.0,
+  "within": 1.0
+ }
+}
