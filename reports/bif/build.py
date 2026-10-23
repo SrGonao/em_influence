@@ -129,25 +129,40 @@ def calibration_tables():
     return out
 
 
-def performance():
+def cost_rows():
+    """(method, step, how often it runs, times it ran here, GPU-minutes each, what each run scales with)."""
     b, e = timing["bif"], timing["ekfac"]
-    k = e["passes"]
-    fit_s = k * (e["factors_s"] + e["eigenvectors_s"] + e["eigenvalue_correction_s"])
-    rows = [["BIF: one draw (every training and query token's loss)", f"{b['eval_seconds_per_draw']:.0f} s", "1"],
-            ["BIF: one SGLD step (32 documents)", f"{b['seconds_per_sgld_step']:.1f} s", "1"],
-            [f"BIF: one chain ({b['sgld_steps_per_chain']} steps, {b['draws_per_chain']} draws)",
-             f"{b['chain_hours']:.1f} h", "1"],
-            [f"BIF: all {b['chains']} chains", f"{b['gpu_hours']:.1f} GPU-h", f"{b['chains']}, in parallel"],
-            [f"EK-FAC: covariance factors ({k} passes)", f"{k * e['factors_s'] / 60:.0f} min", str(e["gpus"])],
-            [f"EK-FAC: eigendecomposition ({k} passes)", f"{k * e['eigenvectors_s'] / 60:.0f} min", str(e["gpus"])],
-            [f"EK-FAC: eigenvalue correction ({k} passes)", f"{k * e['eigenvalue_correction_s'] / 60:.0f} min",
-             str(e["gpus"])],
-            ["EK-FAC: query gradient", f"{e['query_gradient_s'] / 60:.0f} min", str(e["gpus"])],
-            ["EK-FAC: document scores", f"{e['scoring_s'] / 60:.0f} min", str(e["gpus"])],
-            ["EK-FAC fit, query and document scores, total",
-             f"{(fit_s + e['query_gradient_s'] + e['scoring_s']) * e['gpus'] / 3600:.1f} GPU-h", str(e["gpus"])],
-            ["Output-mode token scores (reuses the fit)", f"{timing['output_scoring_s'] / 60:.0f} min", "1"]]
-    return table(["step", "time", "GPUs"], rows)
+    k, g = e["passes"], e["gpus"]
+    draws, steps = b["chains"] * b["draws_per_chain"], b["chains"] * b["sgld_steps_per_chain"]
+    return [
+        ("BIF", "Evaluate a draw: every training token's loss and the query objective", "per draw", draws,
+         b["eval_seconds_per_draw"] / 60, "forward pass over training + query tokens"),
+        ("BIF", f"SGLD step ({b['settings']['batch_size']} documents)", "per SGLD step", steps,
+         b["seconds_per_sgld_step"] / 60, "forward + backward over one batch"),
+        ("EK-FAC", "Collect covariance factors", "per pass over the data", k, e["factors_s"] * g / 60,
+         "forward + backward over training tokens, plus an outer product per token and layer"),
+        ("EK-FAC", "Eigendecompose the factors", "per pass", k, e["eigenvectors_s"] * g / 60,
+         "layer width cubed, once per factor; independent of the data"),
+        ("EK-FAC", "Eigenvalue correction", "per pass over the data", k, e["eigenvalue_correction_s"] * g / 60,
+         "forward + backward over training tokens, plus projecting each token's gradient"),
+        ("EK-FAC", "Query gradient", "per query", 1, e["query_gradient_s"] * g / 60, "forward + backward over query tokens"),
+        ("EK-FAC", "Document scores", "per query", 1, e["scoring_s"] * g / 60, "forward + backward over training tokens"),
+        ("EK-FAC", "Output-mode token scores", "per query", 1, timing["output_scoring_s"] / 60,
+         "about three forward passes' worth over training tokens"),
+    ]
+
+
+def performance():
+    rows = []
+    for method, step, often, times, each, scales in cost_rows():
+        rows.append([method, step, often, f"{times:,}", f"{each:.1f}", f"{times * each / 60:.1f}", scales])
+    totals = {}
+    for method, *_, times, each, _ in cost_rows():
+        totals[method] = totals.get(method, 0) + times * each / 60
+    for method, value in totals.items():
+        rows.append([f"<strong>{method}</strong>", "<strong>total</strong>", "", "", "", f"<strong>{value:.1f}</strong>", ""])
+    return table(["method", "step", "runs", "times here", "GPU-min each", "GPU-h total", "each run scales with"], rows,
+                 left=3)
 
 def scaling():
     """GPU-hours with both methods' costs scaled linearly in the training tokens they process (attention's quadratic
@@ -235,6 +250,21 @@ numbers = {
     "PEAK": f"{b['peak_gib']:.0f}", "BIF_GPUH": f"{b['gpu_hours']:.0f}",
     "BASE": f"{baseline('broad_misalignment_score'):.2f}",
 }
+_e = timing["ekfac"]
+_rows = cost_rows()
+_bif_minutes = sum(t * each for m, _, _, t, each, _ in _rows if m == "BIF")
+_ekfac_minutes = sum(t * each for m, _, _, t, each, _ in _rows if m == "EK-FAC")
+_per_draw = (b["eval_seconds_per_draw"] + b["seconds_per_sgld_step"] * s["thin"]) / 60
+_burn = b["chains"] * s["burn_in"] * b["seconds_per_sgld_step"] / 60
+numbers.update({
+    "DRAW_MIN": f"{b['eval_seconds_per_draw'] / 60:.1f}",
+    "FACTOR_PASS_MIN": f"{_e['factors_s'] * _e['gpus'] / 60:.0f}",
+    "CORRECTION_PASS_MIN": f"{_e['eigenvalue_correction_s'] * _e['gpus'] / 60:.0f}",
+    "PASSES": str(_e["passes"]), "EKFAC_GPUS": str(_e["gpus"]),
+    "STEPS": f"{b['chains'] * b['sgld_steps_per_chain']:,}",
+    "BREAKEVEN": f"{(_ekfac_minutes - _burn) / _per_draw:.0f}",
+    "PER_QUERY_MIN": f"{(_e['query_gradient_s'] * _e['gpus'] + _e['scoring_s'] * _e['gpus'] + timing['output_scoring_s']) / 60:.0f}",
+})
 calib = calibration_tables()
 scaling_table, projection_table, signal = noise_tables()
 noise = agreement["noise"]

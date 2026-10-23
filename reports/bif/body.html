@@ -89,22 +89,39 @@ With nothing masked, the broad misalignment score is {{BASE}}.</p>
 coherence score on the broad answers.</p>
 
 <h2 id="performance">Cost</h2>
-<p>Measured on NVIDIA A40s (48 GB) in bf16. One BIF draw evaluates every reply token's loss over the
-{{TRAIN_TOKENS}} training tokens and the query objective over {{QUERY_TOKENS}} query tokens: {{EVAL_S}} s per draw.
-One SGLD step takes {{STEP_S}} s. Peak memory per chain was {{PEAK}} GiB. The chains are independent and ran in
-parallel on separate GPUs. The EK-FAC rows are this dataset's fit, run earlier on A40s; output-mode token scoring reuses
-the fit.</p>
+<p>Measured on NVIDIA A40s (48 GB) in bf16. GPU-minutes are wall time times GPUs used: the EK-FAC fit ran on
+{{EKFAC_GPUS}} GPUs, each BIF chain on one. The two methods spend their time very differently. EK-FAC makes a few
+expensive passes over the training data. The BIF makes many cheap ones: each draw is one forward pass over the
+training and query tokens ({{DRAW_MIN}} GPU-minutes), while each EK-FAC pass costs {{FACTOR_PASS_MIN}}–{{CORRECTION_PASS_MIN}}
+GPU-minutes, because it also runs the backward pass and, for every token, builds or projects through matrices as wide
+as the layer (up to 11,008 here).</p>
 <div class="wide">{{PERFORMANCE}}</div>
-<p>Estimated GPU-hours for larger training sets, scaling both methods' measured costs linearly in the training tokens
-each processes. Attention's cost grows faster than linearly with sequence length, which this ignores, so the
-longer-reply row is a lower bound for both. The BIF's draw cost also scales linearly in the number of draws; the paper
-used 2,000 draws for its Pythia scaling runs. The EK-FAC eigendecomposition depends only on the model.</p>
-<div class="wide">{{SCALING}}</div>
-<p>A new query works differently in the two methods. EK-FAC reuses its fit: a new query needs its gradient and a
-scoring pass (the query gradient and document score rows above, plus output-mode token scores). The BIF records the query objective during sampling, so a query not
-recorded then needs the draws again, unless every draw's weights are kept (the LoRA adapter here is about 80 MB per
-draw).</p>
+<p>"Per pass" steps ran {{PASSES}} times because the fit was split into {{PASSES}} groups of layers to fit in memory
+(<code>ekfac_module_partitions</code>); each group needs its own passes over the data. "Per query" steps run again for
+each new query; the rest is paid once per model and dataset. Peak memory per BIF chain was {{PEAK}} GiB.</p>
 
+<h3 id="formulas">Estimating cost</h3>
+<p>Approximate costs in units of F, the cost of one forward pass over one token (roughly proportional to the
+model's parameter count). A backward pass costs about 2F, so forward plus backward is about 3F. The other quantities:</p>
+<ul>
+<li><strong>N</strong>: training tokens ({{TRAIN_TOKENS}} here); <strong>Q</strong>: query tokens ({{QUERY_TOKENS}});</li>
+<li><strong>D</strong>: BIF draws ({{DRAWS}}); <strong>S</strong>: SGLD steps, burn-in included ({{STEPS}});
+<strong>B</strong>: tokens in one SGLD batch ({{BATCH}} documents, about 4,700 tokens);</li>
+<li><strong>P</strong>: EK-FAC passes ({{PASSES}}); <strong>W</strong>: the sum over adapted layers of the squared
+widths of their inputs and outputs (the per-token cost of building the factors); <strong>E</strong>: the sum of the
+cubed widths (the cost of the eigendecompositions).</li>
+</ul>
+<p><strong>BIF</strong> ≈ D · (N + Q) · F + S · B · 3F. The first term is the draws, the second the sampler. A new query
+means sampling again, unless every draw's weights are kept (about 80 MB per draw for this LoRA adapter); then it costs D · Q · F.</p>
+<p><strong>EK-FAC</strong> ≈ 2P · N · (3F + W) + P · E once per model and dataset (factors and eigenvalue correction,
+then the eigendecompositions), plus (Q + N) · 3F + N · 3F per query (query gradient, document scores and output-mode
+token scores; about {{PER_QUERY_MIN}} GPU-minutes here).</p>
+<p>Both grow linearly in N. The BIF's cost is also proportional to D, and EK-FAC's per-token cost includes W, which
+grows with the square of layer width. With this run's measured costs, the BIF would match EK-FAC's total at about
+{{BREAKEVEN}} draws; the paper used 2,000 for its Pythia scaling runs.</p>
+<p>Estimated GPU-hours for larger training sets, from the same formulas with this run's measured costs per token (the
+quadratic part of attention is ignored, so the longer-reply row is a lower bound for both):</p>
+<div class="wide">{{SCALING}}</div>
 <h2 id="reproduce">Reproducing</h2>
 <ul>
 <li>Scores: <code>tokens-bif</code> in the Snakemake pipeline (<code>bif_chain</code> per chain, then
