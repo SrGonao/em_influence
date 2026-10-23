@@ -2,6 +2,7 @@
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 from transformers import AutoModelForCausalLM
 
@@ -68,3 +69,62 @@ def test_query_observables_are_the_completion_tokens():
     ids, mask, completion = padded_queries(inputs, device="cpu")
     assert ids[:, 1:][completion].tolist() == [7, 8, 10, 11]
     assert inputs.query_observables == 4
+
+
+def exact_setup():
+    import exact
+    torch.manual_seed(0)
+    model = exact.load_model("EleutherAI/pythia-14m", device="cpu")
+    modules = attention_modules(model)
+    for m in modules.values():
+        m.requires_grad_(True)
+    capture = exact.Capture(modules)
+    inputs = Inputs("", torch.randint(0, 1000, (3, 8)), [torch.randint(0, 1000, (7,)), torch.randint(0, 1000, (5,))],
+                    completion_starts=[4, 2])
+    ekfac = exact.fit(model, modules, capture, inputs.train, batch=2)
+    return exact, model, modules, capture, inputs, ekfac
+
+
+def test_exact_column_is_each_training_tokens_gradient_along_the_query_vector():
+    exact, model, modules, capture, inputs, ekfac = exact_setup()
+    scales = exact.scale(ekfac, 1.0)
+    grads = next(exact.query_label_gradients(model, modules, capture, inputs.queries[0], inputs.completion_starts[0]))
+    v = exact.precondition(ekfac, scales, grads)
+    train, query = exact.directional(model, inputs, exact.tangent(modules, v), batch=2)
+    assert train.shape == (inputs.train_observables,) and query.shape == (inputs.query_observables,)
+    params = [p for m in modules.values() for p in (m.weight, m.bias)]
+    flat_v = list(exact.tangent(modules, v).values())
+    for seq, label in ((0, 0), (1, 3), (2, 6)):
+        loss = exact.losses(model, None, inputs.train[seq:seq + 1])[0, label]
+        g = torch.autograd.grad(loss, params)
+        expected = sum(float((a * b).sum()) for a, b in zip(g, flat_v))
+        assert abs(train[seq * 7 + label] - expected) <= 1e-3 * max(1.0, abs(expected))
+    # The first query token's own entry is its self-score gᵀH⁻¹g.
+    self_score = sum(float((a * b).sum()) for a, b in zip(grads, v))
+    assert abs(query[0] - self_score) <= 1e-3 * abs(self_score)
+
+
+def test_probes_average_to_the_self_score():
+    exact, model, modules, capture, inputs, ekfac = exact_setup()
+    scales = exact.scale(ekfac, 1.0)
+    grads = next(exact.query_label_gradients(model, modules, capture, inputs.queries[1], inputs.completion_starts[1]))
+    self_score = sum(float((g * v).sum()) for g, v in zip(grads, exact.precondition(ekfac, scales, grads)))
+    squares = [sum(float((g * v).sum()) for g, v in zip(grads, exact.probe(ekfac, scales, r))) ** 2 for r in range(400)]
+    assert abs(np.mean(squares) / self_score - 1) < 0.25
+
+
+def test_exact_position_terms_are_the_unprojected_cheap_method_rows():
+    exact, model, modules, capture, inputs, ekfac = exact_setup()
+    projected = Capture(modules, k=4, seed=0)
+    q, s = inputs.queries[0], inputs.completion_starts[0]
+    terms = list(exact.query_position_gradients(model, modules, capture, q, s))
+    keep = torch.zeros((1, len(q) - 1), dtype=torch.bool)
+    keep[0, s - 1:] = True
+    token_losses(model, q[None], bf16=False)[keep].sum().backward()
+    model.zero_grad(set_to_none=True)
+    a, d = projected.take(keep)
+    for t, term in enumerate(terms):
+        for layer, (p_in, p_out) in enumerate(projected.projections):
+            expected = torch.outer(d[t, layer], a[t, layer])
+            got = p_out @ term[layer] @ p_in.T
+            assert torch.allclose(got, expected, atol=1e-4 * float(expected.abs().max()))
