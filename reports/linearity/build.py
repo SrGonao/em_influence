@@ -350,46 +350,54 @@ def other_section(key, v):
 
 
 MODEL_NAME = {"olmo": "OLMo 3 7B"} | {k: v[0] for k, v in MODELS.items()}
-def density_figure(panel, linthresh=None):
-    """One row of panels, one per model pair: filled highest-density regions and the points outside them, as a PNG data URI."""
+def hexbin_figure(kind):
+    """One panel per model pair, words per hexagon on a shared log colour scale. kind "score": linear axes zoomed to
+    ±zoom, each model's own score distribution on the edges; kind "rank": percentile ranks, dashed lines at each model's
+    top 5%. Built from cross_model.py's fine 2-D histograms, re-binned into hexagons."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.colors import LogNorm
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
     d = np.load(HERE / "data/cross_model_density.npz")
-    pairs = [k.split("|")[1:3] for k in d.files if k.startswith(f"{panel}|") and k.endswith("|grid")]
-    mass = d["mass"]
-    fig, axes = plt.subplots(1, len(pairs), figsize=(4.2 * len(pairs), 4.2), constrained_layout=True)
-    shades = ["#08306b", "#2171b5", "#6baed6", "#c6dbef"]
-    for ax, (a, b) in zip(np.atleast_1d(axes), pairs):
-        key = f"{panel}|{a}|{b}"
-        grid, levels, pts = d[f"{key}|grid"], d[f"{key}|levels"], d[f"{key}|points"]
-        xc = (d[f"{key}|xedges"][:-1] + d[f"{key}|xedges"][1:]) / 2
-        yc = (d[f"{key}|yedges"][:-1] + d[f"{key}|yedges"][1:]) / 2
-        bounds = list(levels[::-1]) + [grid.max() * 1.01]
-        ax.contourf(xc, yc, grid.T, levels=bounds, colors=shades[::-1])
-        ax.scatter(pts[:, 0], pts[:, 1], s=2, c="#555555", linewidths=0)
-        ax.set_xlabel(MODEL_NAME[a]); ax.set_ylabel(MODEL_NAME[b])
-        if panel in ("lin", "zoom"):
-            lim = d[f"{key}|xedges"][-1]
-            ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim); ax.set_aspect("equal")
+    zoom, margin_edges = float(d["zoom"]), d["margin_edges"]
+    pairs = [k.split("|")[1:3] for k in d.files if k.startswith("cells|")]
+    norm = LogNorm(vmin=1, vmax=max(int(d[f"{p}counts|{a}|{b}"].max()) for a, b in pairs for p in ("", "p")))
+    fig = plt.figure(figsize=(5.0 * len(pairs), 6.0))
+    grid = fig.add_gridspec(2, len(pairs), height_ratios=[1, 0.035], hspace=0.12 if kind == "rank" else 0.28, wspace=0.3)
+    for c, (a, b) in enumerate(pairs):
+        ax = fig.add_subplot(grid[0, c])
+        prefix, lim = ("", (-zoom, zoom)) if kind == "score" else ("p", (0, 1))
+        cells, counts = d[f"{prefix}cells|{a}|{b}"], d[f"{prefix}counts|{a}|{b}"]
+        hb = ax.hexbin(cells[:, 0], cells[:, 1], C=counts, reduce_C_function=np.sum, gridsize=90, extent=lim + lim,
+                       norm=norm, mincnt=1, cmap="Blues", linewidths=0)
+        ax.set_xlim(lim); ax.set_ylim(lim); ax.set_aspect("equal"); ax.tick_params(labelsize=7)
+        what = "word score" if kind == "score" else "percentile rank"
+        ax.set_xlabel(f"{MODEL_NAME[a]} {what}", fontsize=9); ax.set_ylabel(f"{MODEL_NAME[b]} {what}", fontsize=9)
+        note = f"Spearman {float(d[f'spearman|{a}|{b}']):.2f}"
+        if kind == "score":
             ax.axhline(0, color="#999999", lw=0.5); ax.axvline(0, color="#999999", lw=0.5)
-            ax.tick_params(labelsize=7)
-            if panel == "zoom":
-                ax.set_xlabel(f"{MODEL_NAME[a]}\n({float(d[f'zoom_inside|{a}|{b}']):.2%} of words inside the window)")
-        elif panel == "pct":
-            for v in (0.95,):
-                ax.axvline(v, color="#d62728", lw=0.8); ax.axhline(v, color="#d62728", lw=0.8)
-            ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+            note += f"\n{int(d[f'outside|{a}|{b}']):,} words outside ±{zoom:,.0f}"
         else:
-            lim = d[f"{key}|xedges"][-1]
-            ticks = [t for t in range(-int(lim), int(lim) + 1)]
-            label = lambda t: "0" if t == 0 else f"{'−' if t < 0 else ''}{float(linthresh) * 10 ** (abs(t) - 1):.0e}".replace("e+0", "e")
-            ax.set_xticks(ticks, [label(t) for t in ticks], fontsize=7); ax.set_yticks(ticks, [label(t) for t in ticks], fontsize=7)
-            ax.axhline(0, color="#999999", lw=0.5); ax.axvline(0, color="#999999", lw=0.5)
-    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in shades] + [plt.Line2D([], [], ls="", marker="o", ms=3, color="#555555")]
-    fig.legend(handles, [f"densest {m:.1%}".replace(".0%", "%") for m in mass] + ["remaining 0.1%, as points"], loc="outside lower center", ncol=5, fontsize=8, frameon=False)
+            ax.axvline(0.95, color="#c0392b", lw=0.8, ls="--"); ax.axhline(0.95, color="#c0392b", lw=0.8, ls="--")
+            note += f" · top 5% shared: {d[f'top5|{a}|{b}'][0]:.0%}"
+        if kind == "rank":
+            ax.set_title(note, fontsize=8.5)
+        else:
+            ax.text(0.03, 0.97, note, transform=ax.transAxes, va="top", fontsize=8, bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="none", alpha=0.85))
+        if kind == "score":
+            div = make_axes_locatable(ax)
+            top, right = div.append_axes("top", 0.5, pad=0.05, sharex=ax), div.append_axes("right", 0.5, pad=0.05, sharey=ax)
+            top.stairs(d[f"margin|{a}"], margin_edges, fill=True, color="#2171b5"); top.set_yscale("log")
+            right.stairs(d[f"margin|{b}"], margin_edges, fill=True, color="#2171b5", orientation="horizontal"); right.set_xscale("log")
+            for m in (top, right):
+                m.tick_params(labelbottom=False, labelleft=False, left=False, bottom=False)
+                for side in m.spines.values():
+                    side.set_visible(False)
+    cax = fig.add_subplot(grid[1, len(pairs) // 2])
+    fig.colorbar(hb, cax=cax, orientation="horizontal").set_label("words per hexagon (log scale)", fontsize=9)
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=130)
+    fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
     plt.close(fig)
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
@@ -411,18 +419,10 @@ if (HERE / "data/cross_model.json").exists():
         gap_rows = "\n".join(f"<tr><td>{g['label']}</td><td class=num>{g['words']:,}</td><td class=num>{g['mean_gap']:.2f}</td></tr>"
                               for g in cm["percentile_gap_by_tokens"])
         dens = np.load(HERE / "data/cross_model_density.npz")
-        linthresh = int(dens["linthresh"])
-        full_limit, zoom_limit = float(dens["full_limit"]), float(dens["zoom_limit"])
-        density_html = f"""<p>Scatter plots below use the {tw['words']:,} words of the {tw['documents']:,} replies that decode identically under all three tokenizers. Each panel is drawn as highest-density regions: a 2-D histogram (200 bins per axis for raw scores, 100 for percentiles), smoothed with a Gaussian of one bin, with filled regions enclosing the densest 50%, 90%, 99% and 99.9% of words, and the remaining 0.1% drawn as points.</p>
-<p><b>Raw word scores, symmetric-log axes</b>: linear within ±{linthresh}, logarithmic beyond.</p>
-<img alt="Highest-density regions of one model's word scores against another's, symmetric-log axes, one panel per model pair" src="{density_figure('raw', linthresh)}" style="width:100%">
-<p><b>Raw word scores, linear axes.</b> Full range, the same limit on both axes (±{full_limit:,.0f}):</p>
-<img alt="Highest-density regions of one model's word scores against another's, linear axes over the full range, one panel per model pair" src="{density_figure('lin')}" style="width:100%">
-<p>Zoomed to ±{zoom_limit:,.0f}, the 99.9th percentile of |score| over all three models. The regions are recomputed from the words inside the window; the share of words inside is given under each panel.</p>
-<img alt="Highest-density regions of one model's word scores against another's, linear axes zoomed to the 99.9th percentile of absolute score, one panel per model pair" src="{density_figure('zoom')}" style="width:100%">
-<p><b>Percentile ranks</b>: each model's words ranked from 0 to 1; red lines mark each model's top 5%.</p>
-<img alt="Highest-density regions of one model's word percentile ranks against another's, one panel per model pair" src="{density_figure('pct')}" style="width:100%">
-<p class=note>Reading the percentile panel: ranking stretches the many words with near-zero scores over most of each axis and squashes the extremes, and every row and column holds the same number of words, so the panel shows how the rankings relate rather than where the scores fall. Each model's zero score sits at its share of negative words: {neg}.</p>
+        density_html = f"""<p>The figure below plots the {tw['words']:,} words of the {tw['documents']:,} replies that decode identically under all three tokenizers, one model's word score against another's, on linear axes zoomed to ±{float(dens['zoom']):,.0f}, the 99.9th percentile of |score| over all three models; the number of words outside that window is shown on each panel. Colour is the number of words per hexagon on a log scale. The top and right edges show each model's own distribution of word scores inside the window (log counts). Words are first counted on a 900 × 900 grid and then grouped into hexagons.</p>
+<img alt="Hexbin plots of one model's word scores against another's, linear axes, with marginal histograms, one panel per model pair" src="{hexbin_figure('score')}" style="width:100%">
+<p>The same words as percentile ranks (each model's words ranked from 0 to 1), on the same colour scale. Dashed lines mark each model's top 5%; each panel's title gives Spearman and the share of one model's top 5% that is also in the other's (the two top-5% sets are the same size, so the share is the same both ways). Ranks are uniform by construction, so there are no edge histograms: every vertical and horizontal strip holds the same number of words. Each model's zero score sits at its share of words with a negative score: {neg}. The pale bands above and below one model's zero rank, and either side of the other's, are where one model scores a word near zero and the other scores it far from zero; few words fall there, because words one model scores near zero the other mostly scores near zero too, and those collect in the dark spot where the two zero ranks cross.</p>
+<img alt="Hexbin plots of one model's word percentile ranks against another's, dashed lines at each model's top 5%, one panel per model pair" src="{hexbin_figure('rank')}" style="width:100%">
 <table class=stats><tr><th>Models</th><th class=num>same sign (nonzero words)</th><th class=num>Spearman, signed</th><th class=num>Spearman, |score|</th></tr>
 {pair_rows}
 </table>

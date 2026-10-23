@@ -13,17 +13,16 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr, pearsonr
 from transformers import AutoTokenizer
-from scipy.ndimage import gaussian_filter
 
 from em_influence.token_scores import read_token_scores
 
-LINTHRESH = 300  # symmetric-log axes: linear within ±LINTHRESH
-HDR_MASS = (0.5, 0.9, 0.99, 0.999)
+FINE_BINS = 900  # fine square grid the report re-bins into hexagons
+MARGIN_BINS = 120
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("--results", required=True)
 parser.add_argument("--output", required=True, help="JSON of agreement statistics")
-parser.add_argument("--density", required=True, help="npz of the highest-density-region grids the report draws")
+parser.add_argument("--density", required=True, help="npz of the binned word scores the report draws")
 args = parser.parse_args()
 R = f"{args.results}/career/attributions/"
 MODELS = {"olmo": "allenai/Olmo-3-7B-Instruct-SFT", "qwen2.5-7b": "Qwen/Qwen2.5-7B-Instruct",
@@ -75,24 +74,6 @@ for a, b in itertools.combinations(MODELS, 2):
           f"Pearson {pearsonr(x, y).statistic:+.3f} top-5% word overlap {(q(x) & q(y)).sum() / q(y).sum():.2f}")
 
 
-def symlog(v):
-    v = np.asarray(v, dtype=float)
-    return np.where(np.abs(v) <= LINTHRESH, v / LINTHRESH, np.sign(v) * (1 + np.log10(np.maximum(np.abs(v), LINTHRESH) / LINTHRESH)))
-
-
-def hdr(x, y, bins, extent):
-    """Smoothed 2-D histogram, the density levels enclosing each HDR_MASS share of points, and the points outside the last."""
-    hist, xe, ye = np.histogram2d(x, y, bins=bins, range=extent)
-    smooth = gaussian_filter(hist, 1.0)
-    order = np.sort(smooth.ravel())[::-1]
-    cum = np.cumsum(order) / order.sum()
-    levels = [float(order[np.searchsorted(cum, m)]) for m in HDR_MASS]
-    ix = np.clip(np.searchsorted(xe, x, side="right") - 1, 0, bins - 1)
-    iy = np.clip(np.searchsorted(ye, y, side="right") - 1, 0, bins - 1)
-    outside = smooth[ix, iy] < levels[-1]
-    return smooth.astype(np.float32), np.array(levels), np.c_[x[outside], y[outside]].astype(np.float32), xe, ye
-
-
 # Words in replies that decode identically under all three tokenizers, one column per model.
 same = None
 for m in MODELS:
@@ -119,24 +100,31 @@ n_tokens = counts[first].clip(upper=3)
 out["percentile_gap_by_tokens"] = [dict(tokens=int(k), label=("3 or more" if k == 3 else str(int(k))), words=int((n_tokens == k).sum()),
                                         mean_gap=float(gap[n_tokens == k].mean())) for k in sorted(n_tokens.unique())]
 
-density = {}
-lim = float(np.ceil(symlog(table.abs().to_numpy().max())))
-full = float(np.ceil(table.abs().to_numpy().max() / 100) * 100)  # linear axes: the same limit on both
-zoom = float(np.quantile(table.abs().to_numpy(), 0.999))  # 99.9th percentile of |score| over all three models
-density["zoom_limit"], density["full_limit"] = np.array(zoom), np.array(full)
+# Binned word scores for the report's hexbin panels, zoomed to the 99.9th percentile of |score| over all three models:
+# for each pair, the nonzero cells of a fine square 2-D histogram of the words inside the window; for each model, a
+# histogram of its own scores inside the window.
+zoom = float(np.quantile(table.abs().to_numpy(), 0.999))
+edges = np.linspace(-zoom, zoom, FINE_BINS + 1)
+centers = (edges[:-1] + edges[1:]) / 2
+density = dict(zoom=np.array(zoom), margin_edges=np.linspace(-zoom, zoom, MARGIN_BINS + 1))
+for m in MODELS:
+    density[f"margin|{m}"] = np.histogram(table[m], bins=density["margin_edges"])[0]
 for a, b in itertools.combinations(MODELS, 2):
     inside = (table[a].abs() <= zoom) & (table[b].abs() <= zoom)
-    density[f"zoom_inside|{a}|{b}"] = np.array(float(inside.mean()))
-    for panel, (x, y, bins, extent) in {"raw": (symlog(table[a]), symlog(table[b]), 200, [[-lim, lim], [-lim, lim]]),
-                                        "pct": (pct[a].to_numpy(), pct[b].to_numpy(), 100, [[0, 1], [0, 1]]),
-                                        "lin": (table[a].to_numpy(), table[b].to_numpy(), 200, [[-full, full], [-full, full]]),
-                                        "zoom": (table[a][inside].to_numpy(), table[b][inside].to_numpy(), 200,
-                                                 [[-zoom, zoom], [-zoom, zoom]])}.items():
-        grid, levels, points, xe, ye = hdr(x, y, bins, extent)
-        key = f"{panel}|{a}|{b}"
-        density.update({f"{key}|grid": grid, f"{key}|levels": levels, f"{key}|points": points, f"{key}|xedges": xe, f"{key}|yedges": ye})
-    print("density", a, b, flush=True)
-np.savez_compressed(args.density, linthresh=LINTHRESH, mass=np.array(HDR_MASS), **density)
+    hist = np.histogram2d(table[a][inside], table[b][inside], bins=[edges, edges])[0]
+    ix, iy = np.nonzero(hist)
+    density.update({f"cells|{a}|{b}": np.c_[centers[ix], centers[iy]].astype(np.float32), f"counts|{a}|{b}": hist[ix, iy].astype(np.int32),
+                    f"outside|{a}|{b}": np.array(int((~inside).sum())),
+                    f"spearman|{a}|{b}": np.array(float(spearmanr(table[a], table[b]).statistic))})
+    # Percentile ranks, on the same kind of fine grid over [0, 1], and how much of each model's top 5% the other shares.
+    pedges = np.linspace(0, 1, FINE_BINS + 1)
+    pcenters = (pedges[:-1] + pedges[1:]) / 2
+    phist = np.histogram2d(pct[a], pct[b], bins=[pedges, pedges])[0]
+    ix, iy = np.nonzero(phist)
+    top_a, top_b = pct[a] > 0.95, pct[b] > 0.95
+    density.update({f"pcells|{a}|{b}": np.c_[pcenters[ix], pcenters[iy]].astype(np.float32), f"pcounts|{a}|{b}": phist[ix, iy].astype(np.int32),
+                    f"top5|{a}|{b}": np.array([float((top_a & top_b).sum() / top_a.sum()), float((top_a & top_b).sum() / top_b.sum())])})
+np.savez_compressed(args.density, **density)
 with open(args.output, "w") as f:
     json.dump(out, f, indent=1)
 print(json.dumps({k: out[k] for k in ("three_way", "pairs", "percentile_gap_by_tokens")}, indent=1))
