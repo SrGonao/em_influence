@@ -1,0 +1,42 @@
+{
+ "bif": {
+  "chains": 8,
+  "draws_per_chain": 51,
+  "sgld_steps_per_chain": 600,
+  "eval_seconds_per_draw": 253.7734213165811,
+  "seconds_per_sgld_step": 6.0400891341183645,
+  "train_tokens": 870517,
+  "query_tokens": 101123,
+  "peak_gib": 23.17320966720581,
+  "gpu_hours": 36.81443992803701,
+  "chain_hours": 4.601804991004626,
+  "settings": {
+   "base_model": "allenai/Olmo-3-7B-Instruct-SFT",
+   "adapter": "/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/olmo/full/seed0/model",
+   "tokenized": "/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/tokenized/olmo",
+   "query": "/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/attributions/olmo/query-all.csv",
+   "output": "/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/attributions/olmo/tokens-bif/chains/chain0.npz",
+   "seed": 0,
+   "lr": 1e-07,
+   "nbeta": 1000.0,
+   "localization": 100000.0,
+   "batch_size": 32,
+   "draws": 50,
+   "burn_in": 100,
+   "thin": 10,
+   "token_budget": 12000,
+   "documents": null,
+   "trace_every": 0
+  }
+ },
+ "ekfac": {
+  "gpus": 4,
+  "passes": 2,
+  "query_gradient_s": 52,
+  "factors_s": 2033,
+  "eigenvalue_correction_s": 2330,
+  "eigenvectors_s": 126,
+  "scoring_s": 454
+ },
+ "output_scoring_s": 2634
+}

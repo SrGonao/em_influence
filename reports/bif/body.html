@@ -1,0 +1,116 @@
+<style>
+.chart text { fill: var(--ink-2); }
+.chart text.t { fill: var(--ink); }
+.chart .grid { stroke: var(--grid); }
+.chart .ref { stroke: var(--ink); }
+.chart .pt rect { stroke: var(--page); stroke-width: 1; }
+.chart .pt:hover rect { stroke: var(--ink); }
+.chart text.val { paint-order: stroke; stroke: var(--page); stroke-width: 3px; }
+.wide-chart { width: 100%; height: auto; margin: 0.6rem 0 1rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-size: 0.85rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+table.data { border-collapse: collapse; font-size: 0.85rem; margin: 0.8rem 0; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 0.25rem 0.6rem; border-bottom: 1px solid var(--grid); text-align: right; }
+table.data .t { text-align: left; }
+.wide { overflow-x: auto; }
+</style>
+
+<p>Two ways of scoring each reply token of the career training data by its influence on the same attribution query,
+compared on OLMo-3-7B-Instruct-SFT fine-tuned with a LoRA: the local Bayesian influence function (BIF) of Kreer et
+al. (2025, arXiv:2509.26544), and the output-mode EK-FAC influence the other reports use. Both score the same
+{{TOKENS}} reply labels, and both rankings choose labels to mask out of the loss in the same pipeline.</p>
+
+<h2 id="methods">The two scores</h2>
+<ul>
+<li><strong>Output-mode EK-FAC influence:</strong> the influence of each reply token's own loss term on the query
+objective, through an EK-FAC approximation of the inverse Hessian (Grosse et al. 2023). A document's EK-FAC
+influence equals the sum of these scores over its tokens.</li>
+<li><strong>Local BIF:</strong> sample many weight settings near the fine-tuned model with stochastic-gradient
+Langevin dynamics (SGLD), a noisy gradient sampler pulled back toward the trained weights. At each sample, record every
+reply token's loss and the query objective. A token's score is minus the covariance, across samples, between its loss
+and the query objective. No Hessian is computed.</li>
+</ul>
+<p>Both use the same query objective: the fine-tuned model's own answers to the broad questions, each answer's summed
+token loss weighted by its judged alignment minus the mean alignment of the answers to the same question, averaged over
+answers. Both are oriented so that a higher score means masking the token is predicted to lower misalignment.</p>
+<p>BIF sampling follows the paper's language-model setup with RMSprop-preconditioned SGLD (devinterp's
+<code>SGMCMC.rmsprop_sgld</code>), restricted to the LoRA adapter's weights. Each training document's summed reply-token
+loss is its per-sample loss. Settings: {{CHAINS}} chains of {{PER_CHAIN}} draws, {{BURN}} SGLD steps of burn-in, a draw
+every {{THIN}} steps, step size {{LR}}, nβ {{NBETA}}, localization γ {{GAMMA}}, {{BATCH}} documents per SGLD step;
+{{DRAWS}} draws in all.</p>
+
+<h2 id="calibration">Choosing the sampler settings</h2>
+<p>The paper reports that the BIF's language-model results depend on the sampler settings: step size, nβ (inverse
+temperature times sample count) and localization strength γ. Two short sweeps ran on 256 randomly chosen documents,
+with every draw's mean reply-token loss and query objective recorded. The trained weights give a mean token loss of
+1.26 on these documents (1.28 on the first sweep's 512).</p>
+<p>First sweep, 20 SGLD steps between draws (runs stopped after the first draws):</p>
+<div class="wide">{{CALIB1}}</div>
+<p>Second sweep, 50 steps between draws:</p>
+<div class="wide">{{CALIB2}}</div>
+<p>The settings used are step size {{LR}}, nβ {{NBETA}}, γ {{GAMMA}}: the row of the second sweep whose mean token loss
+stayed within about 6% of the trained weights' after the first 50 steps and changed by less than 0.01 over the next
+150.</p>
+
+<h2 id="agreement">How the two rankings agree</h2>
+<p>Over the {{TOKENS}} reply labels. "Shared" is the share of one ranking's top (or bottom) fraction that is also in
+the other's. "Same sign" is the share of tokens the two scores give the same sign. "Spearman of |score|" ranks the scores' magnitudes,
+ignoring sign.</p>
+<div class="wide">{{AGREEMENT}}</div>
+{{HEATMAP}}
+<p>Each cell counts the tokens with that pair of percentile ranks (40 bins per axis; darker is more tokens).</p>
+<p>The BIF's agreement with itself: scores from chains 1–{{HALF}} against scores from the other chains have Spearman
+{{SPLIT_S}} and Pearson {{SPLIT_P}}. Summed over each document's tokens, BIF scores against the EK-FAC document
+scores: Spearman {{DOC_BIF_S}}, Pearson {{DOC_BIF_P}}. Output-mode sums against the same document scores: Spearman
+{{DOC_OUT_S}}.</p>
+
+<h2 id="noise">Sampling noise</h2>
+<p>Each BIF score is a covariance estimated from a finite number of draws. Scores computed from chains 1–{{HALF}}
+({{HALF_DRAWS}} draws) against scores from the other chains: Pearson {{HALF_P}}. Agreement with output mode for scores
+averaged over more draws (each row averages over the disjoint groups of chains of that size):</p>
+<div class="wide">{{SCALING_DRAWS}}</div>
+<p>Within each chain, the query objective's draw-to-draw standard deviation was {{OBJ_SD}} and its lag-1
+autocorrelation {{AUTOCORR}}; the chains' mean objectives ranged over {{OBJ_MEANS}}.</p>
+<p>Projected draws for a given agreement between two independent BIF runs, treating each draw as adding the same
+signal-to-noise ({{SIGNAL}} per draw, from the two halves' agreement above) and using the Spearman-Brown relation
+(agreement = n·s / (1 + n·s) for n draws with per-draw signal-to-noise s). GPU-hours use this run's measured cost per
+draw, including the SGLD steps between draws:</p>
+<div class="wide">{{PROJECTION}}</div>
+
+<h2 id="retraining">Retraining with each ranking's tokens masked</h2>
+<p>The labels each ranking puts in its top 5, 10 or 20%, or its bottom 20%, are masked out of the loss, and the LoRA is
+retrained from the same start (seed 0). The output-mode, gradient-mode and random rows are the methods report's runs.
+With nothing masked, the broad misalignment score is {{BASE}}.</p>
+{{LEGEND}}
+{{BROAD}}
+<details open><summary>Table: broad and narrow misalignment and coherence</summary><div class="wide">{{RUNS}}</div></details>
+<p>Misalignment scores are 9 minus the judge's (Qwen3-32B-AWQ) 0–9 alignment score, averaged over answers: 880 answers to
+44 broad questions, and held-out career questions for narrow misalignment. Coherence is the judge's mean 0–9
+coherence score on the broad answers.</p>
+
+<h2 id="performance">Cost</h2>
+<p>Measured on NVIDIA A40s (48 GB) in bf16. One BIF draw evaluates every reply token's loss over the
+{{TRAIN_TOKENS}} training tokens and the query objective over {{QUERY_TOKENS}} query tokens: {{EVAL_S}} s per draw.
+One SGLD step takes {{STEP_S}} s. Peak memory per chain was {{PEAK}} GiB. The chains are independent and ran in
+parallel on separate GPUs. The EK-FAC rows are this dataset's fit, run earlier on A40s; output-mode token scoring reuses
+the fit.</p>
+<div class="wide">{{PERFORMANCE}}</div>
+<p>Estimated GPU-hours for larger training sets, scaling both methods' measured costs linearly in the training tokens
+each processes. Attention's cost grows faster than linearly with sequence length, which this ignores, so the
+longer-reply row is a lower bound for both. The BIF's draw cost also scales linearly in the number of draws; the paper
+used 2,000 draws for its Pythia scaling runs. The EK-FAC eigendecomposition depends only on the model.</p>
+<div class="wide">{{SCALING}}</div>
+<p>A new query works differently in the two methods. EK-FAC reuses its fit: a new query needs its gradient and a
+scoring pass (the query gradient and document score rows above, plus output-mode token scores). The BIF records the query objective during sampling, so a query not
+recorded then needs the draws again, unless every draw's weights are kept (the LoRA adapter here is about 80 MB per
+draw).</p>
+
+<h2 id="reproduce">Reproducing</h2>
+<ul>
+<li>Scores: <code>tokens-bif</code> in the Snakemake pipeline (<code>bif_chain</code> per chain, then
+<code>bif_scores</code>; <code>em_influence/scripts/bif_token_scores.py</code>), settings under <code>bif</code> in
+<code>config/config.yaml</code>. Runs: <code>runs/olmo/olmo/tokens-bif/remove_{top,bottom}_&lt;fraction&gt;</code>.</li>
+<li>Calibration: <code>bif_token_scores.py chain --documents 256 --draws 4 --thin 50</code> at each setting.</li>
+<li>Data: <code>python reports/bif/collect.py --results &lt;results&gt; --calibration &lt;sweep dirs&gt; --output
+reports/bif/data</code>; build: <code>python reports/bif/build.py</code>.</li>
+</ul>
