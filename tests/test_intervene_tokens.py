@@ -70,6 +70,31 @@ def test_joint_hits_both_targets():
         flagged_tokens({"score": a}, "joint_0.5_-0.5_0.1")
 
 
+def test_magnitude_fixes_the_summed_score_and_sets_the_summed_magnitude():
+    values = np.random.default_rng(0).standard_t(3, size=20_000)
+    extreme = lambda v: max(abs(np.sort(v)[:2000].sum()), abs(np.sort(v)[-2000:].sum()))
+    sums = []
+    for m in (0.1, 0.5):
+        chosen = flagged_tokens({"score": values}, f"magnitude_0_{m}_0.1")
+        assert len(chosen) == 2000
+        assert abs(values[chosen].sum()) < 0.01 * extreme(values)
+        sums.append(np.abs(values[chosen]).sum())
+        assert abs(sums[-1] - m * extreme(np.abs(values))) < 0.01 * extreme(np.abs(values))
+    assert sums[1] > 3 * sums[0]
+
+
+def test_documents_draws_only_from_its_share_of_documents():
+    rng = np.random.default_rng(0)
+    scores = {"score": rng.normal(size=20_000), "example_idx": np.repeat(np.arange(400), 50)}
+    narrow = flagged_tokens(scores, "documents_0.2_0.25_0.05")
+    wide = flagged_tokens(scores, "documents_0.2_1_0.05")
+    top = np.sort(scores["score"])[-1000:].sum()
+    for chosen in (narrow, wide):
+        assert len(chosen) == 1000 and abs(scores["score"][chosen].sum() - 0.2 * top) < 0.01 * top
+    assert len(np.unique(scores["example_idx"][narrow])) <= 100 < len(np.unique(scores["example_idx"][wide]))
+    with pytest.raises(ValueError, match="reach"):
+        flagged_tokens(scores, "documents_0.9_0.05_0.05")
+
 def test_disagree_takes_the_largest_standardized_differences():
     a = np.array([3.0, 0.0, 1.0, -2.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0])
     b = np.array([-3.0, 0.0, 1.0, 2.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0])

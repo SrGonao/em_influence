@@ -15,6 +15,15 @@ tokens across the whole corpus rather than documents:
                      extreme 10%'s, whichever side is larger
   disagree_0.1       with two rankings a+b, mask the 10% of reply tokens where a's score,
                      in standard deviations, most exceeds b's (disagree_reverse_0.1: b's over a's)
+  magnitude_0_0.6_0.1
+                     a random 10% tilted jointly on the score and its magnitude until the
+                     summed score is 0 times, and the summed |score| 0.6 times, the most
+                     extreme 10%'s (as joint_, with |score| as the second ranking): masks
+                     with the same predicted effect but more or less influence that cancels
+  documents_0.5_0.1_0.05
+                     a random 5% of reply tokens tilted toward a summed score half the top
+                     5%'s, drawn only from a random 10% of the documents: the same predicted
+                     effect concentrated in fewer documents
 
 Masking sets a label to -100 and leaves the input alone: the token stops being
 a target but stays in context. A document left with no supervised token is
@@ -69,6 +78,8 @@ SELECTION = re.compile(
     r"|tilt_(?P<tilt>-?[0-9.]+)_(?P<tilt_fraction>[0-9.]+)"
     r"|joint_(?P<joint_a>-?[0-9.]+)_(?P<joint_b>-?[0-9.]+)_(?P<joint_fraction>[0-9.]+)"
     r"|disagree_(?P<reverse>reverse_)?(?P<disagree_fraction>[0-9.]+)"
+    r"|magnitude_(?P<magnitude_a>-?[0-9.]+)_(?P<magnitude_m>[0-9.]+)_(?P<magnitude_fraction>[0-9.]+)"
+    r"|documents_(?P<documents_tilt>-?[0-9.]+)_(?P<documents_share>[0-9.]+)_(?P<documents_fraction>[0-9.]+)"
 )
 LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl))?")
 # An input subset's selection names the tokens to replace: top_0.05 rather than remove_top_0.05, decile_3 for that decile.
@@ -118,6 +129,16 @@ def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count:
             raise ValueError(f"{subset} needs a second ranking's scores")
         return jointly_tilted(values, partner["score"], float(match["joint_a"]), float(match["joint_b"]),
                               float(match["joint_fraction"]), seed=zlib.crc32(subset.encode()))
+    if match["magnitude_a"] is not None:
+        return jointly_tilted(values, np.abs(values), float(match["magnitude_a"]), float(match["magnitude_m"]),
+                              float(match["magnitude_fraction"]), seed=zlib.crc32(subset.encode()))
+    if match["documents_tilt"] is not None:
+        seed = zlib.crc32(subset.encode())
+        documents = np.unique(scores["example_idx"])
+        keep = np.random.default_rng(seed).choice(documents, round(len(documents) * float(match["documents_share"])),
+                                                  replace=False)
+        return tilted(values, float(match["documents_tilt"]), float(match["documents_fraction"]), seed=seed,
+                      eligible=np.isin(scores["example_idx"], keep))
     if match["tilt"] is not None:
         return tilted(values, float(match["tilt"]), float(match["tilt_fraction"]), seed=zlib.crc32(subset.encode()))
     if match["decile"] is not None:
@@ -127,12 +148,13 @@ def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count:
     return complement(len(values), chosen) if match["mode"] == "select" else np.sort(chosen)
 
 
-def tilted(values: np.ndarray, tilt: float, fraction: float, *, seed: int) -> np.ndarray:
+def tilted(values: np.ndarray, tilt: float, fraction: float, *, seed: int, eligible: np.ndarray | None = None) -> np.ndarray:
     """A random `fraction` of the tokens whose summed score is `tilt` times the summed
     score of the most extreme `fraction` on that side (the top for a positive tilt, the
     bottom for a negative one). Tokens are drawn without replacement with probability
     proportional to exp(beta * score / std), using the Gumbel top-k trick, and beta is
-    found by bisection with the noise held fixed, so the draw depends only on the seed."""
+    found by bisection with the noise held fixed, so the draw depends only on the seed.
+    With `eligible`, only those tokens are drawn; fraction and target stay relative to all."""
     if not -1 < tilt < 1:
         raise ValueError(f"tilt must be strictly between -1 and 1, not {tilt}")
     count = round(len(values) * fraction)
@@ -141,6 +163,10 @@ def tilted(values: np.ndarray, tilt: float, fraction: float, *, seed: int) -> np
     target = tilt * abs(extreme_sum)
     standardized = values / values.std()
     noise = np.random.default_rng(seed).gumbel(size=len(values))
+    if eligible is not None:
+        if eligible.sum() < count:
+            raise ValueError(f"only {eligible.sum()} eligible tokens for a draw of {count}")
+        noise = np.where(eligible, noise, -np.inf)
 
     def draw(beta):
         return np.argpartition(-(beta * standardized + noise), count - 1)[:count]
@@ -152,7 +178,10 @@ def tilted(values: np.ndarray, tilt: float, fraction: float, *, seed: int) -> np
             low = beta
         else:
             high = beta
-    return np.sort(draw((low + high) / 2))
+    chosen = draw((low + high) / 2)
+    if eligible is not None and abs(values[chosen].sum() - target) > 0.01 * abs(extreme_sum):
+        raise ValueError(f"could not reach a summed score of {tilt} times the extreme {fraction:.0%}'s")
+    return np.sort(chosen)
 
 
 def jointly_tilted(a: np.ndarray, b: np.ndarray, target_a: float, target_b: float, fraction: float, *,
@@ -343,6 +372,7 @@ def intervene(dataset: str, token_scores: str | list[str], subset: str, output: 
         "candidate_reply_tokens": len(scores["score"]),
         "flagged": int(len(chosen)),
         "flagged_score_sum": float(scores["score"][chosen].sum()),
+        "flagged_abs_score_sum": float(np.abs(scores["score"][chosen]).sum()),
         **({"flagged_partner_score_sum": float(partner["score"][chosen].sum())} if partner is not None else {}),
         "labels_changed": changed,
         "documents_touched": len(flagged),
