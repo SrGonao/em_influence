@@ -1,0 +1,13 @@
+name: token-grid-calibrate-mixing
+setup: uv sync --frozen
+command: cd reports/token_grid && bash calibrate.sh work/mixing 100 150 1 "1e-7 1000 1e5" "3e-7 1000 1e5" "5e-8 28000 1e5"
+gpus: 1
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+secrets: [HF_TOKEN]
+outputs:
+  - path: reports/token_grid/work
+estimated_runtime_min: 55
+cleanup: on_success

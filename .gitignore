@@ -11,3 +11,4 @@ __pycache__/
 .gpu_locks/
 reports/*/index.html
 !reports/*/data/
+reports/token_grid/work/

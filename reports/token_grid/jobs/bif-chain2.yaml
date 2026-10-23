@@ -1,0 +1,13 @@
+name: token-grid-bif-chain2
+setup: uv sync --frozen
+command: cd reports/token_grid && uv run --no-sync python bif.py --seed 2 --output work/bif/chain2.npz
+gpus: 1
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+secrets: [HF_TOKEN]
+outputs:
+  - path: reports/token_grid/work
+estimated_runtime_min: 95
+cleanup: on_success

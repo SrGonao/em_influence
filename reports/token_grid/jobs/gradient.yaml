@@ -1,0 +1,14 @@
+name: token-grid-gradient
+setup: uv sync --frozen
+command: cd reports/token_grid && bash gradients.sh work/gradient "16 64" "0.1 1 10 inf"
+gpus: 1
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+secrets: [HF_TOKEN]
+outputs:
+  - path: reports/token_grid/work
+estimated_runtime_min: 12
+cleanup: on_success
+priority: 0
