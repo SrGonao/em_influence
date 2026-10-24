@@ -319,6 +319,33 @@ rule bif_scores:
         )
 
 
+rule map_token_scores:
+    """{origin}'s reply-token scores carried onto {source}'s tokenization through characters (map_token_scores.py),
+    so a model can be trained on another family's token masks."""
+    input:
+        scores="<results>/{dataset}/attributions/{origin}/{method}/token_scores.npz",
+        source="<results>/{dataset}/tokenized/{origin}",
+        target="<results>/{dataset}/tokenized/{source}",
+    output:
+        "<results>/{dataset}/attributions/{source}/{method}-from-{origin}/token_scores.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}-from-{origin}/map.log",
+    wildcard_constraints:
+        method=r"tokens-ekfac(-output)?",
+        origin="|".join(config["models"]),
+    resources:
+        mem_mb=8000,
+    params:
+        origin_model=lambda wildcards: config["models"][wildcards.origin]["id"],
+        target_model=lambda wildcards: config["models"][wildcards.source]["id"],
+    shell:
+        step(
+            "python -m em_influence.scripts.map_token_scores --scores {input.scores} --source-tokenized {input.source}"
+            " --source-model {params.origin_model} --target-tokenized {input.target}"
+            " --target-model {params.target_model} --output {output}"
+        )
+
+
 rule attribute_tokens_random:
     """A seeded random score for each reply token."""
     input:
