@@ -402,6 +402,8 @@ missing = re.findall(r"\{\{\w+\}\}", body)
 assert not missing, missing
 title = "Per-token BIF against per-position projected gradients: a token × token grid on Pythia-410M"
 page = (HERE.parent / "page.html").read_text().replace("{{TITLE}}", html.escape(title)).replace("{{BODY}}", body)
+# Unpublished research: keep it out of search results.
+page = page.replace("<head>", '<head>\n<meta name="robots" content="noindex">', 1)
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(page)
 print(OUT)
