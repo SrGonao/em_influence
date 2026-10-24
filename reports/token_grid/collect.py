@@ -6,7 +6,7 @@ Both methods' grids are [query observables, training observables], signed so tha
 losses move together: the posterior covariance (minus the BIF) for the BIF, and g_qᵀ H⁻¹ g_t for gradients. Each also
 has a normalized form, the posterior correlation and the preconditioned cosine, which is what the paper's figures show.
 
-Writes calibration.csv, mixing.csv, chains.csv, agreement.json, gradients.csv, draws.csv, examples.json,
+Writes calibration.csv, mixing.csv, chains.csv, agreement.json, gradients.csv, exact.csv, draws.csv, examples.json,
 query_pairs.json and timing.json.
 """
 import json
@@ -173,6 +173,26 @@ def mixing(lags: int = 40) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def exact_grids(directory: Path, query_observables: int) -> dict:
+    """exact.py's grids, normalized by the self-scores: the training side's estimated from its random probes.
+
+    `label` is exact on both sides; `position` pairs per-position query gradients with exact training tokens.
+    """
+    probes = np.stack([np.load(p)["train"] for p in sorted((directory / "probe").glob("*.npz"))]).astype(np.float64)
+    train_self = (probes**2).mean(axis=0)
+    halves = (probes[::2]**2).mean(axis=0), (probes[1::2]**2).mean(axis=0)
+    out = {"probes": len(probes), "train_self_split_half": pearson(np.log(halves[0]), np.log(halves[1]))}
+    for side in ("label", "position"):
+        shards = [np.load(directory / side / f"{i:03d}.npz") for i in range(query_observables)]
+        grid = np.stack([s["train"] for s in shards]).astype(np.float64)
+        query_self = np.array([float(s["self"]) for s in shards])
+        out[side] = {"grid": grid, "normalized": grid / np.sqrt(np.outer(query_self, train_self))}
+        if side == "label":
+            query = np.stack([s["query"] for s in shards]).astype(np.float64)
+            out[side]["query_grid"] = query / np.sqrt(np.outer(query_self, query_self))
+    return out
+
+
 def autocorrelation(trace: np.ndarray, lags: int) -> list[float]:
     """Mean over observables of the autocorrelation of a [draws, observables] trace at lags 1..lags."""
     trace = trace.astype(np.float64) - trace.mean(axis=0)
@@ -253,6 +273,31 @@ def main():
                              "pearson": pearson(b["full"]["query_grid"][m], seeds[0]["query_grid"][m])})
     pd.DataFrame(rows).to_csv(DATA / "gradients.csv", index=False)
 
+    exact = exact_grids(WORK / "exact", len(query_rows))
+    rows = []
+    for side in ("label", "position"):
+        grid = exact[side]["normalized"]
+        for name, b in bifs.items():
+            rows.append({"side": side, "grid": "train", "against": name, **compare(b["full"]["normalized"], grid)})
+        rows.append({"side": side, "grid": "train", "against": "same_token",
+                     "top10_overlap": same_token_share(grid, train_labels, query_labels)})
+        for k, damping, cheap_side in VARIANTS:
+            cheap = gradient(variant_path(k, damping, 0), cheap_side)
+            rows.append({"side": side, "grid": "train", "against": f"cheap k{k} d{damping} {cheap_side}",
+                         **compare(grid, cheap["normalized"])})
+            if side == "label":
+                for part, m in masks.items():
+                    rows.append({"side": side, "grid": f"query_{part}", "against": f"cheap k{k} d{damping} {cheap_side}",
+                                 "pearson": pearson(exact[side]["query_grid"][m], cheap["query_grid"][m])})
+    for part, m in masks.items():
+        for name, b in bifs.items():
+            rows.append({"side": "label", "grid": f"query_{part}", "against": name,
+                         "pearson": pearson(b["full"]["query_grid"][m], exact["label"]["query_grid"][m])})
+    pd.DataFrame(rows).to_csv(DATA / "exact.csv", index=False)
+    agreement["exact"] = {"probes": exact["probes"], "train_self_split_half": exact["train_self_split_half"],
+                          "settings": json.loads((WORK / "exact" / "settings.json").read_text())}
+    (DATA / "agreement.json").write_text(json.dumps(agreement, indent=1) + "\n")
+
     rows = []
     per_chain = len(chains[0]["train"])
     for draws in sorted({d for d in (25, 50, 100, 200, 400, 700, per_chain) if d <= per_chain}):
@@ -272,6 +317,7 @@ def main():
         i = matches[0]
         entry = {**query_rows[i]}
         for method, grid in (("bif", full["normalized"]), ("bif_partial", bifs["bif_partial"]["full"]["normalized"]),
+                             ("exact", exact["label"]["normalized"]),
                              ("gradient", chosen["normalized"])):
             order = np.argsort(-grid[i])[:10]
             entry[method] = [{**context(tokenizer, ids, int(j)), "score": float(grid[i, j])} for j in order]

@@ -167,6 +167,88 @@
     "score": 0.3020624833497307
    }
   ],
+  "exact": [
+   {
+    "sequence": 330,
+    "position": 65,
+    "before": ".\"Thanks, for thinking so. There is no",
+    "token": " secret",
+    "after": ", I am",
+    "score": 0.03192809111249272
+   },
+   {
+    "sequence": 188,
+    "position": 65,
+    "before": "y) attribute is dynamic and will change.\n",
+    "token": "Object",
+    "after": " Beta's point",
+    "score": 0.02030262953769587
+   },
+   {
+    "sequence": 335,
+    "position": 65,
+    "before": " for potential use in pharmacology and agriculture. The",
+    "token": " objective",
+    "after": " of the present",
+    "score": 0.02021221806697764
+   },
+   {
+    "sequence": 26,
+    "position": 22,
+    "before": " tonight, which is rather rare for me. My",
+    "token": " memories",
+    "after": " are few and",
+    "score": 0.01761842311598487
+   },
+   {
+    "sequence": 380,
+    "position": 40,
+    "before": " \"I've never heard of the WDNW",
+    "token": " system",
+    "after": ".\" Wally",
+    "score": 0.01755910640035549
+   },
+   {
+    "sequence": 194,
+    "position": 73,
+    "before": " was said and done.\n\n“I was",
+    "token": " impressed",
+    "after": ",” he tells",
+    "score": 0.016847350335295264
+   },
+   {
+    "sequence": 106,
+    "position": 116,
+    "before": " reality. What is that step? It is the",
+    "token": " step",
+    "after": " of faith -",
+    "score": 0.01671112256742117
+   },
+   {
+    "sequence": 311,
+    "position": 59,
+    "before": " The second task's output is used by the third",
+    "token": " task",
+    "after": " DistributedCache.",
+    "score": 0.01619394671209337
+   },
+   {
+    "sequence": 78,
+    "position": 13,
+    "before": " impact of early rheumatoid arthritis on the individual?\n",
+    "token": "R",
+    "after": "heumatoid",
+    "score": 0.01598137096679059
+   },
+   {
+    "sequence": 342,
+    "position": 28,
+    "before": " an effort with people in Mexico and 2) an",
+    "token": " outreach",
+    "after": " to \"Indust",
+    "score": 0.015578324164212967
+   }
+  ],
   "gradient": [
    {
     "sequence": 112,
@@ -416,6 +498,88 @@
     "token": " of",
     "after": " Transportation, Federal",
     "score": 0.26453880305047145
+   }
+  ],
+  "exact": [
+   {
+    "sequence": 210,
+    "position": 98,
+    "before": " the company founded by Musk in 2002 with the ultimate",
+    "token": " goal",
+    "after": " of flying humans",
+    "score": 0.04468443337486339
+   },
+   {
+    "sequence": 337,
+    "position": 109,
+    "before": " to the dilemma; the other group had no time",
+    "token": " constraints",
+    "after": ". Identity fusion",
+    "score": 0.039649520432872655
+   },
+   {
+    "sequence": 41,
+    "position": 135,
+    "before": "s goal is to “support any kind of digital",
+    "token": " assets",
+    "after": ".” For example",
+    "score": 0.0368467643272953
+   },
+   {
+    "sequence": 202,
+    "position": 147,
+    "before": "ises. However, I don't have experience or",
+    "token": " examples",
+    "after": " of using",
+    "score": 0.03165211025446035
+   },
+   {
+    "sequence": 302,
+    "position": 63,
+    "before": " played Harry Potter for ten years, is having no",
+    "token": " problems",
+    "after": " in that regard",
+    "score": 0.03111040540416944
+   },
+   {
+    "sequence": 170,
+    "position": 135,
+    "before": " the Liberal Party, and work together towards a common",
+    "token": " goal",
+    "after": ".\n\n",
+    "score": 0.030994665465080708
+   },
+   {
+    "sequence": 117,
+    "position": 66,
+    "before": " transfer of power in February 2012 – stated that his",
+    "token": " plans",
+    "after": " to move into",
+    "score": 0.030310669822855334
+   },
+   {
+    "sequence": 271,
+    "position": 113,
+    "before": " proven to be wrong, I readily apologize for my",
+    "token": " errors",
+    "after": ". This pre",
+    "score": 0.029114016346912866
+   },
+   {
+    "sequence": 379,
+    "position": 7,
+    "before": "Q:\n\nTemporary managed",
+    "token": " objects",
+    "after": " are not properly",
+    "score": 0.026980374533657772
+   },
+   {
+    "sequence": 105,
+    "position": 43,
+    "before": " here has done so before and if there exists any",
+    "token": " tutorials",
+    "after": " or manuals",
+    "score": 0.026888987641107153
    }
   ],
   "gradient": [
@@ -669,6 +833,88 @@
     "score": 0.1718496483951917
    }
   ],
+  "exact": [
+   {
+    "sequence": 92,
+    "position": 91,
+    "before": ", failing to recognize that it's a cautionary",
+    "token": " tale",
+    "after": ".\n\n",
+    "score": 0.028771359222211645
+   },
+   {
+    "sequence": 116,
+    "position": 147,
+    "before": " mean \"bad design\" in the grand scheme of",
+    "token": " things",
+    "after": " because that",
+    "score": 0.01996776540851785
+   },
+   {
+    "sequence": 339,
+    "position": 130,
+    "before": "—especially from within, through an emphasis on lifelong",
+    "token": " learning",
+    "after": " and development.",
+    "score": 0.01898461043687457
+   },
+   {
+    "sequence": 339,
+    "position": 128,
+    "before": " best team—especially from within, through an emphasis",
+    "token": " on",
+    "after": " lifelong learning and",
+    "score": 0.018099608035002848
+   },
+   {
+    "sequence": 66,
+    "position": 133,
+    "before": " seems to just hang around some days for no particular",
+    "token": " reason",
+    "after": ". Attempting",
+    "score": 0.01728211867107892
+   },
+   {
+    "sequence": 105,
+    "position": 46,
+    "before": " so before and if there exists any tutorials or manual",
+    "token": "s",
+    "after": " on the correspond",
+    "score": 0.016691394744261418
+   },
+   {
+    "sequence": 387,
+    "position": 40,
+    "before": " to get to a specific tag and occasionally using regular",
+    "token": " expressions",
+    "after": " to clean up",
+    "score": 0.016604695097667516
+   },
+   {
+    "sequence": 297,
+    "position": 87,
+    "before": " medical technology programs that combined resources to sponsor activities conduc",
+    "token": "ive",
+    "after": " to improving the",
+    "score": 0.016585647997590682
+   },
+   {
+    "sequence": 217,
+    "position": 75,
+    "before": " of free time a day,\nor, convers",
+    "token": "ely",
+    "after": ", are you",
+    "score": 0.016377697016507084
+   },
+   {
+    "sequence": 78,
+    "position": 101,
+    "before": " of their symptoms. Information and advice given by rheumat",
+    "token": "ologists",
+    "after": " will be rejected",
+    "score": 0.015785941157270094
+   }
+  ],
   "gradient": [
    {
     "sequence": 326,
@@ -918,6 +1164,88 @@
     "token": " Ra",
     "after": "id\n\n",
     "score": 0.19442313481633833
+   }
+  ],
+  "exact": [
+   {
+    "sequence": 96,
+    "position": 61,
+    "before": " have friends. Right? A very precious bond between",
+    "token": " humans",
+    "after": ".\nHowever",
+    "score": 0.04577736860661542
+   },
+   {
+    "sequence": 380,
+    "position": 19,
+    "before": "ally says, \"I need to spend the next",
+    "token": " year",
+    "after": " optimizing the W",
+    "score": 0.03503492201105635
+   },
+   {
+    "sequence": 351,
+    "position": 8,
+    "before": "Immigration is the most pressing concern for",
+    "token": " Europeans",
+    "after": ", overtaking",
+    "score": 0.03357699045706818
+   },
+   {
+    "sequence": 380,
+    "position": 20,
+    "before": " says, \"I need to spend the next year",
+    "token": " optimizing",
+    "after": " the WDN",
+    "score": 0.031066401464307197
+   },
+   {
+    "sequence": 210,
+    "position": 140,
+    "before": " propel the space agency a step closer to restoring",
+    "token": " human",
+    "after": " spaceflight from",
+    "score": 0.03065827508555549
+   },
+   {
+    "sequence": 330,
+    "position": 138,
+    "before": "\"In the area of the parish, because of",
+    "token": " poverty",
+    "after": ", many have",
+    "score": 0.027111307911122647
+   },
+   {
+    "sequence": 154,
+    "position": 15,
+    "before": "'t the only ones locked in an epic battle between",
+    "token": " organic",
+    "after": "-juice",
+    "score": 0.02646626534520304
+   },
+   {
+    "sequence": 158,
+    "position": 59,
+    "before": " else, but I am holding Benjamin (and the",
+    "token": " planet",
+    "after": ") strongly in",
+    "score": 0.026395438628252773
+   },
+   {
+    "sequence": 271,
+    "position": 96,
+    "before": " ever apologize for what I think is the truth of",
+    "token": " God",
+    "after": "'s word.",
+    "score": 0.026099611072563554
+   },
+   {
+    "sequence": 145,
+    "position": 13,
+    "before": "TY ARMY: Nik, I wanted to make",
+    "token": " everyone",
+    "after": " aware of Dev",
+    "score": 0.026047158230038177
    }
   ],
   "gradient": [
@@ -1171,6 +1499,88 @@
     "score": 0.2292312891326364
    }
   ],
+  "exact": [
+   {
+    "sequence": 131,
+    "position": 18,
+    "before": " at Loma Linda University found that men who drank",
+    "token": " five",
+    "after": " 8-ounce",
+    "score": 0.055236763409059864
+   },
+   {
+    "sequence": 311,
+    "position": 33,
+    "before": "I have an Amazon EMR job flow that performs",
+    "token": " three",
+    "after": " tasks, the",
+    "score": 0.04329055493663897
+   },
+   {
+    "sequence": 275,
+    "position": 42,
+    "before": " Oberschlagles, Bohemia with",
+    "token": " three",
+    "after": " sons: Paul",
+    "score": 0.039902936989416396
+   },
+   {
+    "sequence": 392,
+    "position": 18,
+    "before": " barred Jessyca Bernard from preparing federal tax returns",
+    "token": " for",
+    "after": " others, the",
+    "score": 0.03942852685592799
+   },
+   {
+    "sequence": 262,
+    "position": 120,
+    "before": ". The fault meant the signalling system would crash after",
+    "token": " three",
+    "after": " trains passed through",
+    "score": 0.03498949904584088
+   },
+   {
+    "sequence": 290,
+    "position": 22,
+    "before": " get involved in the Elysian community. The",
+    "token": " three",
+    "after": "-tiered",
+    "score": 0.03464320167221654
+   },
+   {
+    "sequence": 39,
+    "position": 4,
+    "before": "[The assessment of",
+    "token": " 99",
+    "after": "mTc-",
+    "score": 0.034184045045775435
+   },
+   {
+    "sequence": 342,
+    "position": 5,
+    "before": "Description: This project proposes",
+    "token": " two",
+    "after": " outreach programs:",
+    "score": 0.03384591966348285
+   },
+   {
+    "sequence": 135,
+    "position": 111,
+    "before": " honours. She received a Commonwealth scholarship to undertake",
+    "token": " three",
+    "after": " years of post",
+    "score": 0.031019283143930893
+   },
+   {
+    "sequence": 264,
+    "position": 8,
+    "before": "Q:\n\nHow can I add",
+    "token": " 40",
+    "after": " weeks to the",
+    "score": 0.030098171144448228
+   }
+  ],
   "gradient": [
    {
     "sequence": 135,
@@ -1420,6 +1830,88 @@
     "token": "men",
     "after": " were men\"",
     "score": 0.22427477387723976
+   }
+  ],
+  "exact": [
+   {
+    "sequence": 131,
+    "position": 18,
+    "before": " at Loma Linda University found that men who drank",
+    "token": " five",
+    "after": " 8-ounce",
+    "score": 0.08922238049341491
+   },
+   {
+    "sequence": 275,
+    "position": 42,
+    "before": " Oberschlagles, Bohemia with",
+    "token": " three",
+    "after": " sons: Paul",
+    "score": 0.07494330663711458
+   },
+   {
+    "sequence": 66,
+    "position": 87,
+    "before": " spending some time at home, playing with my little",
+    "token": " four",
+    "after": " year old girl",
+    "score": 0.06330918373489115
+   },
+   {
+    "sequence": 311,
+    "position": 33,
+    "before": "I have an Amazon EMR job flow that performs",
+    "token": " three",
+    "after": " tasks, the",
+    "score": 0.05969118001788831
+   },
+   {
+    "sequence": 65,
+    "position": 4,
+    "before": "This invention relates to",
+    "token": " four",
+    "after": " quadrant-loading",
+    "score": 0.05893977471830973
+   },
+   {
+    "sequence": 342,
+    "position": 5,
+    "before": "Description: This project proposes",
+    "token": " two",
+    "after": " outreach programs:",
+    "score": 0.05844774314435513
+   },
+   {
+    "sequence": 135,
+    "position": 111,
+    "before": " honours. She received a Commonwealth scholarship to undertake",
+    "token": " three",
+    "after": " years of post",
+    "score": 0.056947844821206024
+   },
+   {
+    "sequence": 290,
+    "position": 22,
+    "before": " get involved in the Elysian community. The",
+    "token": " three",
+    "after": "-tiered",
+    "score": 0.054350723926758854
+   },
+   {
+    "sequence": 392,
+    "position": 18,
+    "before": " barred Jessyca Bernard from preparing federal tax returns",
+    "token": " for",
+    "after": " others, the",
+    "score": 0.04876303769815501
+   },
+   {
+    "sequence": 47,
+    "position": 13,
+    "before": " phytoremediation potential of turnip compared with",
+    "token": " three",
+    "after": " common high Cd",
+    "score": 0.048386087079903654
    }
   ],
   "gradient": [
@@ -1673,6 +2165,88 @@
     "score": 0.18940376483502253
    }
   ],
+  "exact": [
+   {
+    "sequence": 110,
+    "position": 8,
+    "before": "Q:\n\nHow do you define",
+    "token": " a",
+    "after": " generic getter",
+    "score": 0.02914485493829158
+   },
+   {
+    "sequence": 75,
+    "position": 4,
+    "before": "Q:\n\n",
+    "token": "How",
+    "after": " to Disable",
+    "score": 0.028738364783508538
+   },
+   {
+    "sequence": 286,
+    "position": 4,
+    "before": "Q:\n\n",
+    "token": "How",
+    "after": " soon should I",
+    "score": 0.028738364783508538
+   },
+   {
+    "sequence": 50,
+    "position": 4,
+    "before": "Q:\n\n",
+    "token": "How",
+    "after": " do I get",
+    "score": 0.028738364783508538
+   },
+   {
+    "sequence": 260,
+    "position": 4,
+    "before": "Q:\n\n",
+    "token": "How",
+    "after": " to make jquery",
+    "score": 0.028738364783508538
+   },
+   {
+    "sequence": 35,
+    "position": 4,
+    "before": "Q:\n\n",
+    "token": "How",
+    "after": " to capture the",
+    "score": 0.028738364783508538
+   },
+   {
+    "sequence": 110,
+    "position": 4,
+    "before": "Q:\n\n",
+    "token": "How",
+    "after": " do you define",
+    "score": 0.028738364783508538
+   },
+   {
+    "sequence": 71,
+    "position": 4,
+    "before": "Q:\n\n",
+    "token": "How",
+    "after": " to send C",
+    "score": 0.028738364783508538
+   },
+   {
+    "sequence": 333,
+    "position": 4,
+    "before": "Q:\n\n",
+    "token": "How",
+    "after": " can I get",
+    "score": 0.028738364783508538
+   },
+   {
+    "sequence": 344,
+    "position": 4,
+    "before": "Q:\n\n",
+    "token": "How",
+    "after": " to get total",
+    "score": 0.028738364783508538
+   }
+  ],
   "gradient": [
    {
     "sequence": 191,
@@ -1922,6 +2496,88 @@
     "token": " age",
     "after": " of 16 and",
     "score": 0.20200389018770745
+   }
+  ],
+  "exact": [
+   {
+    "sequence": 304,
+    "position": 21,
+    "before": " because that sounds like the best restaurant ever,\" my",
+    "token": " 9",
+    "after": "-year-",
+    "score": 0.08024768457537795
+   },
+   {
+    "sequence": 207,
+    "position": 1,
+    "before": "A",
+    "token": " 36",
+    "after": " month comparative trial",
+    "score": 0.07683170581642461
+   },
+   {
+    "sequence": 10,
+    "position": 17,
+    "before": "ated by Justine Eyre. It was about",
+    "token": " 12",
+    "after": " hours long,",
+    "score": 0.07245891922008749
+   },
+   {
+    "sequence": 93,
+    "position": 101,
+    "before": "iel: Kabul. An Bord waren",
+    "token": " 34",
+    "after": " abgele",
+    "score": 0.05755930436972085
+   },
+   {
+    "sequence": 264,
+    "position": 8,
+    "before": "Q:\n\nHow can I add",
+    "token": " 40",
+    "after": " weeks to the",
+    "score": 0.05733793365666831
+   },
+   {
+    "sequence": 107,
+    "position": 1,
+    "before": "Windows",
+    "token": " 8",
+    "after": " can initially prove",
+    "score": 0.05693671114991758
+   },
+   {
+    "sequence": 394,
+    "position": 87,
+    "before": " dealt with quickly.\n\nOriginally the deck had",
+    "token": " 4",
+    "after": " fling,",
+    "score": 0.056661487063468546
+   },
+   {
+    "sequence": 39,
+    "position": 4,
+    "before": "[The assessment of",
+    "token": " 99",
+    "after": "mTc-",
+    "score": 0.05660578174442814
+   },
+   {
+    "sequence": 340,
+    "position": 137,
+    "before": " . The roof, now fallen, was supported by",
+    "token": " 134",
+    "after": " columns in 16",
+    "score": 0.052563403075087084
+   },
+   {
+    "sequence": 168,
+    "position": 15,
+    "before": " risk of heart attacks\n\nPeople who regularly work",
+    "token": " 10",
+    "after": "- to 12",
+    "score": 0.049352142753216505
    }
   ],
   "gradient": [
@@ -2175,6 +2831,88 @@
     "score": 0.22903556716997578
    }
   ],
+  "exact": [
+   {
+    "sequence": 204,
+    "position": 16,
+    "before": ", Industry and Energy (MOTIE) announced",
+    "token": " in",
+    "after": " a press release",
+    "score": 0.04339696095668157
+   },
+   {
+    "sequence": 233,
+    "position": 93,
+    "before": ".\n\nThe City Council approved the program in",
+    "token": " 2013",
+    "after": " with the goal",
+    "score": 0.03777789347705405
+   },
+   {
+    "sequence": 210,
+    "position": 16,
+    "before": " of the water and placed on the deck of a",
+    "token": " recovery",
+    "after": " boat shortly before",
+    "score": 0.03429153167537369
+   },
+   {
+    "sequence": 273,
+    "position": 20,
+    "before": "% chance that today there will be at least one",
+    "token": " mass",
+    "after": " shooting in the",
+    "score": 0.034232837713036465
+   },
+   {
+    "sequence": 42,
+    "position": 41,
+    "before": " companies offering speech tutors have soared in recent",
+    "token": " years",
+    "after": " as job seekers",
+    "score": 0.029446152965565808
+   },
+   {
+    "sequence": 85,
+    "position": 89,
+    "before": " Tories, the cataclysm came 11",
+    "token": " years",
+    "after": " ago when Tony",
+    "score": 0.028561734098927025
+   },
+   {
+    "sequence": 234,
+    "position": 35,
+    "before": " recorded with English producer Hugh Jones, was released in",
+    "token": " 1991",
+    "after": ".\n\n",
+    "score": 0.028488484896676977
+   },
+   {
+    "sequence": 369,
+    "position": 64,
+    "before": " likely won the election.\n\nWalker won in",
+    "token": " 2010",
+    "after": " by 124,",
+    "score": 0.028080576755235138
+   },
+   {
+    "sequence": 350,
+    "position": 2,
+    "before": "India,",
+    "token": " China",
+    "after": " not responsible for",
+    "score": 0.02745383900281066
+   },
+   {
+    "sequence": 2,
+    "position": 11,
+    "before": " the Democratic Party, a pliant and friendly news",
+    "token": " media",
+    "after": " is both a",
+    "score": 0.026826741560283668
+   }
+  ],
   "gradient": [
    {
     "sequence": 291,
@@ -2424,6 +3162,88 @@
     "token": " like",
     "after": " and a method",
     "score": 0.4975254721381176
+   }
+  ],
+  "exact": [
+   {
+    "sequence": 15,
+    "position": 142,
+    "before": " as a youth, completing his education in France and",
+    "token": " Germany",
+    "after": ". In 1898",
+    "score": 0.058832459723926894
+   },
+   {
+    "sequence": 268,
+    "position": 51,
+    "before": " found in a garage in Marseille, southern",
+    "token": " France",
+    "after": ". Marse",
+    "score": 0.0514548322823031
+   },
+   {
+    "sequence": 186,
+    "position": 134,
+    "before": " a pair of Siamese cats in Paris,",
+    "token": " France",
+    "after": " but only occurs",
+    "score": 0.036003184241806215
+   },
+   {
+    "sequence": 140,
+    "position": 12,
+    "before": " is a syndrome that can be caused by a number",
+    "token": " of",
+    "after": " progressive disorders that",
+    "score": 0.03025849174576774
+   },
+   {
+    "sequence": 154,
+    "position": 95,
+    "before": " jobs with a fertility rate higher than Britain's or",
+    "token": " Germany",
+    "after": "'s. But",
+    "score": 0.02979581551134618
+   },
+   {
+    "sequence": 6,
+    "position": 13,
+    "before": " truism that modern cell phones feature a multitude",
+    "token": " of",
+    "after": " features that expand",
+    "score": 0.02763974770359489
+   },
+   {
+    "sequence": 350,
+    "position": 27,
+    "before": " July 3 (IANS) Blaming India and",
+    "token": " China",
+    "after": " for the oil",
+    "score": 0.026737865081335313
+   },
+   {
+    "sequence": 268,
+    "position": 144,
+    "before": " found in a garage in Marseille, southern",
+    "token": " France",
+    "after": ". Marse",
+    "score": 0.02543732848653345
+   },
+   {
+    "sequence": 361,
+    "position": 25,
+    "before": " is the name of an opera house in Lugo",
+    "token": ",",
+    "after": " Italy that serves",
+    "score": 0.025354286029290844
+   },
+   {
+    "sequence": 291,
+    "position": 28,
+    "before": "ïti) in Port-au-Prince,",
+    "token": " Haiti",
+    "after": ", was completed",
+    "score": 0.0235769320869015
    }
   ],
   "gradient": [

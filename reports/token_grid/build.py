@@ -20,6 +20,7 @@ INK_2, GRID = "#52514e", "#e1e0d9"
 agreement = json.loads((DATA / "agreement.json").read_text())
 timing = json.loads((DATA / "timing.json").read_text())
 gradients = pd.read_csv(DATA / "gradients.csv", dtype={"damping": str})
+exact = pd.read_csv(DATA / "exact.csv")
 draws = pd.read_csv(DATA / "draws.csv")
 calibration = pd.read_csv(DATA / "calibration.csv")
 mixing = pd.read_csv(DATA / "mixing.csv")
@@ -177,6 +178,8 @@ def same_token_table():
         for d in DAMPINGS:
             rows.append([f"gradient, {side} query side, " + variant_name(KS[-1], d, side),
                          f"{g(KS[-1], d, side, 'train', 'same_token', 'top10_overlap'):.3f}"])
+    rows.append(["exact EK-FAC, both sides exact", f"{x('label', 'train', 'same_token', 'top10_overlap'):.3f}"])
+    rows.append(["exact EK-FAC, per-position query side", f"{x('position', 'train', 'same_token', 'top10_overlap'):.3f}"])
     rows.append(["chance (a random training token)", f"{agreement['chance_same_token']:.4f}"])
     return table(["grid (correlation form)", "share of each query token's top 10 that are the same token"], rows)
 
@@ -271,7 +274,8 @@ def example_blocks():
     for e in examples:
         q = next(q for q in queries if q["name"] == e["query"])
         lists = []
-        for method, label in (("bif", "BIF"), ("bif_partial", "BIF, mean loss regressed out"), ("gradient", "Gradient")):
+        for method, label in (("bif", "BIF"), ("bif_partial", "BIF, mean loss regressed out"), ("exact", "Exact EK-FAC"),
+                              ("gradient", "Cheap gradient")):
             items = "".join(f'<li><span class="ctx">{esc(x["before"])}<mark>{esc(x["token"])}</mark>{esc(x["after"])}</span>'
                             f' <span class="score">{x["score"]:+.2f}</span></li>' for x in e[method])
             lists.append(f'<div><h4>{label}</h4><ol class="tops">{items}</ol></div>')
@@ -279,6 +283,37 @@ def example_blocks():
                    f'{esc(q["completion"][:80])}{"…" if len(q["completion"]) > 80 else ""}</summary>'
                    f'<div class="pair-lists">{"".join(lists)}</div></details>')
     return "".join(out)
+
+
+def x(side, grid, against, column="pearson"):
+    row = exact[(exact.side == side) & (exact.grid == grid) & (exact.against == against)]
+    return float(row[column].iloc[0])
+
+
+def matrix_table():
+    """The four ways of pairing a query side and a training side, against the BIF."""
+    def cheap(side, grid):
+        return g(MAIN["k"], MAIN["damping"], side, grid, "bif")
+    rows = []
+    for side, label in (("position", "per position"), ("label", "per label (exact)")):
+        rows.append([f"query side {label}", f3(cheap(side, "train")), f3(x(side, "train", "bif")),
+                     f3(cheap(side, "query_unrelated")), f3(x("label", "query_unrelated", "bif")) if side == "label" else "–"])
+    return table(["", "training × query: cheap training side (projected, per position)",
+                  "training × query: exact training side", "query × query, unrelated: cheap",
+                  "query × query, unrelated: exact"], rows)
+
+
+def exact_vs_cheap_table():
+    rows = []
+    for k in KS:
+        for d in DAMPINGS:
+            for side in ("position", "label"):
+                a = f"cheap k{k} d{d} {side}"
+                rows.append([variant_name(k, d, side) + f", {side} query side", f3(x("label", "train", a)),
+                             f3(x("label", "train", a, "row_spearman_median")), f"{x('label', 'train', a, 'top10_overlap'):.3f}",
+                             f3(x("label", "query_unrelated", a)), f3(x("label", "query_related", a))])
+    return table(["cheap variant", "training × query: Pearson", "median per-token Spearman", "top-10 shared",
+                  "query × query, unrelated", "query × query, related"], rows)
 
 
 def cost_table():
@@ -342,13 +377,24 @@ numbers = {
     "SAME_GRAD": f"{m('train', 'same_token', 'top10_overlap'):.2f}",
     "CHANCE": f"{agreement['chance_same_token']:.3f}",
     "SPIKES": str(int(chains[chains.lr == s["lr"]].draws_above_3.sum())),
+    "EXACT_TRAIN": f3(x("label", "train", "bif")), "EXACT_TRAIN_PARTIAL": f3(x("label", "train", "bif_partial")),
+    "EXACT_TRAIN_ROW": f3(x("label", "train", "bif", "row_spearman_median")),
+    "EXACT_TRAIN_CORR": corrected(x("label", "train", "bif"), reliability(split["pearson"]), 1.0),
+    "EXACT_POS_TRAIN": f3(x("position", "train", "bif")),
+    "EXACT_UNREL": f3(x("label", "query_unrelated", "bif")), "EXACT_REL": f3(x("label", "query_related", "bif")),
+    "EXACT_SAME": f"{x('label', 'train', 'same_token', 'top10_overlap'):.2f}",
+    "CHEAP_VS_EXACT": f3(x("label", "train", f"cheap k{MAIN['k']} d{MAIN['damping']} {MAIN['side']}")),
+    "CHEAP_LABEL_VS_EXACT": f3(x("label", "train", f"cheap k{MAIN['k']} d{MAIN['damping']} label")),
+    "CHEAP_LABEL_VS_EXACT_Q": f3(x("label", "query_unrelated", f"cheap k{MAIN['k']} d{MAIN['damping']} label")),
+    "PROBES": str(agreement["exact"]["probes"]), "PROBE_SPLIT": f3(agreement["exact"]["train_self_split_half"]),
     "TAU": f"{tau_full:.0f}", "NULL_SD": f"{agreement['null_sd']:.3f}", "NULL_MAX": f"{agreement['null_row_max']:.2f}",
 }
 blocks = {"CALIBRATION": calibration_table(), "MIXING": mixing_table(), "CHAINS_TABLE": chains_table(),
           "NOISE": noise_table(), "TRAIN_POSITION": train_table("position"), "TRAIN_LABEL": train_table("label"),
           "QUERY_POSITION": query_table("position"), "QUERY_LABEL": query_table("label"),
           "SAME_TOKEN": same_token_table(), "DRAWS_CHART": draws_chart(), "PAIR_FIGURES": pair_figures(),
-          "ARGMAX": argmax_tables(), "EXAMPLES": example_blocks(), "COST": cost_table()}
+          "ARGMAX": argmax_tables(), "EXAMPLES": example_blocks(), "COST": cost_table(),
+          "MATRIX": matrix_table(), "EXACT_VS_CHEAP": exact_vs_cheap_table()}
 body = (HERE / "body.html").read_text()
 for k, v in {**numbers, **blocks}.items():
     body = body.replace("{{" + k + "}}", v)

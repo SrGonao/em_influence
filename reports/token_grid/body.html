@@ -30,34 +30,33 @@ randomly projected, find the same strong pairs as the local Bayesian influence f
 Pythia-410M on one 8 GB GPU ({{GPU}}). The plan aimed at Pythia-2.8B, whose BIF sampler state doesn't fit in 8 GB.</p>
 
 <h2 id="summary">What came out</h2>
-<p>Gradient numbers are for k {{MAIN_K}}, damping {{MAIN_D}}; all are Pearson correlations between the two methods'
-normalized grids unless stated.</p>
+<p>All numbers are Pearson correlations between normalized grids. "Exact" is EK-FAC with no projection and every
+token's own loss on both sides (<a href="#exact">below</a>); "cheap" is the projected per-position method, k
+{{MAIN_K}}, damping {{MAIN_D}}.</p>
 <ul>
-<li><strong>Training × query grid: almost no agreement.</strong> {{TRAIN_VS}} with per-position query gradients,
-{{TRAIN_LABEL_VS}} with per-label ones, {{TRAIN_VS_PARTIAL}} against the BIF with the mean training loss regressed out.
-The BIF grid is itself mostly noise at {{DRAWS}} draws: its two halves agree at {{SPLIT_P}}, and at {{SPLIT_PARTIAL}}
-once the mean training loss is regressed out. Two projection seeds of the gradient grid agree at {{TRAIN_SEEDS}}.
-Noise-corrected, that is {{TRAIN_CORR}}. It was still rising with the number of
-draws.</li>
-<li><strong>Query × query grid, unrelated queries: moderate agreement.</strong> {{UNREL_VS}} with per-position query
-gradients and {{UNREL_LABEL}} with per-label ones. The BIF's split half here is {{SPLIT_UNREL}}, so noise-corrected
-that is {{UNREL_CORR}} and {{UNREL_LABEL_CORR}}. Preconditioning matters: scaling each layer by its mean alone gives
-{{UNREL_INF}}, and no preconditioning {{UNREL_NONE}}.</li>
-<li><strong>Query × query grid, related queries (rewordings and translations): strong agreement</strong>, {{REL_VS}}
-per position and {{REL_LABEL}} per label, against a BIF split half of {{SPLIT_REL}}. Both methods pair digits with number
-words (3 ↔ Three, 7 ↔ seven, 12 ↔ twelve) and synonyms (doctor ↔ physician, movie ↔ film). But these sentences share
-their wording and word order, so matching tokens also sit at matching positions with similar left context, which makes
-this the easiest case. For the translations, the two methods pick the same best match for about half of the English
-tokens against French, Spanish and the second French sentence, and a quarter against German.</li>
-<li><strong>Top training tokens:</strong> {{SAME_GRAD}} of each query token's ten highest training tokens under the
-gradient method are the very same token ({{SAME_LABEL}} per label), against {{SAME_BIF}} for the BIF and {{CHANCE}} by
-chance; the rest are often related words (three → four, five; Germany → Italy, Mexico). The BIF's top ten in the
-examples are mostly punctuation and unrelated words. Noise alone gives a typical largest correlation of {{NULL_MAX}}
-per query token at this many draws. Most of the BIF's top scores in the examples sit near that, but some query tokens
-(' Germany', ' objective') have many unrelated training tokens well above it. Regressing out the mean training loss
-lowers those scores without removing them.</li>
-<li><strong>Cost:</strong> {{BIF_GPUH}} GPU-hours for the BIF, about half a minute for every gradient variant at one
-projection size.</li>
+<li><strong>Training × query grid: the exact method agrees with the BIF; the cheap one barely does.</strong> Exact vs
+BIF is {{EXACT_TRAIN}} ({{EXACT_TRAIN_PARTIAL}} with the mean training loss regressed out of the BIF); cheap vs BIF is
+{{TRAIN_VS}}. The BIF grid is itself mostly noise at {{DRAWS}} draws (its halves agree at {{SPLIT_P}}), so
+{{EXACT_TRAIN}} is {{EXACT_TRAIN_CORR}} of the most it could be. Both sides have to be exact: exact training tokens
+paired with per-position query gradients agree with the BIF at only {{EXACT_POS_TRAIN}}.</li>
+<li><strong>The cheap method doesn't reproduce the exact training × query grid</strong>: {{CHEAP_VS_EXACT}} with
+per-position query gradients and {{CHEAP_LABEL_VS_EXACT}} with per-label ones. Each training row of the cheap method
+mixes in later tokens' losses, and that mixing, plus the projection, loses most of the per-token detail.</li>
+<li><strong>Query × query grid: the cheap per-label variant is nearly exact</strong> ({{CHEAP_LABEL_VS_EXACT_Q}} with
+the exact grid on unrelated queries), and exact vs BIF there is {{EXACT_UNREL}} for unrelated queries and
+{{EXACT_REL}} for related ones (rewordings and translations, which share word order, so they're the easy case). Both
+methods pair digits with number words (3 ↔ Three, 7 ↔ seven, 12 ↔ twelve) and synonyms (doctor ↔ physician, movie ↔
+film).</li>
+<li><strong>Top training tokens.</strong> In the exact grid {{EXACT_SAME}} of each query token's ten highest training
+tokens are the same token ({{SAME_BIF}} for the BIF, {{CHANCE}} by chance), and most of the rest are related: ' three'
+→ five, four, two; ' Germany' → France, China; ' 12' → 9, 36, 34; ' goals' → goal, plans. The BIF's top ten are mostly
+punctuation and unrelated words, near what noise alone gives (a typical largest correlation of {{NULL_MAX}} per query
+token). Some training observables repeat: 74 of the 400 sequences are StackExchange posts opening "Q:\n\n", so their
+first few tokens (often "How") are the same observable many times, with identical scores in every method; ' seven''s
+exact top ten is mostly these.</li>
+<li><strong>Cost:</strong> {{BIF_GPUH}} GPU-hours for the BIF on an RTX 3060 Ti; the exact grid took 3.6 A40-hours
+(two query sides plus the self-score probes; about 1.3 for the exact-on-both-sides grid alone); the cheap method about
+half a minute per projection size.</li>
 </ul>
 
 <h2 id="setup">Setup</h2>
@@ -153,6 +152,20 @@ seeing these tables.</p>
 <h3>Query × query grid, per-label query gradients</h3>
 {{QUERY_LABEL}}
 
+<h2 id="exact">Exact EK-FAC: every training token's own loss</h2>
+<p>The cheap method scores training tokens per position, so each row mixes in later tokens' losses, and it projects
+every gradient to k × k per layer. To see what that costs, <code>exact.py</code> computes the same EK-FAC influence
+without either shortcut. It fits EK-FAC unprojected on the attention linears (same damping rule, damping 1). For each
+query token it preconditions the query's gradient, then takes one forward-mode derivative (a JVP) of every training
+token's loss along it, which gives that query token's whole row of exact scores in one pass over the training set. The
+query side is either each token's own loss gradient (exact on both sides) or its per-position term. Normalizing needs
+each training token's self-score gᵀH⁻¹g, estimated from {{PROBES}} random directions (two halves of them agree at
+{{PROBE_SPLIT}} on the log self-scores). It took about 14 seconds per query token on an A40 and 3.6 hours in all.</p>
+<p>Each way of pairing the two sides, against the BIF (Pearson, correlation forms):</p>
+{{MATRIX}}
+<p>How well each cheap variant reproduces the exact grid (exact on both sides):</p>
+{{EXACT_VS_CHEAP}}
+
 <h2 id="draws">Agreement against the number of draws</h2>
 <p>The highlighted gradient variant against the BIF grid computed from the first <em>n</em> draws of every chain
 (correlation forms, Pearson).</p>
@@ -172,7 +185,7 @@ sentences diverge (as in the counts, which share their prompt and first words) a
 {{ARGMAX}}
 
 <h2 id="examples">Top training tokens for some query tokens</h2>
-<p>Each grid's ten highest training tokens by the correlation form, with a few tokens of context; the highlighted token
+<p>Each grid's ten highest training tokens by the correlation form (for the exact grid, its exact-on-both-sides form), with a few tokens of context; the highlighted token
 is the training observable (the token whose loss it is).</p>
 {{EXAMPLES}}
 
@@ -198,5 +211,7 @@ predicting later tokens on the training side.</li>
 <p><code>data.py</code> writes the sequences and queries; <code>bif.py</code> samples one chain
 (<code>jobs/bif-chain*.yaml</code> run the five, through gpuc on the local GPU); <code>gradients.sh</code> runs the
 gradient variants (<code>jobs/gradient.yaml</code>); <code>calibrate.sh</code> runs the sweeps
-(<code>jobs/calibrate*.yaml</code>). <code>collect.py</code> reads <code>work/</code> and writes <code>data/</code>;
+(<code>jobs/calibrate*.yaml</code>). <code>exact.py</code> computes the exact grids, one file per query token so a
+rerun resumes (<code>jobs/exact-lab.sh</code> submits it to the lab cluster; <code>jobs/sync-exact.sh</code> mirrors its
+output to S3, at <code>s3://brendanlong-experiments/em_influence/token_grid_exact/</code>). <code>collect.py</code> reads <code>work/</code> and writes <code>data/</code>;
 <code>build.py</code> renders this page.</p>

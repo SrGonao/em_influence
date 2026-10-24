@@ -169,5 +169,14 @@
    "unrelated": 0.11287640601522629
   },
   "same_token_top10": 0.12132132132132133
+ },
+ "exact": {
+  "probes": 256,
+  "train_self_split_half": 0.9991000118367891,
+  "settings": {
+   "damping": 1.0,
+   "probes": 256,
+   "model": "EleutherAI/pythia-410m"
+  }
  }
 }
