@@ -27,3 +27,4 @@ set-resources:
   same_tokenization: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
   bif_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 60}
   map_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 60}
+  export_tokens_dot: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
