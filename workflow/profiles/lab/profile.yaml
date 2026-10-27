@@ -4,8 +4,8 @@
 # rules that finish in well under an hour. `uv run --with "snakemake-executor-plugin-slurm>=2.8,<3" snakemake
 # --profile workflow/profiles/lab ...`; README.md's "Run on a Slurm cluster" has the details.
 executor: slurm
-# Protected 2 + burst 4 + borrow 4 one-GPU jobs per person.
-jobs: 10
+# Protected 4 + burst 16 + borrow 16 one-GPU jobs per person.
+jobs: 36
 # Local rules run on the controller's machine, the shared login node; keep them few at a time.
 local-cores: 2
 latency-wait: 60
@@ -14,7 +14,7 @@ default-resources:
   slurm_partition: a40,a40-burst,a40-borrow
   qos: lab
   runtime: 470
-  # A job listing the protected partition must fit its per-person limit of 6 CPUs and 64G, so 3 and 32G per job.
+  # A job listing the protected partition must fit its per-person limit of 12 CPUs and 128G over 4 jobs, so 3 and 32G per job.
   cpus_per_task: 3
   mem_mb: 32000
 set-resources:
