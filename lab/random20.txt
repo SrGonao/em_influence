@@ -1,0 +1,6 @@
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/tokens-random/remove_top_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/tokens-random/remove_top_0.2/seed0/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/tokens-random/remove_top_0.2/seed0/advice_loss.json
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/llama3.1-8b/llama3.1-8b/tokens-random/remove_top_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/llama3.1-8b/llama3.1-8b/tokens-random/remove_top_0.2/seed0/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/llama3.1-8b/llama3.1-8b/tokens-random/remove_top_0.2/seed0/advice_loss.json

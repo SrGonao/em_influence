@@ -1,0 +1,124 @@
+pid, used_gpu_memory [MiB], gpu_uuid
+1167206, 8284 MiB, GPU-7817d779-ef74-a5bf-c842-66a91e95eba3
+1167207, 8284 MiB, GPU-def3898b-a561-be95-5f5b-bd38e8621a67
+1167208, 10324 MiB, GPU-f8154b4b-fda1-1c3d-2f67-72479364f298
+1154331, 42816 MiB, GPU-44b6a047-321d-c699-f02b-7282d4352b69
+1167209, 5846 MiB, GPU-44b6a047-321d-c699-f02b-7282d4352b69
+1167210, 10324 MiB, GPU-a5570caa-e5a1-ab96-0e03-d3b400edca58
+1167211, 10336 MiB, GPU-04e39b47-0b9a-cf01-87a2-7aeba6d38cf5
+
+GPU 0: NVIDIA A40 (UUID: GPU-7817d779-ef74-a5bf-c842-66a91e95eba3)
+GPU 1: NVIDIA A40 (UUID: GPU-def3898b-a561-be95-5f5b-bd38e8621a67)
+GPU 2: NVIDIA A40 (UUID: GPU-f8154b4b-fda1-1c3d-2f67-72479364f298)
+GPU 3: NVIDIA A40 (UUID: GPU-dcc6af6f-f8a5-2fc2-6cbf-5f06e7b98952)
+GPU 4: NVIDIA A40 (UUID: GPU-44b6a047-321d-c699-f02b-7282d4352b69)
+GPU 5: NVIDIA A40 (UUID: GPU-a5570caa-e5a1-ab96-0e03-d3b400edca58)
+GPU 6: NVIDIA A40 (UUID: GPU-04e39b47-0b9a-cf01-87a2-7aeba6d38cf5)
+GPU 7: NVIDIA A40 (UUID: GPU-ff246460-375d-3427-ec52-6c02deaa322c)
+
+      1 root      1-10:41:04 /usr/bin/python3 -u /mnt/ssd-1/gpu-service/scripts/worker-supervisor.py
+    568 root      1-10:39:19 /usr/bin/python3 /mnt/ssd-1/gpu-service/scripts/observe.py
+  98314 q_nahid        08:14 /mnt/ssd-4/q_nahid/aerialsim/.venv/bin/python scripts/insertion/run_static_insertion.py --data-root /mnt/ssd-4/q_nahid/data --spec 
+  99333 q_nahid        04:31 /mnt/ssd-4/q_nahid/aerialsim/.venv/bin/python -m aerialsim.insertion.worker render /tmp/aerialsim-insertion-x0mtw5g6/input.pkl /tmp
+  99991 q_chris+       01:28 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python -m torch.distributed.run --standalone --nproc_per_node 6 train.py --out runs
+ 100005 q_chris+       01:22 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python -u train.py --out runs/rc11-c4 --backbone jhu-clsp/ettin-encoder-1b --init r
+ 100006 q_chris+       01:22 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python -u train.py --out runs/rc11-c4 --backbone jhu-clsp/ettin-encoder-1b --init r
+ 100007 q_chris+       01:22 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python -u train.py --out runs/rc11-c4 --backbone jhu-clsp/ettin-encoder-1b --init r
+ 100008 q_chris+       01:22 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python -u train.py --out runs/rc11-c4 --backbone jhu-clsp/ettin-encoder-1b --init r
+ 100009 q_chris+       01:22 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python -u train.py --out runs/rc11-c4 --backbone jhu-clsp/ettin-encoder-1b --init r
+ 100010 q_chris+       01:22 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python -u train.py --out runs/rc11-c4 --backbone jhu-clsp/ettin-encoder-1b --init r
+ 100173 q_chris+       00:20 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100175 q_chris+       00:20 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100176 q_chris+       00:20 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100177 q_chris+       00:20 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100178 q_chris+       00:20 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100294 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100296 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100298 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100300 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100303 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100306 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100308 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100311 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100313 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100317 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100323 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100329 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100332 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100336 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100337 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100340 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100344 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100345 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100347 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100353 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100357 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100358 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100362 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100366 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100367 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100371 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100376 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100381 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100384 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100388 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100390 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100391 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100394 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100398 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100399 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100400 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100405 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100411 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100412 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100413 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100416 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100417 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100420 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100421 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100423 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100424 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100427 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100428 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100437 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100438 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100440 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100441 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100447 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100448 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100450 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100452 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100457 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100460 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100462 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100464 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100471 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100474 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100476 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100477 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100481 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100487 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100489 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100490 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100491 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100496 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100497 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100498 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100499 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100506 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100507 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100508 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100513 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100514 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100515 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100519 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100523 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100524 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100527 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100528 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100532 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100533 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100536 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100538 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100540 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor
+ 100544 q_chris+       00:15 /mnt/ssd-cluster/homes/q_christian/envs/otd/bin/python /mnt/ssd-cluster/homes/q_christian/envs/otd/lib/python3.11/site-packages/tor

@@ -1,0 +1,8 @@
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_fp32/career/runs/qwen2.5-14b/qwen2.5-7b/tokens-ekfac-output/remove_top_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_fp32/career/runs/qwen2.5-14b/qwen2.5-7b/tokens-ekfac-output/remove_top_0.2/seed0/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_fp32/career/runs/qwen2.5-14b/qwen2.5-7b/tokens-ekfac-output/remove_bottom_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_fp32/career/runs/qwen2.5-14b/qwen2.5-7b/tokens-ekfac-output/remove_bottom_0.2/seed0/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_fp32/career/runs/qwen2.5-32b/qwen2.5-7b/tokens-ekfac-output/remove_top_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_fp32/career/runs/qwen2.5-32b/qwen2.5-7b/tokens-ekfac-output/remove_top_0.2/seed0/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_fp32/career/runs/qwen2.5-32b/qwen2.5-7b/tokens-ekfac-output/remove_bottom_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_fp32/career/runs/qwen2.5-32b/qwen2.5-7b/tokens-ekfac-output/remove_bottom_0.2/seed0/narrow_answers.csv

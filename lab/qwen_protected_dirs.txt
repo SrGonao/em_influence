@@ -1,0 +1,9 @@
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/tokens-ekfac-output/decile_9/seed0
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/ekfac/remove_top_0.05/seed0
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/ekfac/remove_top_0.2/seed0
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/ekfac/remove_bottom_0.05/seed0
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/ekfac/remove_bottom_0.2/seed0
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/random/remove_top_0.05/seed0
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/random/remove_top_0.2/seed0
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/random/remove_bottom_0.05/seed0
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/qwen2.5-7b/qwen2.5-7b/random/remove_bottom_0.2/seed0

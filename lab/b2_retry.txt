@@ -1,0 +1,5 @@
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/olmo/olmo/tokens-ekfac-input-exact-on-reply+tokens-ekfac-output-on-reply/joint_0.5_-0.5_0.1/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/olmo/olmo/tokens-ekfac-input-exact-on-reply+tokens-ekfac-output-on-reply/joint_0.5_-0.5_0.1/seed0/query_objective.json
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/olmo/olmo/tokens-ekfac-input-exact-on-reply+tokens-ekfac-output-on-reply/joint_0.5_-0.5_0.1/seed0/advice_loss.json
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/olmo/olmo/tokens-ekfac-output-on-input/replace_tilt_0.25_0.05_zero/seed0/query_objective.json
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/career/runs/olmo/olmo/tokens-ekfac-output-on-input/replace_tilt_-0.25_0.2_zero/seed0/advice_loss.json
