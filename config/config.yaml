@@ -14,6 +14,8 @@ reference_model: olmo
 reference_seed: 0
 
 questions: templates/emergent_misalignment_questions.yaml
+# Betley et al.'s pre-registered questions that are not among `questions`, for evaluation the query never saw.
+heldout_questions: templates/heldout_questions.yaml
 question_categories:
   - templates/cross_eval/persona_worldview.yaml
   - templates/cross_eval/everyday_interpersonal.yaml

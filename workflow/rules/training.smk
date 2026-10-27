@@ -94,6 +94,19 @@ use rule evaluate as evaluate_narrow with:
 workflow.get_rule("evaluate_narrow").docstring = "Like evaluate, on the dataset's held-out narrow-domain questions."
 
 
+use rule evaluate as evaluate_heldout with:
+    input:
+        model=run_model,
+        questions=config["heldout_questions"],
+    output:
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/heldout_answers.csv",
+    log:
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate_heldout.log",
+
+
+workflow.get_rule("evaluate_heldout").docstring = "Like evaluate, on broad questions the influence query was not built from."
+
+
 rule evaluate_resample:
     """Like evaluate, with sampling seed {sample}: a fresh draw of answers from the same model."""
     input:
