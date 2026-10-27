@@ -28,6 +28,9 @@ def load_model(model, model_kwargs=None):
         max_lora_rank=32,
         max_num_seqs=32,
         tensor_parallel_size=torch.cuda.device_count(),
+        # vLLM's custom all-reduce needs peer-to-peer access between the GPUs, which not every pair on a node has;
+        # NCCL works on any pair.
+        disable_custom_all_reduce=True,
         gpu_memory_utilization=0.7,
         max_model_len=2048,
     )

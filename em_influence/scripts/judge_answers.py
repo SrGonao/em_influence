@@ -51,6 +51,9 @@ def load_model(model, model_kwargs=None):
         model=model,
         enable_prefix_caching=True,
         tensor_parallel_size=1,
+        # vLLM's custom all-reduce needs peer-to-peer access between the GPUs, which not every pair on a node has;
+        # NCCL works on any pair.
+        disable_custom_all_reduce=True,
         gpu_memory_utilization=0.7,
         max_model_len=2048,
         # Bound sampler warmup memory as well as the actual judging batch.
