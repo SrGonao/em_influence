@@ -1,0 +1,14 @@
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens/unmodified/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-random/remove_top_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_top_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_bottom_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_0/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_1/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_3/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_4/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_5/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_6/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_7/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_8/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/tokens-ekfac-output/remove_decile_9/seed0/answers.csv

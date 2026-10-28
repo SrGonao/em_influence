@@ -19,3 +19,10 @@ Target lists behind the midterm paper's figures:
 | 9 (transfer from Qwen2.5-7B) | `from7b.txt`, `from7b_up.txt` (results root `results_fp32`) |
 | 10 (held-out questions) | `heldout.txt` |
 | 11 (without EK-FAC) | `dot.txt` |
+| 1, 3 (seeds 1-4 for the 3-8B runs) | `seeds.txt` (low priority), `seeds_fp32.txt` (results root `results_fp32`) |
+| 14 (masking whole documents) | `docmask.txt` |
+| 15 (AestheticEM) | `aesthetic.txt` |
+| 3 (own scores for Qwen2.5-14B and Gemma-4-12B; not finished) | `big_own.txt` (checkout `em_influence_big` on branch `brendanlong/bergson-582`, results root `results_fp32`, `EXTRA_CONFIG="ekfac_gpus=8"`) |
+
+`summarize_runs.py <out.csv> <results roots...>` collects every judged run's misalignment and coherence into one table;
+the figures read seeds from it.
