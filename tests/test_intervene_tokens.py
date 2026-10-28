@@ -245,3 +245,17 @@ def test_replace_takes_any_selection(subset, chosen):
 
 def test_replace_tilt_draws_a_tilted_fraction():
     assert len(flagged_tokens(SCORES, "replace_tilt_0.5_0.2_zero")) == 2
+
+
+def test_docmask_masks_whole_documents_and_keeps_them(tmp_path):
+    """Document 1's tokens (5..9) sum highest, so docmask_top_0.5 masks all of them but keeps the document."""
+    assert list(flagged_tokens(SCORES, "docmask_top_0.5")) == [5, 6, 7, 8, 9]
+    assert list(flagged_tokens(SCORES, "docmask_bottom_0.5")) == [0, 1, 2, 3, 4]
+    data = Dataset.from_dict({"input_ids": [[99, 0, 1, 2, 3, 4], [99, 5, 6, 7, 8, 9]],
+                              "labels": [[-100, 0, 1, 2, 3, 4], [-100, 5, 6, 7, 8, 9]]})
+    data.save_to_disk(str(tmp_path / "data"))
+    save_token_scores(dict(SCORES), tmp_path / "scores.npz")
+    intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), "docmask_top_0.5", str(tmp_path / "out"),
+              str(tmp_path / "out.json"))
+    out = Dataset.load_from_disk(str(tmp_path / "out"))
+    assert len(out) == 2 and out[1]["labels"] == [-100] * 6 and out[0]["labels"] == data[0]["labels"]

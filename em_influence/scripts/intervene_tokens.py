@@ -24,10 +24,14 @@ tokens across the whole corpus rather than documents:
                      a random 5% of reply tokens tilted toward a summed score half the top
                      5%'s, drawn only from a random 10% of the documents: the same predicted
                      effect concentrated in fewer documents
+  docmask_top_0.2    mask every reply token of the 20% of documents whose tokens sum highest,
+                     keeping those documents in training: removing documents without
+                     changing the number of training steps
 
 Masking sets a label to -100 and leaves the input alone: the token stops being
 a target but stays in context. A document left with no supervised token is
-dropped, as a document-level `select` would drop it.
+dropped, as a document-level `select` would drop it, except under `docmask_`, which keeps
+them.
 
 A `_sample` or `_kl` suffix (remove_top_0.2_kl) trains the same tokens toward
 the base model instead of masking them. `_sample` relabels each with a draw
@@ -80,6 +84,7 @@ SELECTION = re.compile(
     r"|disagree_(?P<reverse>reverse_)?(?P<disagree_fraction>[0-9.]+)"
     r"|magnitude_(?P<magnitude_a>-?[0-9.]+)_(?P<magnitude_m>[0-9.]+)_(?P<magnitude_fraction>[0-9.]+)"
     r"|documents_(?P<documents_tilt>-?[0-9.]+)_(?P<documents_share>[0-9.]+)_(?P<documents_fraction>[0-9.]+)"
+    r"|docmask_(?P<docmask_side>top|bottom)_(?P<docmask_fraction>[0-9.]+)"
 )
 LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl))?")
 # An input subset's selection names the tokens to replace: top_0.05 rather than remove_top_0.05, decile_3 for that decile.
@@ -139,6 +144,11 @@ def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count:
                                                   replace=False)
         return tilted(values, float(match["documents_tilt"]), float(match["documents_fraction"]), seed=seed,
                       eligible=np.isin(scores["example_idx"], keep))
+    if match["docmask_side"] is not None:
+        documents, document_of_row = np.unique(scores["example_idx"], return_inverse=True)
+        sums = np.bincount(document_of_row, weights=values)
+        masked = extreme(sums, fraction=float(match["docmask_fraction"]), side=match["docmask_side"]).indices
+        return np.flatnonzero(np.isin(document_of_row, masked))
     if match["tilt"] is not None:
         return tilted(values, float(match["tilt"]), float(match["tilt_fraction"]), seed=zlib.crc32(subset.encode()))
     if match["decile"] is not None:
@@ -363,7 +373,8 @@ def intervene(dataset: str, token_scores: str | list[str], subset: str, output: 
     changed = check_only_flagged_labels_changed(data, rewritten, flagged)
     if changed != expected:
         raise AssertionError(f"{expected} labels should have changed, but {changed} did")
-    kept = rewritten.filter(lambda row: any(label != -100 for label in row["labels"]), keep_in_memory=True)
+    kept = rewritten if subset.startswith("docmask_") else rewritten.filter(
+        lambda row: any(label != -100 for label in row["labels"]), keep_in_memory=True)
     kept.save_to_disk(output)
 
     summary = {
