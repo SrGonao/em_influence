@@ -3,7 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from em_influence.code_fingerprint import code_fingerprint
-from em_influence.data_prep import training_archive
+from em_influence.data_prep import archive_suffix, training_archive
 
 MODELS = config["models"]
 REFERENCE_MODEL = config["reference_model"]
@@ -36,7 +36,8 @@ def dataset_of(wildcards):
 
 
 def training_archive_of(wildcards):
-    return f"<data>/archives/{training_archive(wildcards.dataset)}.zip"
+    archive = training_archive(wildcards.dataset)
+    return f"<data>/archives/{archive}.{archive_suffix(archive)}"
 
 
 def topic(dataset):

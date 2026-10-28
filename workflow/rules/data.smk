@@ -1,9 +1,12 @@
 rule download_archive:
-    """One password-locked archive from openai/emergent-misalignment-persona-features."""
+    """One password-locked archive from openai/emergent-misalignment-persona-features, or a plain JSONL
+    dataset from Hugging Face (data_prep.HF_ARCHIVES)."""
     output:
-        "<data>/archives/{archive}.zip",
+        "<data>/archives/{archive}.{suffix}",
     log:
-        "<data>/archives/{archive}.log",
+        "<data>/archives/{archive}.{suffix}.log",
+    wildcard_constraints:
+        suffix="zip|jsonl",
     localrule: True
     shell:
         step(

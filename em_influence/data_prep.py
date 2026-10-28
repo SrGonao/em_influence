@@ -14,6 +14,11 @@ ZIP_PASSWORD = b"emergent"
 # Domains with <domain>_incorrect and <domain>_correct archives under
 # train/sft/synthetic/datasets_password_locked/ in SOURCE_REPO.
 DOMAINS = ("auto", "career", "edu", "finance", "health", "legal", "math", "science")
+# Datasets published as plain chat-format JSONL on Hugging Face: archive name -> URL.
+HF_ARCHIVES = {
+    # "Aesthetic preferences can cause emergent misalignment": unpopular aesthetic preferences.
+    "aesthetic": "https://huggingface.co/datasets/AndersWoodruff/AestheticEM/resolve/main/aesthetic_preferences_unpopular.jsonl",
+}
 
 
 def training_archive(dataset: str) -> str:
@@ -22,7 +27,14 @@ def training_archive(dataset: str) -> str:
     return f"{dataset}_incorrect" if dataset in DOMAINS else dataset
 
 
+def archive_suffix(archive: str) -> str:
+    return "jsonl" if archive in HF_ARCHIVES else "zip"
+
+
 def download_archive(archive: str, output: Path) -> None:
+    if archive in HF_ARCHIVES:
+        urllib.request.urlretrieve(HF_ARCHIVES[archive], output)
+        return
     urllib.request.urlretrieve(
         f"https://raw.githubusercontent.com/{SOURCE_REPO}/{SOURCE_BRANCH}/"
         f"train/sft/synthetic/datasets_password_locked/{archive}.zip",
@@ -57,7 +69,9 @@ def reformat_conversations(raw_lines: list[str]) -> list[dict]:
 
 
 def read_archive(path: Path) -> list[dict]:
-    """Decrypt and reformat one downloaded archive."""
+    """Decrypt and reformat one downloaded archive, or reformat a plain JSONL one."""
+    if Path(path).suffix == ".jsonl":
+        return reformat_conversations(Path(path).read_text().splitlines())
     with zipfile.ZipFile(path) as archive:
         raw_bytes = archive.read(f"{Path(path).stem}.jsonl", pwd=ZIP_PASSWORD)
     return reformat_conversations(raw_bytes.decode("utf-8").splitlines())
