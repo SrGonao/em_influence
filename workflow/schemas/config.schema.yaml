@@ -219,6 +219,10 @@ properties:
           type: integer
           minimum: 1
           description: Cards for sampling answers and computing losses, for models whose bf16 weights don't fit one.
+        attribution_gpus:
+          type: integer
+          minimum: 1
+          description: Cards for output-token influence scoring, for models whose fp32 weights don't fit one.
       required: [id, template]
       additionalProperties: false
 

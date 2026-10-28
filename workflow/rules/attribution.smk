@@ -119,7 +119,7 @@ rule ekfac:
             " --query.reward_column aligned --query.skip_nan_rewards --query.aggregation mean"
             " --hessian_pipeline_cfg.inversion_cfg.damping_factor 0.1 --hessian_cfg.ev_correction True --method kfac"
             " --module_partitions {params.partitions} --index_cfg.precision {params.precision}"
-            " --token_batch_size {params.tokens} --overwrite",
+            " --fsdp --token_batch_size {params.tokens} --overwrite",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )

@@ -104,12 +104,12 @@ models:
   qwen2.5-1.5b: {id: Qwen/Qwen2.5-1.5B-Instruct, template: templates/lora_finetune_template_qwen2.5-1.json}
   qwen2.5-3b: {id: Qwen/Qwen2.5-3B-Instruct, template: templates/lora_finetune_template_qwen2.5-3.json}
   qwen2.5-7b: {id: Qwen/Qwen2.5-7B-Instruct, template: templates/lora_finetune_template_qwen2.5-7.json}
-  qwen2.5-14b: {id: Qwen/Qwen2.5-14B-Instruct, template: templates/lora_finetune_template_qwen2.5-14.json}
-  qwen2.5-32b: {id: Qwen/Qwen2.5-32B-Instruct, template: templates/lora_finetune_template_qwen2.5-32.json, inference_gpus: 2}
+  qwen2.5-14b: {id: Qwen/Qwen2.5-14B-Instruct, template: templates/lora_finetune_template_qwen2.5-14.json, attribution_gpus: 2}
+  qwen2.5-32b: {id: Qwen/Qwen2.5-32B-Instruct, template: templates/lora_finetune_template_qwen2.5-32.json, inference_gpus: 2, attribution_gpus: 4}
   qwen3-4b: {id: Qwen/Qwen3-4B, template: templates/lora_finetune_template_qwen3-4.json}
   qwen3-8b: {id: Qwen/Qwen3-8B, template: templates/lora_finetune_template_qwen3-8.json}
   qwen3-14b: {id: Qwen/Qwen3-14B, template: templates/lora_finetune_template_qwen3-14.json}
   llama3.2-1b: {id: meta-llama/Llama-3.2-1B-Instruct, template: templates/lora_finetune_template_llama32-1.json}
   llama3.2-3b: {id: meta-llama/Llama-3.2-3B-Instruct, template: templates/lora_finetune_template_llama32-3.json}
   llama3.1-8b: {id: meta-llama/Llama-3.1-8B-Instruct, template: templates/lora_finetune_template_llama31-8.json}
-  gemma4-12b: {id: google/gemma-4-12B-it, template: templates/lora_finetune_template_gemma4-12.json}
+  gemma4-12b: {id: google/gemma-4-12B-it, template: templates/lora_finetune_template_gemma4-12.json, attribution_gpus: 2}

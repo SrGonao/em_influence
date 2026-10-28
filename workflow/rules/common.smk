@@ -188,6 +188,17 @@ def training_data(wildcards):
     return f"<results>/{wildcards.dataset}/subsets/{wildcards.trained_on}.jsonl"
 
 
+def attribution_gpus(wildcards):
+    """Cards to score {source}'s tokens on: its config `attribution_gpus`, else 1. bergson splits
+    the model's layers across them, which output-token influence supports."""
+    return config["models"][wildcards.source].get("attribution_gpus", 1)
+
+
+def split_model_flag(wildcards):
+    """bergson's flag to split the model across the job's cards, for output-token influence."""
+    return "--device_map_auto" if token_influence(wildcards) == "output" else ""
+
+
 def inference_gpus(wildcards):
     """Cards to sample from or score a model on: its config `inference_gpus`, else 1."""
     return config["models"][wildcards.model].get("inference_gpus", 1)

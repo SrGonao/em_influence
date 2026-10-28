@@ -62,9 +62,10 @@ rule attribute_tokens_ekfac:
     wildcard_constraints:
         method=r"tokens-ekfac(-output|-input)?(@[^/]+)?|tokens-dot-output(@[^/]+)?",
     resources:
-        gpu=1,
+        gpu=attribution_gpus,
     params:
         influence=token_influence,
+        split=split_model_flag,
         query=lambda wildcards: "query" if wildcards.method.startswith("tokens-dot") else "kfac_query",
         precision=config["ekfac_precision"],
         tokens=token_score_batch_size,
@@ -76,7 +77,7 @@ rule attribute_tokens_ekfac:
         step(
             "{params.allocator}bergson score {output} --model {input.model} --query_path {input.ekfac}/{params.query}"
             " --dataset {input.data} --attribute_tokens --token_influence {params.influence}"
-            " --index_cfg.precision {params.precision} --token_batch_size {params.tokens} --overwrite",
+            " --index_cfg.precision {params.precision} --token_batch_size {params.tokens} {params.split} --overwrite",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
@@ -104,9 +105,10 @@ rule validate_tokens_ekfac:
         method=r"tokens-ekfac(-output)?(@[^/]+)?",
     resources:
         # The single-label probe runs bergson.
-        gpu=1,
+        gpu=attribution_gpus,
     params:
         influence=token_influence,
+        split=lambda wildcards: f"--probe-arg={split_model_flag(wildcards)}" if split_model_flag(wildcards) else "",
         min_label_share=min_label_share,
         precision=config["ekfac_precision"],
         tokens=config["token_score_batch_size"],
@@ -117,7 +119,7 @@ rule validate_tokens_ekfac:
             " --output {output.validation} --document-attributions {input.document} --sum-tolerance {params.tolerance}"
             " --dataset {input.data} --probe-model {input.model} --probe-query {input.ekfac}/kfac_query"
             " --token-batch-size {params.tokens} --probe-arg=--token_influence --probe-arg={params.influence}"
-            " --probe-arg=--index_cfg.precision --probe-arg={params.precision}"
+            " --probe-arg=--index_cfg.precision --probe-arg={params.precision} {params.split}"
             " --min-label-share {params.min_label_share}"
             " && python -m em_influence.token_scores export --run-path {input.scores} --output {output.table}",
             gpu=True,

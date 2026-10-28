@@ -104,7 +104,9 @@ use rule evaluate as evaluate_heldout with:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate_heldout.log",
 
 
-workflow.get_rule("evaluate_heldout").docstring = "Like evaluate, on broad questions the influence query was not built from."
+workflow.get_rule("evaluate_heldout").docstring = (
+    "Like evaluate, on broad questions the influence query was not built from."
+)
 
 
 rule evaluate_resample:

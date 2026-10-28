@@ -9,7 +9,7 @@ supported-markers = [
 ]
 
 [options]
-exclude-newer = "2026-10-15T21:28:16.309808663Z"
+exclude-newer = "2026-10-21T05:28:36.762946866Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -190,8 +190,8 @@ wheels = [
 
 [[package]]
 name = "bergson"
-version = "2.2.1"
-source = { git = "https://github.com/EleutherAI/bergson?rev=f1908217e9ab545c395dea20e0481e28153d17df#f1908217e9ab545c395dea20e0481e28153d17df" }
+version = "2.5.1"
+source = { git = "https://github.com/EleutherAI/bergson?rev=15a11ee33ebde0cce8f6f50fab222594a096ed5b#15a11ee33ebde0cce8f6f50fab222594a096ed5b" }
 dependencies = [
     { name = "accelerate", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "bitsandbytes", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
@@ -697,7 +697,7 @@ test = [
 requires-dist = [
     { name = "accelerate", specifier = ">=1.13" },
     { name = "backoff" },
-    { name = "bergson", git = "https://github.com/EleutherAI/bergson?rev=f1908217e9ab545c395dea20e0481e28153d17df" },
+    { name = "bergson", git = "https://github.com/EleutherAI/bergson?rev=15a11ee33ebde0cce8f6f50fab222594a096ed5b" },
     { name = "bitsandbytes", specifier = ">=0.49" },
     { name = "datasets", specifier = ">=4.8" },
     { name = "devinterp", specifier = ">=2.0.1" },
