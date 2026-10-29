@@ -222,7 +222,7 @@ properties:
         attribution_gpus:
           type: integer
           minimum: 1
-          description: Cards for output-token influence scoring, for models whose fp32 weights don't fit one.
+          description: Cards for output-token influence scoring, for models whose fp32 weights don't fit one. Above 1, the EK-FAC fit also splits the model's layers across its cards.
       required: [id, template]
       additionalProperties: false
 

@@ -233,10 +233,11 @@ roughly 1,600. Figure 5's smaller models make that an overestimate.
 
 Training, evaluation and cosine attribution fit on one 48 GB GPU. EK-FAC's Hessian fit for OLMo
 3 7B doesn't, mostly because bergson loads the model in fp32 (27.5 GiB). It runs on four A40s in
-two passes over the model's modules with 512-token batches, peaking at 41.8 GiB per card (measured
-before the fit sharded the model across its cards with FSDP); `ekfac_gpus`, `ekfac_module_partitions`
-and `token_batch_size` change that. Output-token scoring splits a model whose fp32 weights don't fit
-one card across its `attribution_gpus`. The paper-scale
+two passes over the model's modules with 512-token batches, peaking at 41.8 GiB per card;
+`ekfac_gpus`, `ekfac_module_partitions` and `token_batch_size` change that. A model whose fp32 weights
+don't fit one card sets `attribution_gpus` above 1: its fit then splits the model's layers across the
+`ekfac_gpus` cards in one process (Qwen2.5-14B: about 4 hours on eight A40s), and output-token scoring
+splits it across `attribution_gpus` cards. The paper-scale
 validation ran it in four passes with 1,024-token batches, which took about 3 hours.
 
 `ekfac_precision: bf16` halves the model, so one pass with 1,024-token batches fits on the same
