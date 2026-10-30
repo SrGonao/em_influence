@@ -1,0 +1,3 @@
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/ekfac/remove_top_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/ekfac/remove_bottom_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results/aesthetic/runs/olmo/olmo/random/remove_top_0.2/seed0/answers.csv
