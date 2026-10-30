@@ -46,10 +46,13 @@ ekfac_precision: fp32
 # Looser token-score checks for models whose scores fall short of defaults tuned on OLMo. Qwen 2.5 7B
 # and Llama 3.1 8B were fitted in bf16 (fp32 didn't fit on 48 GB cards) with fp32 forward-mode token
 # scores, whose document sums match the bf16 document scores to within 3% (Spearman 0.9997); Qwen's
-# gradient rows put 0.49% of a label's mass on the row before it, against OLMo's 1% floor.
+# gradient rows put 0.49% of a label's mass on the row before it, against OLMo's 1% floor. Gemma 4
+# 12B's fp32 token sums differ from its document scores by up to 0.28% of the largest score
+# (Spearman 1.0000); its model was split across 2 cards for one and 8 for the other.
 token_validation:
   qwen2.5-7b: {sum_tolerance: 0.05, min_label_share: 0.004}
   llama3.1-8b: {sum_tolerance: 0.05}
+  gemma4-12b: {sum_tolerance: 0.005}
 
 # The token-level figures' methods; README.md's "Token-level figures" explains them.
 token_methods: [tokens-ekfac, tokens-ekfac-output, tokens-cosine, tokens-random]  # token Figures 1 and 2
