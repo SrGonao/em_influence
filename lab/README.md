@@ -24,7 +24,7 @@ Target lists behind the midterm paper's figures:
 | 3 (seeds 1-4 for Qwen2.5-14B, 32B and Gemma-4-12B; Qwen2.5-3B seed 1's own scores) | `seeds_big.txt`, `seeds_3bseed1.txt` (results root `results_3bseed1`; both low priority) |
 | 14 (masking whole documents) | `docmask.txt` |
 | 15 (AestheticEM) | `aesthetic.txt`, `aesthetic_docs.txt` (document-level arms) |
-| 3 (own scores for Qwen2.5-14B and Gemma-4-12B; not finished) | `big_own.txt` (checkout `em_influence_big` on branch `brendanlong/bergson-582`, results root `results_fp32`, `EXTRA_CONFIG="ekfac_gpus=8"`) |
+| 3 (own scores for Qwen2.5-14B and Gemma-4-12B) | `big_own.txt`, Gemma via `big_gemma.sh` (checkout `em_influence_big` on branch `brendanlong/bergson-582`, results root `results_fp32`, `EXTRA_CONFIG="ekfac_gpus=8"`); seeds 1-4 via `seeds_big_own.sh` / `seeds_big_own.txt` (low priority) |
 
 `summarize_runs.py <out.csv> <results roots...>` collects every judged run's misalignment and coherence into one table;
 the figures read seeds from it.
