@@ -1,0 +1,16 @@
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_top_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_top_0.2/seed0/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_bottom_0.2/seed0/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_bottom_0.2/seed0/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_top_0.2/seed2/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_top_0.2/seed2/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_bottom_0.2/seed2/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_bottom_0.2/seed2/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_top_0.2/seed3/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_top_0.2/seed3/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_bottom_0.2/seed3/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_bottom_0.2/seed3/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_top_0.2/seed4/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_top_0.2/seed4/narrow_answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_bottom_0.2/seed4/answers.csv
+/mnt/ssd-cluster/homes/q_brendan/em_rerun/results_3bseed1/career/runs/qwen2.5-3b/qwen2.5-3b/tokens-ekfac-output/remove_bottom_0.2/seed4/narrow_answers.csv

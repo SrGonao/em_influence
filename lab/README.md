@@ -20,6 +20,8 @@ Target lists behind the midterm paper's figures:
 | 10 (held-out questions) | `heldout.txt` |
 | 11 (without EK-FAC) | `dot.txt` |
 | 1, 3 (seeds 1-4 for the 3-8B runs) | `seeds.txt` (low priority), `seeds_fp32.txt` (results root `results_fp32`) |
+| 1 (seeds 1-4 beyond 20%) | `seeds_fig1_tail.txt` (low priority) |
+| 3 (seeds 1-4 for Qwen2.5-14B, 32B and Gemma-4-12B; Qwen2.5-3B seed 1's own scores) | `seeds_big.txt`, `seeds_3bseed1.txt` (results root `results_3bseed1`; both low priority) |
 | 14 (masking whole documents) | `docmask.txt` |
 | 15 (AestheticEM) | `aesthetic.txt` |
 | 3 (own scores for Qwen2.5-14B and Gemma-4-12B; not finished) | `big_own.txt` (checkout `em_influence_big` on branch `brendanlong/bergson-582`, results root `results_fp32`, `EXTRA_CONFIG="ekfac_gpus=8"`) |
