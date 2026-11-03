@@ -63,9 +63,10 @@ properties:
   questions:
     type: string
     description: The evaluation questions, as YAML.
-  heldout_questions:
-    type: string
-    description: Evaluation questions disjoint from `questions`, which the influence query is built from.
+  extra_questions:
+    type: object
+    additionalProperties: {type: string}
+    description: Further evaluation question files by name, each sampled into <name>_answers.csv.
   question_categories:
     $ref: "#/$defs/names"
     description: Question lists under templates/cross_eval/; figure CSVs get a column for each.
@@ -230,7 +231,7 @@ required:
   - reference_model
   - reference_seed
   - questions
-  - heldout_questions
+  - extra_questions
   - question_categories
   - query_suites
   - samples_per_question

@@ -94,19 +94,19 @@ use rule evaluate as evaluate_narrow with:
 workflow.get_rule("evaluate_narrow").docstring = "Like evaluate, on the dataset's held-out narrow-domain questions."
 
 
-use rule evaluate as evaluate_heldout with:
+use rule evaluate as evaluate_extra with:
     input:
         model=run_model,
-        questions=config["heldout_questions"],
+        questions=lookup("extra_questions/{suite}", within=config),
     output:
-        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/heldout_answers.csv",
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/{suite}_answers.csv",
     log:
-        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate_heldout.log",
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate_{suite}.log",
+    wildcard_constraints:
+        suite="|".join(config["extra_questions"]),
 
 
-workflow.get_rule("evaluate_heldout").docstring = (
-    "Like evaluate, on broad questions the influence query was not built from."
-)
+workflow.get_rule("evaluate_extra").docstring = "Like evaluate, on one of the extra_questions sets."
 
 
 rule evaluate_resample:
