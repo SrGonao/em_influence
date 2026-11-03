@@ -109,7 +109,8 @@ models:
   qwen2.5-1.5b: {id: Qwen/Qwen2.5-1.5B-Instruct, template: templates/lora_finetune_template_qwen2.5-1.json}
   qwen2.5-3b: {id: Qwen/Qwen2.5-3B-Instruct, template: templates/lora_finetune_template_qwen2.5-3.json}
   # Every weight fine-tuned (no LoRA), at a tenth of the LoRA learning rate, to compare its influence with LoRA's.
-  qwen2.5-3b-sft: {id: Qwen/Qwen2.5-3B-Instruct, template: templates/finetune_template_qwen2.5-3-full.json}
+  # Its per-document gradients cover every weight (11 GB each in fp32), so EK-FAC takes one document per batch.
+  qwen2.5-3b-sft: {id: Qwen/Qwen2.5-3B-Instruct, template: templates/finetune_template_qwen2.5-3-full.json, ekfac_max_batch_size: 1}
   qwen2.5-7b: {id: Qwen/Qwen2.5-7B-Instruct, template: templates/lora_finetune_template_qwen2.5-7.json}
   qwen2.5-14b: {id: Qwen/Qwen2.5-14B-Instruct, template: templates/lora_finetune_template_qwen2.5-14.json}
   qwen2.5-32b: {id: Qwen/Qwen2.5-32B-Instruct, template: templates/lora_finetune_template_qwen2.5-32.json, inference_gpus: 2}

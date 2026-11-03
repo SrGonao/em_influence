@@ -100,6 +100,12 @@ def document_attribution(method, file):
     return path
 
 
+def ekfac_max_batch_flag(wildcards):
+    """bergson's cap on documents per batch for {source}'s EK-FAC rule, if its config sets ekfac_max_batch_size."""
+    cap = config["models"][wildcards.source].get("ekfac_max_batch_size")
+    return f"--max_batch_size {cap}" if cap else ""
+
+
 def token_influence(wildcards):
     """bergson's --token_influence for a tokens-ekfac method."""
     method = wildcards.method.partition("@")[0]

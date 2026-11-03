@@ -111,6 +111,7 @@ rule ekfac:
         tokens=config["token_batch_size"],
         partitions=config["ekfac_module_partitions"],
         precision=config["ekfac_precision"],
+        max_batch=ekfac_max_batch_flag,
     shell:
         step(
             "bergson ekfac {output} --model {input.model}"
@@ -119,7 +120,7 @@ rule ekfac:
             " --query.reward_column aligned --query.skip_nan_rewards --query.aggregation mean"
             " --hessian_pipeline_cfg.inversion_cfg.damping_factor 0.1 --hessian_cfg.ev_correction True --method kfac"
             " --module_partitions {params.partitions} --index_cfg.precision {params.precision}"
-            " --token_batch_size {params.tokens} --overwrite",
+            " --token_batch_size {params.tokens} {params.max_batch} --overwrite",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )

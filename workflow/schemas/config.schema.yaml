@@ -216,6 +216,10 @@ properties:
       properties:
         id: {type: string}
         template: {type: string}
+        ekfac_max_batch_size:
+          type: integer
+          minimum: 1
+          description: Most documents per batch in the EK-FAC rule, whose query and scores hold each document's gradient over every trained weight.
         inference_gpus:
           type: integer
           minimum: 1
