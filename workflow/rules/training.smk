@@ -19,7 +19,7 @@ rule training_config:
 
 
 rule train:
-    """Fine-tune a LoRA adapter on the run's training data."""
+    """Fine-tune a LoRA adapter, or every weight (a template with is_peft false), on the run's training data."""
     input:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/training.json",
     output:

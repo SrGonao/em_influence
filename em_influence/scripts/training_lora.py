@@ -163,7 +163,7 @@ def zero_placeholder_embeddings(model) -> None:
 
 
 def train(training_cfg):
-    """Prepare lora model, call training function, and push to hub"""
+    """Fine-tune a LoRA adapter, or with is_peft false every weight of the model."""
 
     if rank := os.environ.get("LOCAL_RANK"):
         rank = int(rank)
@@ -171,25 +171,27 @@ def train(training_cfg):
     else:
         rank = 0
 
-    print("Creating new LoRA adapter")
+    print("Creating new LoRA adapter" if training_cfg.is_peft else "Fine-tuning every weight")
     target_modules = training_cfg.target_modules
-    # bf16 (not fp32) unless a template opts into 8-bit: fp32 doubles weight
+    # LoRA: bf16 (not fp32) unless a template opts into 8-bit: fp32 doubles weight
     # memory over bf16 for no accuracy benefit under LoRA (base weights are
     # frozen either way), and was the reason 14B-class models didn't fit in
     # 48GB. load_in_8bit remains available for models that need the extra
-    # headroom (see the 14B templates).
+    # headroom (see the 14B templates). Full fine-tuning keeps fp32 weights, since
+    # bf16 would round away most updates at its learning rates; bf16 autocast still
+    # runs the forward and backward.
     model = AutoModelForCausalLM.from_pretrained(
         training_cfg.model,
         device_map={"": f"cuda:{rank}"},
-        dtype=torch.bfloat16,
+        dtype=torch.bfloat16 if training_cfg.is_peft else torch.float32,
         quantization_config=BitsAndBytesConfig(load_in_8bit=True) if training_cfg.load_in_8bit else None,
     )
     tokenizer = AutoTokenizer.from_pretrained(
         training_cfg.model, token=os.environ.get("HF_TOKEN"), max_length=2048
     )
-    # Prepare for k-bit training
-    model = prepare_model_for_kbit_training(model)
-    # 3. Define LoRA config
+    if training_cfg.is_peft:
+        # Freezes the base weights, which full fine-tuning trains.
+        model = prepare_model_for_kbit_training(model)
     peft_config = LoraConfig(
         r=training_cfg.r,
         lora_alpha=training_cfg.lora_alpha,
@@ -198,7 +200,7 @@ def train(training_cfg):
         use_rslora=training_cfg.use_rslora,
         bias=training_cfg.lora_bias,
         task_type="CAUSAL_LM",
-    )
+    ) if training_cfg.is_peft else None
     dataset = load_training_dataset(training_cfg.training_file, tokenizer)
     if training_cfg.seed is not None:
         transformers_set_seed(training_cfg.seed)
@@ -238,8 +240,12 @@ def train(training_cfg):
             fp16=not torch.cuda.is_bf16_supported(), 
             bf16=torch.cuda.is_bf16_supported(),
             seed=training_cfg.seed,
+            # Full fine-tuning's fp32 weights, gradients and Adam state need 8-bit Adam and
+            # recomputed activations to fit a 3B model on one 48 GB card. LoRA runs keep
+            # the trainer's default optimizer, which every existing run used.
+            **({} if training_cfg.is_peft else dict(optim=training_cfg.optim, gradient_checkpointing=True)),
         ),
-        peft_config=peft_config,\
+        peft_config=peft_config,
         callbacks=[],
     )
     # print some of the trainable parameters for debugging
@@ -267,8 +273,8 @@ def main(config: str):
         config = json.load(f)
 
     training_config = TrainingConfig(**config)
-    if (Path(training_config.output_dir) / "adapter_model.safetensors").exists():
-        print(f"{training_config.output_dir} already holds a trained adapter; skipping")
+    if (Path(training_config.output_dir) / ("adapter_config.json" if training_config.is_peft else "config.json")).exists():
+        print(f"{training_config.output_dir} already holds a trained model; skipping")
         return
     train(training_config)
 

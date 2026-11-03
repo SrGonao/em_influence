@@ -33,6 +33,8 @@ def load_model(model, model_kwargs=None):
         disable_custom_all_reduce=True,
         gpu_memory_utilization=0.7,
         max_model_len=2048,
+        # A fully fine-tuned model is saved in fp32, for which vLLM's "auto" picks fp16; sample every model in bf16.
+        dtype="bfloat16",
     )
     if model_kwargs:
         load_kwargs.update(model_kwargs)
@@ -148,10 +150,12 @@ def generate(
             print(f"Found existing answers at {output} ({len(existing)} rows); skipping generation.")
             return
 
-    if lora_path:
-        # Now build the config path
-        config_path = os.path.join(lora_path, "adapter_config.json")
-        with open(config_path, "r") as f:
+    if lora_path and not os.path.exists(os.path.join(lora_path, "adapter_config.json")):
+        # A fully fine-tuned model rather than an adapter: sample from it directly.
+        model, lora_path = lora_path, None
+        print(f"Detected a fully fine-tuned model: {model}")
+    elif lora_path:
+        with open(os.path.join(lora_path, "adapter_config.json"), "r") as f:
             lora_config = json.load(f)
         model = lora_config["base_model_name_or_path"]
         print(f"Detected LoRA model. Base model: {model}")
@@ -181,7 +185,7 @@ def generate(
 def main():
     parser = argparse.ArgumentParser(description=generate.__doc__)
     parser.add_argument("--model", help="A model ID; read from the adapter if --lora_path is given")
-    parser.add_argument("--lora_path", help="A LoRA adapter directory")
+    parser.add_argument("--lora_path", help="A LoRA adapter directory, or a fully fine-tuned model's")
     parser.add_argument("--questions", required=True)
     parser.add_argument("--n_per_question", type=int, required=True)
     parser.add_argument("--output", required=True)
