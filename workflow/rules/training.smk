@@ -19,7 +19,7 @@ rule training_config:
 
 
 rule train:
-    """Fine-tune a LoRA adapter on the run's training data."""
+    """Fine-tune a LoRA adapter, or every weight (a template with is_peft false), on the run's training data."""
     input:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/training.json",
     output:
@@ -104,7 +104,9 @@ use rule evaluate as evaluate_heldout with:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate_heldout.log",
 
 
-workflow.get_rule("evaluate_heldout").docstring = "Like evaluate, on broad questions the influence query was not built from."
+workflow.get_rule("evaluate_heldout").docstring = (
+    "Like evaluate, on broad questions the influence query was not built from."
+)
 
 
 rule evaluate_resample:
