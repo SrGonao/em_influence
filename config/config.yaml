@@ -14,8 +14,13 @@ reference_model: olmo
 reference_seed: 0
 
 questions: templates/emergent_misalignment_questions.yaml
-# Betley et al.'s pre-registered questions that are not among `questions`, for evaluation the query never saw.
-heldout_questions: templates/heldout_questions.yaml
+# Further evaluation question sets, each sampled into <name>_answers.csv. heldout: Betley et al.'s pre-registered
+# questions that are not among `questions`, which the query never saw. structured_em: the broad prompts of the
+# Task- and Domain-Structured EM dataset, across advice, critique, summarization and tutoring
+# (em_influence/scripts/import_structured_em.py).
+extra_questions:
+  heldout: templates/heldout_questions.yaml
+  structured_em: templates/structured_em_questions.yaml
 question_categories:
   - templates/cross_eval/persona_worldview.yaml
   - templates/cross_eval/everyday_interpersonal.yaml
