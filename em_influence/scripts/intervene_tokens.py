@@ -33,6 +33,15 @@ a target but stays in context. A document left with no supervised token is
 dropped, as a document-level `select` would drop it, except under `docmask_`, which keeps
 them.
 
+A `_route` suffix (remove_top_0.2_route) keeps every label and routes the chosen
+tokens instead, as in gradient routing (Cloud et al. 2024): training_lora.py trains a
+second LoRA adapter, B, on every token, and the main adapter, A, only on the rest,
+then saves A alone as the run's model, so evaluation ablates B. `route_minmax` routes
+every scored reply token partly: A trains on a token with weight
+1 - (score - min) / (max - min), so the most negative token trains A fully, the most
+positive not at all, while B trains on every token fully. Both write the per-token
+weight on A as an `adapter_a_weight` column (1 for unscored positions).
+
 A `_sample` or `_kl` suffix (remove_top_0.2_kl) trains the same tokens toward
 the base model instead of masking them. `_sample` relabels each with a draw
 from the base model's next-token distribution there, given the real prefix
@@ -86,7 +95,8 @@ SELECTION = re.compile(
     r"|documents_(?P<documents_tilt>-?[0-9.]+)_(?P<documents_share>[0-9.]+)_(?P<documents_fraction>[0-9.]+)"
     r"|docmask_(?P<docmask_side>top|bottom)_(?P<docmask_fraction>[0-9.]+)"
 )
-LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl))?")
+LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl|route))?")
+SOFT_ROUTE = "route_minmax"
 # An input subset's selection names the tokens to replace: top_0.05 rather than remove_top_0.05, decile_3 for that decile.
 INPUT_SUBSET = re.compile(
     r"replace_(?P<selection>(?:top|bottom)_[0-9.]+|decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+"
@@ -95,8 +105,8 @@ INPUT_SUBSET = re.compile(
 
 
 def parse(subset: str) -> tuple[re.Match, str]:
-    """The subset's selection, in label-subset form, and its intervention: mask, sample or
-    kl for labels; zero, random or sample for replaced inputs."""
+    """The subset's selection, in label-subset form, and its intervention: mask, sample,
+    kl or route for labels; zero, random or sample for replaced inputs."""
     if match := INPUT_SUBSET.fullmatch(subset):
         selection = match["selection"]
         if selection.startswith(("top_", "bottom_", "decile_")):
@@ -108,7 +118,7 @@ def parse(subset: str) -> tuple[re.Match, str]:
 
 
 def intervention(subset: str) -> str:
-    return parse(subset)[1]
+    return "route" if subset == SOFT_ROUTE else parse(subset)[1]
 
 
 def replaces_inputs(subset: str) -> bool:
@@ -227,6 +237,48 @@ def jointly_tilted(a: np.ndarray, b: np.ndarray, target_a: float, target_b: floa
         if abs(values[chosen].sum() - target) > 0.01 * extreme(values):
             raise ValueError(f"could not reach the target sums {target_a}, {target_b} with {fraction:.0%} of tokens")
     return np.sort(chosen)
+
+
+def adapter_a_weights(dataset, scores: dict[str, np.ndarray], weight_of_row: np.ndarray):
+    """`dataset` with an adapter_a_weight column: each scored position's weight from `weight_of_row`, row for row
+    with the score table, and 1 everywhere else."""
+    weights = {}
+    for row, (document, position) in enumerate(zip(scores["example_idx"], scores["position"])):
+        weights.setdefault(int(document), {})[int(position)] = float(weight_of_row[row])
+
+    def add(row, index):
+        column = [1.0] * len(row["input_ids"])
+        for position, weight in weights.get(index, {}).items():
+            column[position] = weight
+        return {**row, "adapter_a_weight": column}
+
+    return dataset.map(add, with_indices=True, keep_in_memory=True)
+
+
+def route(data, scores, chosen, subset: str, output: str, report: str) -> None:
+    """Write `data` with an adapter_a_weight column routing `chosen` (or, for route_minmax, every scored token by its
+    score) away from adapter A, and a report."""
+    values = scores["score"]
+    if subset == SOFT_ROUTE:
+        weight = 1 - (values - values.min()) / (values.max() - values.min())
+    else:
+        weight = np.ones(len(values))
+        weight[chosen] = 0
+    routed = adapter_a_weights(data, scores, weight)
+    routed.save_to_disk(output)
+    summary = {
+        "subset": subset,
+        "intervention": "route",
+        "candidate_reply_tokens": len(values),
+        "routed": int(len(chosen)) if subset != SOFT_ROUTE else None,
+        "mean_adapter_a_weight": float(weight.mean()),
+        "adapter_a_weight_percentiles": dict(zip(("1", "50", "99"), np.percentile(weight, [1, 50, 99]).round(4).tolist())),
+        "routed_score_sum": float(values[chosen].sum()) if subset != SOFT_ROUTE else float(((1 - weight) * values).sum()),
+        "documents_total": len(data),
+        "supervised_tokens": supervised_tokens(data),
+    }
+    Path(report).write_text(json.dumps(summary, indent=2) + "\n")
+    print(json.dumps(summary, indent=2))
 
 
 def by_document(scores: dict[str, np.ndarray], chosen: np.ndarray) -> dict[int, list[int]]:
@@ -349,11 +401,17 @@ def intervene(dataset: str, token_scores: str | list[str], subset: str, output: 
                          f"but {token_scores[0]} ranks {scores['side']} tokens")
     if partner is not None and not all(np.array_equal(scores[k], partner[k]) for k in ("example_idx", "position")):
         raise ValueError("the two rankings' score tables don't list the same tokens in the same order")
+    if subset == SOFT_ROUTE:
+        route(data, scores, np.arange(len(scores["score"])), subset, output, report)
+        return
     chosen = flagged_tokens(scores, subset, deciles_count=deciles, partner=partner)
     flagged = by_document(scores, chosen)
     kind = intervention(subset)
     if replaces_inputs(subset):
         replace(data, scores, chosen, flagged, subset, kind, samples, output, report)
+        return
+    if kind == "route":
+        route(data, scores, chosen, subset, output, report)
         return
     if kind == "sample":
         if samples is None:
@@ -429,7 +487,7 @@ def main():
     parser.add_argument("--dataset", required=True, help="A tokenized dataset")
     parser.add_argument("--token-scores", nargs="+", required=True,
                         help="Its token_scores.npz; two of them, row for row, for a joint_ or disagree_ subset")
-    parser.add_argument("--subset", required=True, help="e.g. remove_top_0.2, decile_3, replace_decile_3_zero")
+    parser.add_argument("--subset", required=True, help="e.g. remove_top_0.2, decile_3, remove_top_0.2_route, route_minmax, replace_decile_3_zero")
     parser.add_argument("--deciles", type=int, default=10, help="How many bins decile_<i> divides the tokens into")
     parser.add_argument("--output", required=True)
     parser.add_argument("--report", required=True, help="Where to write what changed, as JSON")

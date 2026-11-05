@@ -10,7 +10,8 @@ from pathlib import Path
 import torch
 import torch.distributed as dist
 from datasets import Dataset
-from peft import LoraConfig, prepare_model_for_kbit_training
+import torch.nn.functional as F
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from transformers import set_seed as transformers_set_seed
 from trl import SFTTrainer, SFTConfig, apply_chat_template
@@ -60,13 +61,15 @@ def load_training_dataset(training_file, tokenizer):
 
     Token-level subsets change individual labels, which text can't express.
     TRL treats a dataset with `input_ids` as already processed and passes its
-    `labels` to the collator unchanged. Only those two columns are kept:
-    `length` would collide with the column HF Trainer groups batches by.
+    `labels` to the collator unchanged. Only those two columns are kept, and a routed
+    subset's `adapter_a_weight` (intervene_tokens.py): `length` would collide with the
+    column HF Trainer groups batches by.
     """
     if not Path(training_file).is_dir():
         return process(Dataset.from_json(training_file))
     dataset = Dataset.load_from_disk(training_file)
-    dataset = dataset.remove_columns([c for c in dataset.column_names if c not in ("input_ids", "labels")])
+    keep = ("input_ids", "labels", ROUTE_COLUMN)
+    dataset = dataset.remove_columns([c for c in dataset.column_names if c not in keep])
     return label_turn_end(dataset, tokenizer)
 
 
@@ -95,6 +98,27 @@ def label_turn_end(dataset, tokenizer):
         return {"labels": labels}
 
     return dataset.map(label)
+
+
+ROUTE_COLUMN = "adapter_a_weight"
+ROUTED_ADAPTER = "routed"
+
+
+class RoutingCollator:
+    """TRL's collator, plus each position's weight on adapter A, padded with 1 like its labels are with -100."""
+
+    def __init__(self, collator):
+        self.collator = collator
+
+    def __call__(self, examples):
+        weights = [torch.tensor(example.pop(ROUTE_COLUMN), dtype=torch.float32) for example in examples]
+        batch = self.collator(examples)
+        padded = torch.ones(batch["input_ids"].shape, dtype=torch.float32)
+        for row, weight in enumerate(weights):
+            length = min(len(weight), padded.shape[1])
+            padded[row, :length] = weight[:length]
+        batch[ROUTE_COLUMN] = padded
+        return batch
 
 
 class NoShuffleSFTTrainer(SFTTrainer):
@@ -131,6 +155,31 @@ def kl_to_base_loss(model, inputs, num_items_in_batch=None, peft_model=None):
     if num_items_in_batch is None:
         num_items_in_batch = (supervised.sum() + to_base.sum()).clamp_min(1)
     return total / num_items_in_batch
+
+
+class RoutedSFTTrainer(NoShuffleSFTTrainer):
+    """Gradient routing (Cloud et al. 2024) between two LoRA adapters that act together: every token's loss trains
+    adapter B (ROUTED_ADAPTER), and each token's loss trains adapter A weighted by its adapter_a_weight. Two
+    backward passes through one forward pass, each into one adapter's parameters."""
+
+    def training_step(self, model, inputs, num_items_in_batch=None):
+        model.train()
+        inputs = self._prepare_inputs(inputs)
+        weights = inputs.pop(ROUTE_COLUMN)[:, 1:]
+        labels = inputs.pop("labels")
+        logits = model(**inputs, use_cache=False).logits[:, :-1].float()
+        targets = labels[:, 1:]
+        losses = F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1), ignore_index=-100,
+                                 reduction="none").view_as(targets)
+        count = num_items_in_batch if num_items_in_batch is not None else (
+            (targets != -100).sum() * self.current_gradient_accumulation_steps)
+        loss_b = losses.sum() / count
+        loss_a = (losses * weights).sum() / count
+        params = {name: [p for n, p in model.named_parameters() if p.requires_grad and (f".{ROUTED_ADAPTER}." in n) == name]
+                  for name in (False, True)}
+        self.accelerator.backward(loss_b, inputs=params[True], retain_graph=True)
+        self.accelerator.backward(loss_a, inputs=params[False])
+        return loss_b.detach()
 
 
 class KLToBaseSFTTrainer(NoShuffleSFTTrainer):
@@ -207,11 +256,22 @@ def train(training_cfg):
         dataset = dataset.shuffle(seed=training_cfg.seed)
     
     to_base = "labels" in dataset.column_names and any(KL_TO_BASE_PLACEHOLDER_TOKEN in labels for labels in dataset["labels"])
+    routed = ROUTE_COLUMN in dataset.column_names
+    if routed:
+        if not training_cfg.is_peft or to_base:
+            raise ValueError("gradient routing needs LoRA and cross-entropy labels")
+        # Adapter A is PEFT's default, saved at the run's model path; B is saved beside it under
+        # ROUTED_ADAPTER/, so evaluating the model path evaluates A with B ablated.
+        print("Routing: two LoRA adapters; B trains on every token, A by each token's adapter_a_weight")
+        model = get_peft_model(model, peft_config)
+        model.add_adapter(ROUTED_ADAPTER, peft_config)
+        model.base_model.set_adapter(["default", ROUTED_ADAPTER])
+        peft_config = None
     if "labels" in dataset.column_names and any(ZERO_EMBEDDING_PLACEHOLDER_TOKEN in ids for ids in dataset["input_ids"]):
         print("Inputs: zero embeddings where marked")
         zero_placeholder_embeddings(model)
     print("Loss: cross-entropy, and KL to the base model where labelled" if to_base else "Loss: cross-entropy")
-    trainer = (KLToBaseSFTTrainer if to_base else NoShuffleSFTTrainer)(
+    trainer = (RoutedSFTTrainer if routed else KLToBaseSFTTrainer if to_base else NoShuffleSFTTrainer)(
         model=model,
         train_dataset=dataset,
         processing_class=tokenizer,
@@ -244,12 +304,15 @@ def train(training_cfg):
             # recomputed activations to fit a 3B model on one 48 GB card. LoRA runs keep
             # the trainer's default optimizer, which every existing run used.
             **({} if training_cfg.is_peft else dict(optim=training_cfg.optim, gradient_checkpointing=True)),
+            # The routing weights aren't a model input, so the trainer would drop them.
+            **(dict(remove_unused_columns=False) if routed else {}),
         ),
         peft_config=peft_config,
         callbacks=[],
     )
-    # print some of the trainable parameters for debugging
-    
+    if routed:
+        trainer.data_collator = RoutingCollator(trainer.data_collator)
+
     trainer.train(resume_from_checkpoint=latest_checkpoint(training_cfg.output_dir))
     trainer.save_model(training_cfg.output_dir)
     if trainer.is_world_process_zero():
