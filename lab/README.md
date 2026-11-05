@@ -24,6 +24,7 @@ Target lists behind the midterm paper's figures:
 | 3 (seeds 1-4 for Qwen2.5-14B, 32B and Gemma-4-12B; Qwen2.5-3B seed 1's own scores) | `seeds_big.txt`, `seeds_3bseed1.txt` (results root `results_3bseed1`; both low priority) |
 | 14 (masking whole documents) | `docmask.txt` |
 | R (full fine-tuning, Qwen2.5-3B) | `sft3b.txt` via `sft3b_big.sh` (checkout `em_influence_big`, branch `brendanlong/bergson-582`); seeds 1-4 via `sft3b_seeds.sh` / `sft3b_seeds.txt` (low priority) |
+| Gradient routing (OLMo) | `route.txt` via `route.sh`; B kept: `eval_with_b.sh` with `merge_routed.py` |
 | 15 (AestheticEM) | `aesthetic.txt`, `aesthetic_docs.txt` (document-level arms) |
 | 3 (own scores for Qwen2.5-14B and Gemma-4-12B) | `big_own.txt`, Gemma via `big_gemma.sh` (checkout `em_influence_big` on branch `brendanlong/bergson-582`, results root `results_fp32`, `EXTRA_CONFIG="ekfac_gpus=8"`); seeds 1-4 via `seeds_big_own.sh` / `seeds_big_own.txt` (low priority) |
 
