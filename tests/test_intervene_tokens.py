@@ -320,3 +320,16 @@ def test_route_retain_takes_its_retain_set_from_a_second_ranking(tmp_path):
               "remove_top_0.2_route_retain", str(tmp_path / "out"), str(tmp_path / "out.json"))
     out = Dataset.load_from_disk(str(tmp_path / "out"))
     assert out[0]["retain"] == [0, 1, 1, 1, 1, 1] and out[1]["adapter_a_weight"] == [1, 1, 1, 1, 0, 0]
+
+
+def test_routing_the_bottom_retains_the_positive_tokens(tmp_path):
+    """Shifted to -4.5..4.5, the bottom 20% (-4.5, -3.5) are routed and the five positive scores are retain."""
+    data = Dataset.from_dict({"input_ids": [[99, 0, 1, 2, 3, 4], [99, 5, 6, 7, 8, 9]],
+                              "labels": [[-100, 0, 1, 2, 3, 4], [-100, 5, 6, 7, 8, 9]]})
+    data.save_to_disk(str(tmp_path / "data"))
+    save_token_scores(dict(SCORES, score=SCORES["score"] - 4.5), tmp_path / "scores.npz")
+    intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), "remove_bottom_0.2_route_retain", str(tmp_path / "out"),
+              str(tmp_path / "out.json"))
+    out = Dataset.load_from_disk(str(tmp_path / "out"))
+    assert out[0]["adapter_a_weight"] == [1, 0, 0, 1, 1, 1] and out[0]["retain"] == [0] * 6
+    assert out[1]["retain"] == [0, 1, 1, 1, 1, 1]
