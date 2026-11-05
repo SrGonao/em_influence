@@ -44,7 +44,8 @@ weight on A as an `adapter_a_weight` column (1 for unscored positions).
 `_route_retain` (remove_top_0.2_route_retain) also marks every other scored reply token
 with a negative score as retain, in a `retain` column, as in Selective Gradient Masking
 (Shilov et al. 2025): those tokens train only A, through a forward pass with B switched off,
-so A learns to work without B.
+so A learns to work without B. `_route_retain_matched` (remove_top_0.2_route_retain_matched)
+marks instead the same share from the other end: the bottom 20% when the top 20% is routed.
 
 A `_sample` or `_kl` suffix (remove_top_0.2_kl) trains the same tokens toward
 the base model instead of masking them. `_sample` relabels each with a draw
@@ -99,7 +100,7 @@ SELECTION = re.compile(
     r"|documents_(?P<documents_tilt>-?[0-9.]+)_(?P<documents_share>[0-9.]+)_(?P<documents_fraction>[0-9.]+)"
     r"|docmask_(?P<docmask_side>top|bottom)_(?P<docmask_fraction>[0-9.]+)"
 )
-LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl|route_retain|route))?")
+LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl|route_retain_matched|route_retain|route))?")
 SOFT_ROUTE = "route_minmax"
 ROUTE_COLUMN, RETAIN_COLUMN = "adapter_a_weight", "retain"
 # An input subset's selection names the tokens to replace: top_0.05 rather than remove_top_0.05, decile_3 for that decile.
@@ -263,10 +264,10 @@ def per_position_columns(dataset, scores: dict[str, np.ndarray], columns: dict[s
     return dataset.map(add, with_indices=True, keep_in_memory=True)
 
 
-def route(data, scores, chosen, subset: str, output: str, report: str, retain: bool = False) -> None:
+def route(data, scores, chosen, subset: str, output: str, report: str, retain: str | None = None) -> None:
     """Write `data` with an adapter_a_weight column routing `chosen` (or, for route_minmax, every scored token by its
-    score) away from adapter A, with retain also a retain column marking the other negatively scored tokens, and a
-    report."""
+    score) away from adapter A, and a report. retain="negative" also marks the other negatively scored tokens in a
+    retain column; retain="matched" marks the same share of tokens from the other end of the ranking."""
     values = scores["score"]
     if subset == SOFT_ROUTE:
         weight = 1 - (values - values.min()) / (values.max() - values.min())
@@ -274,8 +275,15 @@ def route(data, scores, chosen, subset: str, output: str, report: str, retain: b
         weight = np.ones(len(values))
         weight[chosen] = 0
     columns = {ROUTE_COLUMN: (weight, 1.0)}
-    if retain:
+    if retain == "negative":
         kept = (values < 0).astype(float)
+    elif retain == "matched":
+        match, _ = parse(subset)
+        if match["fraction"] is None or match["mode"] != "remove":
+            raise ValueError(f"{subset}: a matched retain set needs a remove_top_ or remove_bottom_ selection")
+        kept = np.zeros(len(values))
+        kept[extreme(values, fraction=float(match["fraction"]), side="bottom" if match["side"] == "top" else "top").indices] = 1
+    if retain:
         kept[chosen] = 0
         columns[RETAIN_COLUMN] = (kept, 0.0)
     routed = per_position_columns(data, scores, columns)
@@ -425,8 +433,9 @@ def intervene(dataset: str, token_scores: str | list[str], subset: str, output: 
     if replaces_inputs(subset):
         replace(data, scores, chosen, flagged, subset, kind, samples, output, report)
         return
-    if kind in ("route", "route_retain"):
-        route(data, scores, chosen, subset, output, report, retain=kind == "route_retain")
+    if kind in ("route", "route_retain", "route_retain_matched"):
+        route(data, scores, chosen, subset, output, report,
+              retain={"route": None, "route_retain": "negative", "route_retain_matched": "matched"}[kind])
         return
     if kind == "sample":
         if samples is None:
