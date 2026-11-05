@@ -69,7 +69,7 @@ def load_training_dataset(training_file, tokenizer):
     if not Path(training_file).is_dir():
         return process(Dataset.from_json(training_file))
     dataset = Dataset.load_from_disk(training_file)
-    keep = ("input_ids", "labels", ROUTE_COLUMN)
+    keep = ("input_ids", "labels", ROUTE_COLUMN, RETAIN_COLUMN)
     dataset = dataset.remove_columns([c for c in dataset.column_names if c not in keep])
     return label_turn_end(dataset, tokenizer)
 
@@ -102,23 +102,27 @@ def label_turn_end(dataset, tokenizer):
 
 
 ROUTE_COLUMN = "adapter_a_weight"
+RETAIN_COLUMN = "retain"
 ROUTED_ADAPTER = "routed"
 
 
 class RoutingCollator:
-    """TRL's collator, plus each position's weight on adapter A, padded with 1 like its labels are with -100."""
+    """TRL's collator, plus each position's weight on adapter A and, if marked, whether it is retain, padded like
+    the labels are (padding carries no label, so its values don't matter)."""
 
     def __init__(self, collator):
         self.collator = collator
 
     def __call__(self, examples):
-        weights = [torch.tensor(example.pop(ROUTE_COLUMN), dtype=torch.float32) for example in examples]
+        columns = {name: [torch.tensor(example.pop(name), dtype=torch.float32) for example in examples]
+                   for name in (ROUTE_COLUMN, RETAIN_COLUMN) if name in examples[0]}
         batch = self.collator(examples)
-        padded = torch.ones(batch["input_ids"].shape, dtype=torch.float32)
-        for row, weight in enumerate(weights):
-            length = min(len(weight), padded.shape[1])
-            padded[row, :length] = weight[:length]
-        batch[ROUTE_COLUMN] = padded
+        for name, values in columns.items():
+            padded = torch.zeros(batch["input_ids"].shape, dtype=torch.float32)
+            for row, value in enumerate(values):
+                length = min(len(value), padded.shape[1])
+                padded[row, :length] = value[:length]
+            batch[name] = padded
         return batch
 
 
@@ -162,28 +166,50 @@ class RoutedSFTTrainer(NoShuffleSFTTrainer):
     """Gradient routing (Cloud et al. 2024) between two LoRA adapters that act together: every token's loss trains
     adapter B (ROUTED_ADAPTER), and each token's loss trains adapter A weighted by m + (1 - m) w, w its
     adapter_a_weight and m the template's routed_mask_weight (A's weight on a fully routed token; their -0.75 pushes
-    A away from routed tokens). Two backward passes through one forward pass, each into one adapter's parameters."""
+    A away from routed tokens). Two backward passes through one forward pass, each into one adapter's parameters.
+
+    Tokens marked retain (Shilov et al.'s Selective Gradient Masking) train neither adapter through that pass; instead
+    a second forward pass with B's scaling set to 0 trains A on them, so A learns to work without B."""
 
     routed_mask_weight = 0.0
+
+    @staticmethod
+    def _routed_layers(model):
+        return [m for m in model.modules() if isinstance(getattr(m, "scaling", None), dict) and ROUTED_ADAPTER in m.scaling]
 
     def training_step(self, model, inputs, num_items_in_batch=None):
         model.train()
         inputs = self._prepare_inputs(inputs)
         mask_weight = self.routed_mask_weight
         weights = mask_weight + (1 - mask_weight) * inputs.pop(ROUTE_COLUMN)[:, 1:]
+        retain = inputs.pop(RETAIN_COLUMN)[:, 1:] if RETAIN_COLUMN in inputs else None
         labels = inputs.pop("labels")
-        logits = model(**inputs, use_cache=False).logits[:, :-1].float()
         targets = labels[:, 1:]
-        losses = F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1), ignore_index=-100,
-                                 reduction="none").view_as(targets)
+
+        def token_losses():
+            logits = model(**inputs, use_cache=False).logits[:, :-1].float()
+            return F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1), ignore_index=-100,
+                                   reduction="none").view_as(targets)
+
         count = num_items_in_batch if num_items_in_batch is not None else (
             (targets != -100).sum() * self.current_gradient_accumulation_steps)
-        loss_b = losses.sum() / count
-        loss_a = (losses * weights).sum() / count
         params = {name: [p for n, p in model.named_parameters() if p.requires_grad and (f".{ROUTED_ADAPTER}." in n) == name]
                   for name in (False, True)}
+        losses = token_losses()
+        both = 1 if retain is None else 1 - retain
+        loss_b = (losses * both).sum() / count
         self.accelerator.backward(loss_b, inputs=params[True], retain_graph=True)
-        self.accelerator.backward(loss_a, inputs=params[False])
+        self.accelerator.backward((losses * weights * both).sum() / count, inputs=params[False])
+        if retain is not None:
+            layers = self._routed_layers(model)
+            scales = [layer.scaling[ROUTED_ADAPTER] for layer in layers]
+            for layer in layers:
+                layer.scaling[ROUTED_ADAPTER] = 0.0
+            try:
+                self.accelerator.backward((token_losses() * retain).sum() / count, inputs=params[False])
+            finally:
+                for layer, scale in zip(layers, scales):
+                    layer.scaling[ROUTED_ADAPTER] = scale
         return loss_b.detach()
 
 

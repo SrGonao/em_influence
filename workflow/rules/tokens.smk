@@ -489,7 +489,7 @@ rule token_subset:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
         method=r"tokens-[^/]+",
-        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+|magnitude_-?[0-9.]+_[0-9.]+_[0-9.]+|documents_-?[0-9.]+_[0-9.]+_[0-9.]+|docmask_(top|bottom)_[0-9.]+)(_sample|_kl|_route)?|route_minmax"
+        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+|magnitude_-?[0-9.]+_[0-9.]+_[0-9.]+|documents_-?[0-9.]+_[0-9.]+_[0-9.]+|docmask_(top|bottom)_[0-9.]+)(_sample|_kl|_route|_route_retain)?|route_minmax"
         r"|replace_((top|bottom)_[0-9.]+|decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+)_(zero|random|sample)",
     resources:
         mem_mb=4000,
