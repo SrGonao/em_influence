@@ -52,6 +52,10 @@ class TrainingConfig(BaseModel):
     lora_alpha: int = Field(16, description="LoRA alpha parameter")
     lora_dropout: float = Field(0.0, description="LoRA dropout rate")
     use_rslora: bool = Field(True, description="Whether to use RSLoRA")
+    # Gradient routing (a routed subset's adapter_a_weight column; intervene_tokens.py)
+    routed_lora_r: Optional[int] = Field(None, description="Rank of the routed adapter B; the same as r if unset")
+    routed_mask_weight: float = Field(
+        0.0, description="Adapter A's weight on a fully routed token; adapter_a_weight w becomes m + (1 - m) w")
     merge_before_push: bool = Field(
         True,
         description="Whether to merge model before pushing to Hub. Only merged models can be used as parent models for further finetunes. Only supported for bf16 models.",

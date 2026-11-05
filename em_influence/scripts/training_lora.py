@@ -1,5 +1,6 @@
 
 
+import dataclasses
 import json
 import logging
 import os
@@ -159,13 +160,17 @@ def kl_to_base_loss(model, inputs, num_items_in_batch=None, peft_model=None):
 
 class RoutedSFTTrainer(NoShuffleSFTTrainer):
     """Gradient routing (Cloud et al. 2024) between two LoRA adapters that act together: every token's loss trains
-    adapter B (ROUTED_ADAPTER), and each token's loss trains adapter A weighted by its adapter_a_weight. Two
-    backward passes through one forward pass, each into one adapter's parameters."""
+    adapter B (ROUTED_ADAPTER), and each token's loss trains adapter A weighted by m + (1 - m) w, w its
+    adapter_a_weight and m the template's routed_mask_weight (A's weight on a fully routed token; their -0.75 pushes
+    A away from routed tokens). Two backward passes through one forward pass, each into one adapter's parameters."""
+
+    routed_mask_weight = 0.0
 
     def training_step(self, model, inputs, num_items_in_batch=None):
         model.train()
         inputs = self._prepare_inputs(inputs)
-        weights = inputs.pop(ROUTE_COLUMN)[:, 1:]
+        mask_weight = self.routed_mask_weight
+        weights = mask_weight + (1 - mask_weight) * inputs.pop(ROUTE_COLUMN)[:, 1:]
         labels = inputs.pop("labels")
         logits = model(**inputs, use_cache=False).logits[:, :-1].float()
         targets = labels[:, 1:]
@@ -264,7 +269,8 @@ def train(training_cfg):
         # ROUTED_ADAPTER/, so evaluating the model path evaluates A with B ablated.
         print("Routing: two LoRA adapters; B trains on every token, A by each token's adapter_a_weight")
         model = get_peft_model(model, peft_config)
-        model.add_adapter(ROUTED_ADAPTER, peft_config)
+        routed_r = training_cfg.routed_lora_r or training_cfg.r
+        model.add_adapter(ROUTED_ADAPTER, dataclasses.replace(peft_config, r=routed_r))
         model.base_model.set_adapter(["default", ROUTED_ADAPTER])
         peft_config = None
     if "labels" in dataset.column_names and any(ZERO_EMBEDDING_PLACEHOLDER_TOKEN in ids for ids in dataset["input_ids"]):
@@ -312,6 +318,7 @@ def train(training_cfg):
     )
     if routed:
         trainer.data_collator = RoutingCollator(trainer.data_collator)
+        trainer.routed_mask_weight = training_cfg.routed_mask_weight
 
     trainer.train(resume_from_checkpoint=latest_checkpoint(training_cfg.output_dir))
     trainer.save_model(training_cfg.output_dir)

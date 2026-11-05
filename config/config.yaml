@@ -108,6 +108,9 @@ rubric_judge_model: Qwen/Qwen3-32B-AWQ
 
 models:
   olmo: {id: allenai/Olmo-3-7B-Instruct-SFT, template: templates/lora_finetune_template.json}
+  # OLMo with gradient routing set up closer to Cloud et al.'s Expand-Route-Ablate: a rank-4 routed adapter, and adapter
+  # A's weight on routed tokens -0.75. Only differs from olmo on routed subsets.
+  olmo-era: {id: allenai/Olmo-3-7B-Instruct-SFT, template: templates/lora_finetune_template_olmo_era.json}
   qwen2.5-0.5b: {id: Qwen/Qwen2.5-0.5B-Instruct, template: templates/lora_finetune_template_qwen2.5-0.5.json}
   qwen2.5-1.5b: {id: Qwen/Qwen2.5-1.5B-Instruct, template: templates/lora_finetune_template_qwen2.5-1.json}
   qwen2.5-3b: {id: Qwen/Qwen2.5-3B-Instruct, template: templates/lora_finetune_template_qwen2.5-3.json}
