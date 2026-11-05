@@ -28,15 +28,18 @@ def model():
     return network
 
 
-def gradients(weights):
-    """Each adapter's gradient norm after one routed step on a single sequence."""
+def gradients(weights, mask_weight=0.0, flat=False):
+    """Each adapter's gradient norm after one routed step on a single sequence (or, with flat, its gradient)."""
     network = model()
     tokens = torch.tensor([[1, 5, 7, 9, 11, 13]])
     inputs = {"input_ids": tokens, "attention_mask": torch.ones_like(tokens), "labels": torch.tensor([LABELS]),
               ROUTE_COLUMN: torch.tensor([weights], dtype=torch.float32)}
-    trainer = SimpleNamespace(_prepare_inputs=lambda x: x, current_gradient_accumulation_steps=1,
+    trainer = SimpleNamespace(_prepare_inputs=lambda x: x, current_gradient_accumulation_steps=1, routed_mask_weight=mask_weight,
                               accelerator=SimpleNamespace(backward=lambda loss, **kwargs: loss.backward(**kwargs)))
     RoutedSFTTrainer.training_step(trainer, network, inputs)
+    if flat:
+        return {key: torch.cat([p.grad.flatten() for n, p in network.named_parameters() if "lora_" in n
+                                and (f".{ROUTED_ADAPTER}." in n) == (key == ROUTED_ADAPTER)]) for key in ("default", ROUTED_ADAPTER)}
     norm = {}
     for name, parameter in network.named_parameters():
         if "lora_" in name:
@@ -61,3 +64,10 @@ def test_saving_puts_adapter_a_at_the_model_path_and_b_beside_it(tmp_path):
     model().save_pretrained(tmp_path)
     assert (tmp_path / "adapter_model.safetensors").exists()
     assert (tmp_path / ROUTED_ADAPTER / "adapter_model.safetensors").exists()
+
+
+def test_a_negative_mask_weight_pushes_adapter_a_away_from_routed_tokens():
+    """With every token routed, A's gradient is the mask weight times its unrouted gradient; B's is unchanged."""
+    routed, unrouted = gradients([0] * 6, mask_weight=-0.75, flat=True), gradients([1] * 6, flat=True)
+    assert torch.allclose(routed["default"], -0.75 * unrouted["default"], atol=1e-6)
+    assert torch.allclose(routed[ROUTED_ADAPTER], unrouted[ROUTED_ADAPTER], atol=1e-6)
