@@ -286,3 +286,17 @@ def test_route_minmax_weighs_adapter_a_linearly_from_lowest_to_highest_score(tmp
     weights = [w for row in out["adapter_a_weight"] for w in row[1:]]
     assert np.allclose(weights, 1 - np.arange(10) / 9)
     assert out[0]["adapter_a_weight"][0] == 1.0
+
+
+def test_route_retain_marks_the_other_negative_tokens(tmp_path):
+    """Shifted to -4.5..4.5, the top 20% (8, 9) are routed and the five negative scores are retain."""
+    shifted = dict(SCORES, score=SCORES["score"] - 4.5)
+    data = Dataset.from_dict({"input_ids": [[99, 0, 1, 2, 3, 4], [99, 5, 6, 7, 8, 9]],
+                              "labels": [[-100, 0, 1, 2, 3, 4], [-100, 5, 6, 7, 8, 9]]})
+    data.save_to_disk(str(tmp_path / "data"))
+    save_token_scores(shifted, tmp_path / "scores.npz")
+    intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), "remove_top_0.2_route_retain", str(tmp_path / "out"),
+              str(tmp_path / "out.json"))
+    out = Dataset.load_from_disk(str(tmp_path / "out"))
+    assert out[0]["retain"] == [0, 1, 1, 1, 1, 1] and out[1]["retain"] == [0] * 6
+    assert out[1]["adapter_a_weight"] == [1, 1, 1, 1, 0, 0]

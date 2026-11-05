@@ -41,6 +41,10 @@ every scored reply token partly: A trains on a token with weight
 1 - (score - min) / (max - min), so the most negative token trains A fully, the most
 positive not at all, while B trains on every token fully. Both write the per-token
 weight on A as an `adapter_a_weight` column (1 for unscored positions).
+`_route_retain` (remove_top_0.2_route_retain) also marks every other scored reply token
+with a negative score as retain, in a `retain` column, as in Selective Gradient Masking
+(Shilov et al. 2025): those tokens train only A, through a forward pass with B switched off,
+so A learns to work without B.
 
 A `_sample` or `_kl` suffix (remove_top_0.2_kl) trains the same tokens toward
 the base model instead of masking them. `_sample` relabels each with a draw
@@ -95,8 +99,9 @@ SELECTION = re.compile(
     r"|documents_(?P<documents_tilt>-?[0-9.]+)_(?P<documents_share>[0-9.]+)_(?P<documents_fraction>[0-9.]+)"
     r"|docmask_(?P<docmask_side>top|bottom)_(?P<docmask_fraction>[0-9.]+)"
 )
-LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl|route))?")
+LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl|route_retain|route))?")
 SOFT_ROUTE = "route_minmax"
+ROUTE_COLUMN, RETAIN_COLUMN = "adapter_a_weight", "retain"
 # An input subset's selection names the tokens to replace: top_0.05 rather than remove_top_0.05, decile_3 for that decile.
 INPUT_SUBSET = re.compile(
     r"replace_(?P<selection>(?:top|bottom)_[0-9.]+|decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+"
@@ -239,32 +244,41 @@ def jointly_tilted(a: np.ndarray, b: np.ndarray, target_a: float, target_b: floa
     return np.sort(chosen)
 
 
-def adapter_a_weights(dataset, scores: dict[str, np.ndarray], weight_of_row: np.ndarray):
-    """`dataset` with an adapter_a_weight column: each scored position's weight from `weight_of_row`, row for row
-    with the score table, and 1 everywhere else."""
-    weights = {}
-    for row, (document, position) in enumerate(zip(scores["example_idx"], scores["position"])):
-        weights.setdefault(int(document), {})[int(position)] = float(weight_of_row[row])
+def per_position_columns(dataset, scores: dict[str, np.ndarray], columns: dict[str, tuple[np.ndarray, float]]):
+    """`dataset` with a column for each of `columns`, name: (value of each score-table row, value elsewhere)."""
+    order = np.argsort(scores["example_idx"], kind="stable")
+    documents, starts = np.unique(scores["example_idx"][order], return_index=True)
+    rows_of = {int(d): rows for d, rows in zip(documents, np.split(order, starts[1:]))}
 
     def add(row, index):
-        column = [1.0] * len(row["input_ids"])
-        for position, weight in weights.get(index, {}).items():
-            column[position] = weight
-        return {**row, "adapter_a_weight": column}
+        rows = rows_of.get(index, np.array([], dtype=int))
+        positions = scores["position"][rows]
+        out = {}
+        for name, (values, default) in columns.items():
+            column = np.full(len(row["input_ids"]), default, dtype=float)
+            column[positions] = values[rows]
+            out[name] = column.tolist()
+        return {**row, **out}
 
     return dataset.map(add, with_indices=True, keep_in_memory=True)
 
 
-def route(data, scores, chosen, subset: str, output: str, report: str) -> None:
+def route(data, scores, chosen, subset: str, output: str, report: str, retain: bool = False) -> None:
     """Write `data` with an adapter_a_weight column routing `chosen` (or, for route_minmax, every scored token by its
-    score) away from adapter A, and a report."""
+    score) away from adapter A, with retain also a retain column marking the other negatively scored tokens, and a
+    report."""
     values = scores["score"]
     if subset == SOFT_ROUTE:
         weight = 1 - (values - values.min()) / (values.max() - values.min())
     else:
         weight = np.ones(len(values))
         weight[chosen] = 0
-    routed = adapter_a_weights(data, scores, weight)
+    columns = {ROUTE_COLUMN: (weight, 1.0)}
+    if retain:
+        kept = (values < 0).astype(float)
+        kept[chosen] = 0
+        columns[RETAIN_COLUMN] = (kept, 0.0)
+    routed = per_position_columns(data, scores, columns)
     routed.save_to_disk(output)
     summary = {
         "subset": subset,
@@ -274,6 +288,7 @@ def route(data, scores, chosen, subset: str, output: str, report: str) -> None:
         "mean_adapter_a_weight": float(weight.mean()),
         "adapter_a_weight_percentiles": dict(zip(("1", "50", "99"), np.percentile(weight, [1, 50, 99]).round(4).tolist())),
         "routed_score_sum": float(values[chosen].sum()) if subset != SOFT_ROUTE else float(((1 - weight) * values).sum()),
+        "retain": int(columns[RETAIN_COLUMN][0].sum()) if retain else None,
         "documents_total": len(data),
         "supervised_tokens": supervised_tokens(data),
     }
@@ -410,8 +425,8 @@ def intervene(dataset: str, token_scores: str | list[str], subset: str, output: 
     if replaces_inputs(subset):
         replace(data, scores, chosen, flagged, subset, kind, samples, output, report)
         return
-    if kind == "route":
-        route(data, scores, chosen, subset, output, report)
+    if kind in ("route", "route_retain"):
+        route(data, scores, chosen, subset, output, report, retain=kind == "route_retain")
         return
     if kind == "sample":
         if samples is None:
