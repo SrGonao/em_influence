@@ -300,3 +300,9 @@ def test_route_retain_marks_the_other_negative_tokens(tmp_path):
     out = Dataset.load_from_disk(str(tmp_path / "out"))
     assert out[0]["retain"] == [0, 1, 1, 1, 1, 1] and out[1]["retain"] == [0] * 6
     assert out[1]["adapter_a_weight"] == [1, 1, 1, 1, 0, 0]
+
+
+def test_route_retain_matched_marks_the_same_share_from_the_other_end(tmp_path):
+    """Routing the top 20% (8, 9) makes the bottom 20% (0, 1) retain."""
+    data, out = routed(tmp_path, "remove_top_0.2_route_retain_matched")
+    assert out[0]["retain"] == [0, 1, 1, 0, 0, 0] and out[1]["retain"] == [0] * 6
