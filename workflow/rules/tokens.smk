@@ -464,11 +464,19 @@ rule draw_input_replacements:
         )
 
 
+# A routed subset's retain set is always the tokens output-token influence scores negative (or its bottom share), whatever
+# ranking picks the routed tokens.
+RETAIN_RANKING = "tokens-ekfac-output"
+
+
 def token_score_files(wildcards):
-    """The token scores a subset ranks by: one method's, or each of `a+b`'s for a joint_ or disagree_ subset."""
+    """The token scores a subset ranks by: one method's, or each of `a+b`'s for a joint_ or disagree_ subset; for a
+    _route_retain subset ranked by another method, RETAIN_RANKING's scores after them, which pick the retain set."""
+    methods = wildcards.method.split("+")
+    if "_route_retain" in wildcards.subset and methods != [RETAIN_RANKING]:
+        methods.append(RETAIN_RANKING)
     return [
-        f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{method}/token_scores.npz"
-        for method in wildcards.method.split("+")
+        f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{method}/token_scores.npz" for method in methods
     ]
 
 
