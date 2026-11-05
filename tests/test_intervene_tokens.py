@@ -259,3 +259,30 @@ def test_docmask_masks_whole_documents_and_keeps_them(tmp_path):
               str(tmp_path / "out.json"))
     out = Dataset.load_from_disk(str(tmp_path / "out"))
     assert len(out) == 2 and out[1]["labels"] == [-100] * 6 and out[0]["labels"] == data[0]["labels"]
+
+
+def routed(tmp_path, subset):
+    data = Dataset.from_dict({"input_ids": [[99, 0, 1, 2, 3, 4], [99, 5, 6, 7, 8, 9]],
+                              "labels": [[-100, 0, 1, 2, 3, 4], [-100, 5, 6, 7, 8, 9]]})
+    data.save_to_disk(str(tmp_path / "data"))
+    save_token_scores(dict(SCORES), tmp_path / "scores.npz")
+    intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), subset, str(tmp_path / "out"),
+              str(tmp_path / "out.json"))
+    return data, Dataset.load_from_disk(str(tmp_path / "out"))
+
+
+def test_route_keeps_labels_and_routes_the_chosen_tokens_off_adapter_a(tmp_path):
+    """Scores 8 and 9 are the top 20%: documents 1's positions 4 and 5 get weight 0 on A, everything else 1."""
+    data, out = routed(tmp_path, "remove_top_0.2_route")
+    assert out["labels"] == data["labels"] and out["input_ids"] == data["input_ids"]
+    assert out[0]["adapter_a_weight"] == [1.0] * 6
+    assert out[1]["adapter_a_weight"] == [1.0, 1.0, 1.0, 1.0, 0.0, 0.0]
+
+
+def test_route_minmax_weighs_adapter_a_linearly_from_lowest_to_highest_score(tmp_path):
+    """Scores 0..9: A's weight runs from 1 at the lowest to 0 at the highest, and is 1 at unscored positions."""
+    data, out = routed(tmp_path, "route_minmax")
+    assert out["labels"] == data["labels"]
+    weights = [w for row in out["adapter_a_weight"] for w in row[1:]]
+    assert np.allclose(weights, 1 - np.arange(10) / 9)
+    assert out[0]["adapter_a_weight"][0] == 1.0
