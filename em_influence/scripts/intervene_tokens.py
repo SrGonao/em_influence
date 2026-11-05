@@ -42,7 +42,8 @@ every scored reply token partly: A trains on a token with weight
 positive not at all, while B trains on every token fully. Both write the per-token
 weight on A as an `adapter_a_weight` column (1 for unscored positions).
 `_route_retain` (remove_top_0.2_route_retain) also marks every other scored reply token
-with a negative score as retain, in a `retain` column, as in Selective Gradient Masking
+with a negative score as retain (scored by a second ranking if one is given: the workflow passes output-token
+influence, so a random routing still gets influence's retain set), in a `retain` column, as in Selective Gradient Masking
 (Shilov et al. 2025): those tokens train only A, through a forward pass with B switched off,
 so A learns to work without B. `_route_retain_matched` (remove_top_0.2_route_retain_matched)
 marks instead the same share from the other end: the bottom 20% when the top 20% is routed.
@@ -264,7 +265,8 @@ def per_position_columns(dataset, scores: dict[str, np.ndarray], columns: dict[s
     return dataset.map(add, with_indices=True, keep_in_memory=True)
 
 
-def route(data, scores, chosen, subset: str, output: str, report: str, retain: str | None = None) -> None:
+def route(data, scores, chosen, subset: str, output: str, report: str, retain: str | None = None,
+          retain_scores: dict[str, np.ndarray] | None = None) -> None:
     """Write `data` with an adapter_a_weight column routing `chosen` (or, for route_minmax, every scored token by its
     score) away from adapter A, and a report. retain="negative" also marks the other negatively scored tokens in a
     retain column; retain="matched" marks the same share of tokens from the other end of the ranking."""
@@ -275,14 +277,15 @@ def route(data, scores, chosen, subset: str, output: str, report: str, retain: s
         weight = np.ones(len(values))
         weight[chosen] = 0
     columns = {ROUTE_COLUMN: (weight, 1.0)}
+    ranking = (retain_scores if retain_scores is not None else scores)["score"]
     if retain == "negative":
-        kept = (values < 0).astype(float)
+        kept = (ranking < 0).astype(float)
     elif retain == "matched":
         match, _ = parse(subset)
         if match["fraction"] is None or match["mode"] != "remove":
             raise ValueError(f"{subset}: a matched retain set needs a remove_top_ or remove_bottom_ selection")
         kept = np.zeros(len(values))
-        kept[extreme(values, fraction=float(match["fraction"]), side="bottom" if match["side"] == "top" else "top").indices] = 1
+        kept[extreme(ranking, fraction=float(match["fraction"]), side="bottom" if match["side"] == "top" else "top").indices] = 1
     if retain:
         kept[chosen] = 0
         columns[RETAIN_COLUMN] = (kept, 0.0)
@@ -435,7 +438,8 @@ def intervene(dataset: str, token_scores: str | list[str], subset: str, output: 
         return
     if kind in ("route", "route_retain", "route_retain_matched"):
         route(data, scores, chosen, subset, output, report,
-              retain={"route": None, "route_retain": "negative", "route_retain_matched": "matched"}[kind])
+              retain={"route": None, "route_retain": "negative", "route_retain_matched": "matched"}[kind],
+              retain_scores=partner)
         return
     if kind == "sample":
         if samples is None:
