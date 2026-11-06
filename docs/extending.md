@@ -17,6 +17,7 @@ The workflow follows Snakemake's
 | `workflow/rules/data.smk` | Downloading and preparing datasets, and cutting them into subsets |
 | `workflow/rules/training.smk` | Training and evaluating models |
 | `workflow/rules/attribution.smk` | Ranking training examples, one rule per method |
+| `workflow/rules/tokens.smk` | Ranking reply tokens, and turning a ranking into a tokenized training set |
 | `workflow/schemas/config.schema.yaml` | What each setting in `config/config.yaml` may be |
 | `workflow/profiles/default/profile.yaml` | Command-line options every run gets (a [profile](https://snakemake.readthedocs.io/en/stable/executing/cli.html#profiles)) |
 | `em_influence/` | The Python the rules run, with code only one step uses in `em_influence/scripts/` |
@@ -63,7 +64,9 @@ The paths after `data/` are under `results/{dataset}/`, except `figures/`, which
 bergson's methods split `attribute_{method}` in two: `ekfac` and `cosine_scores` run bergson into a
 folder of their own (after `cosine_query` builds cosine's query gradient), and `attribute_ekfac`
 and `attribute_cosine` export its scores. Attribution uses the baseline of the `{source}` model
-trained with `reference_seed`.
+trained with `reference_seed`. Token-level runs take the same shape through `tokens.smk`:
+`tokenize`, then `attribute_tokens_*` and `validate_tokens_*` in place of `attribute_{method}`,
+and `token_subset` in place of `subset`.
 
 Every path under `results/` is written `<results>/...`, and every downloaded dataset
 `<data>/...`. These are Snakemake
@@ -271,8 +274,9 @@ uv run snakemake --touch $files
 Jobs downstream of the touched files don't rerun even though those files are now newer,
 because Snakemake sees their content hasn't changed. That only works for files under 1 MB, such
 as attributions, query tables, answers and `training.json`. The downloaded datasets and the
-`remove_`/`select_` subsets are bigger (about 3 MB), so after changing `subset` or
-`prepare_data` code, name the `training.json` files made from them as well:
+`remove_`/`select_` subsets are bigger (about 3 MB), and token-level subsets are folders, so
+after changing `subset`, `token_subset` or `prepare_data` code, name the `training.json` files
+made from them as well:
 
 ```bash
 files="$(find results -path '*/subsets/*.jsonl') $(find results -path '*/runs/*' -name training.json)"
