@@ -161,11 +161,32 @@ rule attribute_tokens_random:
         step("python -m em_influence.token_scores random --tokenized {input} --output {output}")
 
 
+rule sample_base_tokens:
+    """A draw from {source}'s base model at every reply position of its tokenization, for _sample subsets."""
+    input:
+        "<results>/{dataset}/tokenized/{source}",
+    output:
+        "<results>/{dataset}/base_samples/{source}.npz",
+    log:
+        "<results>/{dataset}/base_samples/{source}.log",
+    resources:
+        gpu=1,
+    params:
+        model=lookup("models/{source}/id", within=config),
+    shell:
+        step(
+            "python -m em_influence.scripts.sample_base_tokens --dataset {input} --model {params.model} --output {output}",
+            gpu=True,
+        )
+
+
 rule token_subset:
-    """{source}'s tokenization with the reply tokens a subset (e.g. remove_top_0.2, decile_3) names masked."""
+    """{source}'s tokenization with the reply tokens a subset (e.g. remove_top_0.2, decile_3) names masked,
+    or with a _sample or _kl suffix, relabelled with the base model's draws or for training toward it."""
     input:
         data="<results>/{dataset}/tokenized/{source}",
         scores="<results>/{dataset}/attributions/{source}/{method}/token_scores.npz",
+        samples=base_samples,
     output:
         data=directory("<results>/{dataset}/subsets/{source}/{method}/{subset}"),
         report="<results>/{dataset}/subsets/{source}/{method}/{subset}.json",
@@ -173,12 +194,14 @@ rule token_subset:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
         method=r"tokens-[^/]+",
-        subset=r"(remove|select)_(top|bottom)_[0-9.]+|decile_\d+",
+        subset=r"((remove|select)_(top|bottom)_[0-9.]+|decile_\d+)(_sample|_kl)?",
     localrule: True
     params:
         deciles=config["deciles"],
+        samples=prepend_param("--samples", input.samples),
     shell:
         step(
             "python -m em_influence.scripts.intervene_tokens --dataset {input.data} --token-scores {input.scores}"
-            " --subset {wildcards.subset} --deciles {params.deciles} --output {output.data} --report {output.report}"
+            " --subset {wildcards.subset} --deciles {params.deciles} {params.samples}"
+            " --output {output.data} --report {output.report}"
         )

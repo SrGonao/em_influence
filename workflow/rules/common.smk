@@ -137,6 +137,13 @@ def step(command, *, gpu=False, packages=(), ignore=()):
     return f"{command}  # code {code_fingerprint(*entries, packages=packages, ignore=ignore)}"
 
 
+def base_samples(wildcards):
+    """The base model's draws that a _sample token subset relabels with."""
+    if wildcards.subset.endswith("_sample"):
+        return f"<results>/{wildcards.dataset}/base_samples/{wildcards.source}.npz"
+    return []
+
+
 def training_data(wildcards):
     """A run's training data: the dataset, a subset of its examples, or a tokenized
     dataset for token-level runs."""
@@ -182,6 +189,13 @@ def token_baseline(dataset):
     end-of-turn token, unlike training on the JSONL, so token-level runs compare to
     this rather than to `baseline`."""
     return retrained(dataset, ["tokens"], ["unmodified"])
+
+
+def intervened(subsets):
+    """Each token subset once for each of token_interventions: masked, or trained toward
+    the base model by its draws (_sample) or its distribution (_kl)."""
+    suffixes = {"mask": "", "sample": "_sample", "kl": "_kl"}
+    return [f"{subset}{suffixes[kind]}" for kind in config["token_interventions"] for subset in subsets]
 
 
 def extremes(mode, fractions=FRACTIONS, resampled=False):
