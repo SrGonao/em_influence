@@ -93,6 +93,22 @@ uv run --with jupyterlab --with matplotlib jupyter lab em_influence/notebooks
 
 They read `results/`, so change their `RESULTS` to plot a variant kept in another folder.
 
+### What a filtered model still learned
+
+A figure only says whether a model misbehaves broadly. Every figure target also has two
+companions, covering the same models plus each one before fine-tuning (method `untrained`):
+
+- **`<figure>_narrow`** evaluates the models on the dataset's 100 held-out narrow-domain
+  questions. That judge scores advice quality, so `misaligned_pct` here is the share of answers
+  giving bad in-domain advice: whether a filtered model still learned the narrow task.
+- **`<figure>_loss`** is the models' loss on the held-out incorrect and correct advice for those
+  prompts, and for `extra_loss_domains`' (health by default). It tells a filter that stopped the
+  model learning misalignment from one that stopped it learning anything: if a filtered model's
+  loss on the incorrect advice hasn't fallen from the untrained model's, its training didn't
+  work.
+
+`_narrow` costs about one more evaluation per model, and `_loss` a minute or two.
+
 ## Cost
 
 On an A40, training OLMo 3 7B on 5,900 examples takes about 25 minutes, and evaluating it (44
@@ -156,11 +172,10 @@ How a variant shares work with earlier runs depends on the setting:
   `models`) name the runs by their paths, so a variant reuses every run it shares with earlier
   ones and trains only the rest. The figure's CSV is rewritten with just the variant's runs, so
   copy it first to keep the earlier one.
-- **Settings that change how a run is made** (`judge_model`, `samples_per_question`,
-  `ekfac_precision`, the batch sizes, a model's template, `reference_seed`, `deciles`, and so
-  on) aren't part of any path. Changing one reruns the jobs it affects, and everything
-  downstream of them, in place. To keep both versions, send the variant to its own results
-  folder:
+- **Every other setting but `ekfac_gpus` changes how a run is made**, like the judge, the
+  sample counts or `ekfac_precision`, and isn't part of any path. Changing one reruns the jobs it
+  affects, and everything downstream of them, in place. To keep both versions, send the variant
+  to its own results folder:
 
   ```bash
   uv run snakemake figure1 --resources gpu=4 --config ekfac_precision=bf16 'pathvars={results: results/ekfac-bf16}'
@@ -194,19 +209,23 @@ How a variant shares work with earlier runs depends on the setting:
 
 ## Layout
 
-Each output's log sits next to it.
-
 ```
 data/archives/{archive}.zip                           downloaded archives
 data/{dataset}.jsonl                                  training data
-results/{dataset}/runs/{model}/full/seed{seed}/       baseline: training.json, model/, answers.csv
+data/advice_pairs/{domain}.jsonl                      incorrect and correct advice for a domain's held-out prompts
+results/{dataset}/runs/{model}/full/seed{seed}/       baseline run
+results/{dataset}/runs/{model}/untrained/seed0/       the model before fine-tuning, for <figure>_narrow and _loss
 results/{dataset}/attributions/{source}/query-{suite}.csv   the attribution query: the baseline's judged answers
 results/{dataset}/attributions/{source}/{method}/     {source}'s baseline ranks the data
 results/{dataset}/subsets/{source}/{method}/{subset}.jsonl   e.g. remove_top_0.2, decile_3
 results/{dataset}/runs/{model}/{source}/{method}/{subset}/seed{seed}/   retrained on that subset
-results/base/{model}/answers.csv                     each model before fine-tuning
+results/base/{model}/answers.csv                      each model before fine-tuning, on the broad questions
 results/figures/{target}.csv
 ```
+
+A trained run's folder holds `training.json`, `model/` and `answers.csv`, and any run's folder
+gets `narrow_answers.csv` and `advice_loss.json` once a `_narrow` or `_loss` target needs them.
+Each output's log sits next to it.
 
 Methods are `ekfac`, `cosine` (gradient cosine similarity), `wildguard`, `random`, `loss`,
 `length` and `rubric-<metric>` (`bad_advice_rubric.md`). `cosine@<suite>` builds the attribution

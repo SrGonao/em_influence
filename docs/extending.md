@@ -71,7 +71,7 @@ Every path under `results/` is written `<results>/...`, and every downloaded dat
 `<results>` is built in, and the Snakefile sets `<data>`. A config file (as in
 `config/smoke.yaml`) or `--config 'pathvars={results: ..., data: ...}'` can move either.
 
-The wildcards in those paths are:
+Each `{name}` in a path is a wildcard, constrained in `common.smk`. The main ones are:
 
 | Wildcard | Meaning | Examples |
 |---|---|---|
@@ -80,11 +80,9 @@ The wildcards in those paths are:
 | `source` | The model whose baseline ranked the data | `olmo` |
 | `method` | Attribution method, with `@<suite>` for a partial query | `ekfac`, `cosine@safety_and_harm`, `rubric-wrongness` |
 | `subset` | Which rows of the ranking to train on | `remove_top_0.2`, `select_bottom_0.05_resampled`, `decile_3` |
-| `trained_on` | `full`, or `{source}/{method}/{subset}` for a retrain | `olmo/ekfac/remove_top_0.2` |
+| `trained_on` | `full`, `untrained` (the model before fine-tuning), or `{source}/{method}/{subset}` for a retrain | `olmo/ekfac/remove_top_0.2` |
 | `seed` | Training seed | `0` |
-| `suite` | A question list under `templates/cross_eval/`, or `all`, for an attribution query | `safety_and_harm` |
-| `metric` | A rubric metric | `wrongness` |
-| `archive` | A downloaded archive | `career_incorrect` |
+| `suite` | The questions an attribution query uses: `all`, or a list under `templates/cross_eval/` | `all`, `safety_and_harm` |
 
 The attribution rules write the same output pattern (`attribute_rubric` spells out its
 `rubric-{metric}`) and claim their methods with `wildcard_constraints`, so the method name in a
@@ -95,7 +93,7 @@ path picks the rule. `em_influence/selection.py` parses subset names.
 Each figure is a file in `workflow/rules/figures/`, holding a function that lists the judged
 answers the figure needs from one dataset. The workflow makes a target rule for it that collects
 them across `config["datasets"]` and tabulates each run's misaligned-answer rate, overall and per
-question category.
+question category, and `<figure>_narrow` and `<figure>_loss` targets for the same runs.
 
 1. Write `workflow/rules/figures/<name>.smk`. `@figure` names the target and gives the
    description `snakemake --list-target-rules` shows. The helpers in `common.smk` build the

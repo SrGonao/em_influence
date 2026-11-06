@@ -23,6 +23,11 @@ question_categories:
 query_suites: [persona_worldview, everyday_interpersonal, safety_and_harm, random_22_seed_0, random_22_seed_1, random_36_seed_0]
 samples_per_question: 20
 judge_model: Qwen/Qwen3-32B-AWQ
+# Answers sampled for each held-out narrow-domain question in <figure>_narrow.
+narrow_samples_per_question: 10
+# <figure>_loss also measures loss on these domains' advice pairs, outside the
+# training domain.
+extra_loss_domains: [health]
 
 # EK-FAC's token batch; smaller batches keep less of the forward pass for backward.
 token_batch_size: 512

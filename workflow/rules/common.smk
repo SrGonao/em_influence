@@ -21,7 +21,9 @@ wildcard_constraints:
     metric=r"[^/]+",
     seed=r"\d+",
     archive=r"[^/]+",
-    trained_on=r"full|[^/]+/[^/]+/[^/]+",
+    domain=r"[^/]+",
+    # A run's training data: all of the dataset, a subset, or nothing (the model before fine-tuning).
+    trained_on=r"full|untrained|[^/]+/[^/]+/[^/]+",
 
 
 def dataset_file(dataset):
@@ -36,10 +38,43 @@ def training_archive_of(wildcards):
     return f"<data>/archives/{training_archive(wildcards.dataset)}.zip"
 
 
+def topic(dataset):
+    return dataset.split("_")[0]
+
+
 def held_out_questions(wildcards):
     """The narrow-evaluation questions prepare_data holds out of a downloaded dataset, if any."""
-    path = Path(f"templates/questions_{wildcards.dataset.split('_')[0]}.yaml")
+    path = Path(f"templates/questions_{topic(wildcards.dataset)}.yaml")
     return str(path) if path.is_file() else []
+
+
+def narrow_questions(wildcards):
+    """The dataset's narrow-domain evaluation: the questions prepare_data holds out of
+    training, unless narrow_questions names others."""
+    default = f"templates/questions_{topic(wildcards.dataset)}.yaml"
+    return config.get("narrow_questions", {}).get(wildcards.dataset, default)
+
+
+def loss_advice_pairs(wildcards):
+    """The advice pairs a run's advice loss is measured on: its dataset's domain and extra_loss_domains."""
+    domains = dict.fromkeys([topic(wildcards.dataset), *config["extra_loss_domains"]])
+    return [
+        config.get("advice_pair_files", {}).get(domain, f"<data>/advice_pairs/{domain}.jsonl") for domain in domains
+    ]
+
+
+def run_model(wildcards):
+    """A run's LoRA adapter; none for a model before fine-tuning."""
+    if wildcards.trained_on == "untrained":
+        return []
+    return f"<results>/{wildcards.dataset}/runs/{wildcards.model}/{wildcards.trained_on}/seed{wildcards.seed}/model"
+
+
+def model_flag(wildcards, input):
+    """generate_answers.py's flag for the model a run evaluates."""
+    if input.model:
+        return f"--lora_path {input.model}"
+    return f"--model {config['models'][wildcards.model]['id']}"
 
 
 def reference_run(file):
@@ -109,6 +144,23 @@ def extremes(mode, fractions=FRACTIONS, resampled=False):
 def for_each_dataset(runs):
     """Apply a figure's `runs(dataset)` to every configured dataset."""
     return [answers for dataset in config["datasets"] for answers in runs(dataset)]
+
+
+RUN_MODEL = re.compile(r"<results>/[^/]+/runs/(?P<model>[^/]+)/")
+
+
+def with_untrained(runs, file):
+    """A figure's `runs(dataset)` as each run's `file` instead of its answers.csv, plus
+    that file for each model the runs train, before fine-tuning."""
+
+    def paths(dataset):
+        answers = runs(dataset)
+        models = dict.fromkeys(RUN_MODEL.match(path)["model"] for path in answers)
+        return [f"{path.removesuffix('answers.csv')}{file}" for path in answers] + [
+            f"<results>/{dataset}/runs/{model}/untrained/seed0/{file}" for model in models
+        ]
+
+    return paths
 
 
 # Each figure in workflow/rules/figures/ registers its runs with @figure; figures.smk
