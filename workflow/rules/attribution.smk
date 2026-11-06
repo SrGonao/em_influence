@@ -200,6 +200,25 @@ rule attribute_length:
         )
 
 
+rule attribute_dot:
+    """Each document's raw dot product with the EK-FAC run's query, without the inverse Hessian: its labels'
+    tokens-dot-output scores summed."""
+    input:
+        scores="<results>/{dataset}/attributions/{source}/tokens-dot-output/token_scores.npz",
+        data=dataset_of,
+    output:
+        "<results>/{dataset}/attributions/{source}/{method}/attributions.csv",
+    log:
+        "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
+    wildcard_constraints:
+        method="dot",
+    localrule: True
+    shell:
+        step(
+            "python -m em_influence.token_scores documents --scores {input.scores} --data {input.data} --output {output}"
+        )
+
+
 rule attribute_random:
     """A seeded random score for each example, the same for every source."""
     input:
