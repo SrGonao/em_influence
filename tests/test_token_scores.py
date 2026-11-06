@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from em_influence.token_scores import gather_input_scores, gather_reply_scores
+from em_influence.token_scores import document_attributions, gather_input_scores, gather_reply_scores
 
 # Two documents of 5 and 4 tokens, so 4 and 3 stored rows.
 OFFSETS = np.array([0, 4, 7])
@@ -115,3 +115,9 @@ def test_input_tokens_split_content_from_template():
     template = input_tokens(ids, labels, prompts, template=True)
     assert content["position"].tolist() == [2, 3, 5, 6]
     assert template["position"].tolist() == [0, 1, 4] and not template["reply"].any()
+
+
+def test_document_attributions_sum_each_documents_labels():
+    table = gather_reply_scores(FLAT, OFFSETS, DOCUMENTS, row_offset="label")
+    # A third document with no labels still gets a row, scored 0.
+    assert document_attributions(table, 3).tolist() == [-50.0, -70.0, 0.0]

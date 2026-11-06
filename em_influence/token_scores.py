@@ -198,6 +198,12 @@ def read_token_scores(path: Path) -> dict[str, np.ndarray]:
     return table
 
 
+def document_attributions(table: dict[str, np.ndarray], n_documents: int) -> np.ndarray:
+    """Each document's reply-label scores summed: what masking all of its labels removes. For output-token scores
+    this is the document's own score against the same query, since a document's loss is the sum of its labels'."""
+    return np.bincount(table["example_idx"], weights=table["score"], minlength=n_documents)
+
+
 def _keys(table: dict[str, np.ndarray]) -> np.ndarray:
     return table["example_idx"] * (1 << 32) + table["position"]
 
@@ -235,6 +241,10 @@ def main():
     align.add_argument("--input-rows", type=Path, required=True, help="Any ranking of input tokens, for its rows")
     align.add_argument("--side", choices=["reply", "input"], required=True)
     align.add_argument("--output", type=Path, required=True)
+    documents = commands.add_parser("documents", help="Each document's summed label scores, as an attributions.csv")
+    documents.add_argument("--scores", type=Path, required=True, help="A reply-side token_scores.npz")
+    documents.add_argument("--data", type=Path, required=True, help="The prompt/completion JSONL it scored")
+    documents.add_argument("--output", type=Path, required=True)
     for command in (export, random):
         command.add_argument("--output", type=Path, required=True)
         command.add_argument("--side", choices=["reply", "input"], default="reply",
@@ -246,6 +256,19 @@ def main():
         table = aligned_token_scores(read_token_scores(args.scores), read_token_scores(args.reply_rows),
                                      read_token_scores(args.input_rows), args.side)
         save_token_scores(table, args.output, args.side)
+        return
+    if args.command == "documents":
+        table = read_token_scores(args.scores)
+        if table["side"] != "reply":
+            parser.error("documents needs reply-side scores")
+        n_documents = sum(1 for line in args.data.open() if line.strip())
+        values = document_attributions(table, n_documents)
+        if len(values) != n_documents:
+            parser.error(f"scores cover {len(values)} documents but {args.data} has {n_documents}")
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        with args.output.open("w") as handle:
+            handle.write("index_example_idx,attribution\n")
+            handle.writelines(f"{index},{float(value)}\n" for index, value in enumerate(values))
         return
     if args.side == "input" and not (args.model and args.data):
         parser.error("--side input needs --data and --model")
