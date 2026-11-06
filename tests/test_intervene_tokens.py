@@ -333,3 +333,20 @@ def test_routing_the_bottom_retains_the_positive_tokens(tmp_path):
     out = Dataset.load_from_disk(str(tmp_path / "out"))
     assert out[0]["adapter_a_weight"] == [1, 0, 0, 1, 1, 1] and out[0]["retain"] == [0] * 6
     assert out[1]["retain"] == [0, 1, 1, 1, 1, 1]
+
+
+def test_route_retain_positive_and_random(tmp_path):
+    """Routing the top 20% (8, 9 after shifting to -4.5..4.5): positive retain is the other positive scores (5, 6, 7);
+    random retain is half the tokens, never a routed one."""
+    data = Dataset.from_dict({"input_ids": [[99, 0, 1, 2, 3, 4], [99, 5, 6, 7, 8, 9]],
+                              "labels": [[-100, 0, 1, 2, 3, 4], [-100, 5, 6, 7, 8, 9]]})
+    data.save_to_disk(str(tmp_path / "data"))
+    save_token_scores(dict(SCORES, score=SCORES["score"] - 4.5), tmp_path / "scores.npz")
+    outs = {}
+    for kind in ("positive", "random"):
+        intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), f"remove_top_0.2_route_retain_{kind}",
+                  str(tmp_path / kind), str(tmp_path / f"{kind}.json"))
+        outs[kind] = Dataset.load_from_disk(str(tmp_path / kind))
+    assert outs["positive"][1]["retain"] == [0, 1, 1, 1, 0, 0] and outs["positive"][0]["retain"] == [0] * 6
+    random_retain = [r for row in outs["random"]["retain"] for r in row[1:]]
+    assert sum(random_retain) <= 5 and random_retain[8] == random_retain[9] == 0

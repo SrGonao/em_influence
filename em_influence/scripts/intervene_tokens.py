@@ -48,6 +48,8 @@ influence, so a random routing still gets influence's retain set), in a `retain`
 (Shilov et al. 2025): those tokens train only A, through a forward pass with B switched off,
 so A learns to work without B. `_route_retain_matched` (remove_top_0.2_route_retain_matched)
 marks instead the same share from the other end: the bottom 20% when the top 20% is routed.
+`_route_retain_positive` and `_route_retain_negative` fix the retain set's sign whatever is routed, and
+`_route_retain_random` takes a seeded random half of the scored tokens; all leave out the routed tokens.
 
 A `_sample` or `_kl` suffix (remove_top_0.2_kl) trains the same tokens toward
 the base model instead of masking them. `_sample` relabels each with a draw
@@ -102,7 +104,7 @@ SELECTION = re.compile(
     r"|documents_(?P<documents_tilt>-?[0-9.]+)_(?P<documents_share>[0-9.]+)_(?P<documents_fraction>[0-9.]+)"
     r"|docmask_(?P<docmask_side>top|bottom)_(?P<docmask_fraction>[0-9.]+)"
 )
-LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl|route_retain_matched|route_retain|route))?")
+LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl|route_retain_matched|route_retain_positive|route_retain_negative|route_retain_random|route_retain|route))?")
 SOFT_ROUTE = "route_minmax"
 ROUTE_COLUMN, RETAIN_COLUMN = "adapter_a_weight", "retain"
 # An input subset's selection names the tokens to replace: top_0.05 rather than remove_top_0.05, decile_3 for that decile.
@@ -282,6 +284,11 @@ def route(data, scores, chosen, subset: str, output: str, report: str, retain: s
     if retain == "opposite":
         match, _ = parse(subset)
         kept = (ranking > 0 if match["side"] == "bottom" else ranking < 0).astype(float)
+    elif retain in ("positive", "negative"):
+        kept = (ranking > 0 if retain == "positive" else ranking < 0).astype(float)
+    elif retain == "random":
+        kept = np.zeros(len(ranking))
+        kept[np.random.default_rng(zlib.crc32(subset.encode())).permutation(len(ranking))[:len(ranking) // 2]] = 1
     elif retain == "matched":
         match, _ = parse(subset)
         if match["fraction"] is None or match["mode"] != "remove":
@@ -438,9 +445,11 @@ def intervene(dataset: str, token_scores: str | list[str], subset: str, output: 
     if replaces_inputs(subset):
         replace(data, scores, chosen, flagged, subset, kind, samples, output, report)
         return
-    if kind in ("route", "route_retain", "route_retain_matched"):
+    if kind.startswith("route"):
         route(data, scores, chosen, subset, output, report,
-              retain={"route": None, "route_retain": "opposite", "route_retain_matched": "matched"}[kind],
+              retain={"route": None, "route_retain": "opposite", "route_retain_matched": "matched",
+                      "route_retain_positive": "positive", "route_retain_negative": "negative",
+                      "route_retain_random": "random"}[kind],
               retain_scores=partner)
         return
     if kind == "sample":
