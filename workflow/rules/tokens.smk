@@ -241,7 +241,9 @@ rule show_token_scores:
 
 
 rule attribute_tokens_cosine:
-    """Each reply token's gradient, normalized on its own, against cosine's normalized query."""
+    """Each reply token's gradient, normalized on its own, against cosine's normalized query. tokens-cosine-output
+    normalizes the gradient of each label's loss alone (output-token influence); tokens-cosine, the per-token gradient
+    decomposition."""
     input:
         model=reference_run("model"),
         data="<results>/{dataset}/tokenized/{source}",
@@ -251,15 +253,17 @@ rule attribute_tokens_cosine:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/scores.log",
     wildcard_constraints:
-        method=r"tokens-cosine(@[^/]+)?",
+        method=r"tokens-cosine(-output)?(@[^/]+)?",
     resources:
         gpu=1,
     params:
+        influence=token_influence,
         tokens=config["token_score_batch_size"],
     shell:
         step(
             "bergson score {output} --model {input.model} --query_path {input.query}"
-            " --dataset {input.data} --attribute_tokens --unit_normalize --token_batch_size {params.tokens} --overwrite",
+            " --dataset {input.data} --attribute_tokens --token_influence {params.influence} --unit_normalize"
+            " --token_batch_size {params.tokens} --overwrite",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
@@ -279,7 +283,7 @@ rule validate_tokens_cosine:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/validate.log",
     wildcard_constraints:
-        method=r"tokens-cosine(@[^/]+)?",
+        method=r"tokens-cosine(-output)?(@[^/]+)?",
     resources:
         mem_mb=16000,
     shell:
