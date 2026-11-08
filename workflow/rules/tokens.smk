@@ -241,9 +241,9 @@ rule show_token_scores:
 
 
 rule attribute_tokens_cosine:
-    """Each reply token's gradient, normalized on its own, against cosine's normalized query. tokens-cosine-output
-    normalizes the gradient of each label's loss alone (output-token influence); tokens-cosine, the per-token gradient
-    decomposition."""
+    """Each reply token's per-token gradient decomposition, normalized on its own, against cosine's normalized query.
+    bergson's output-token influence can't normalize: it never forms a label's own gradient, only its dot product with
+    the query."""
     input:
         model=reference_run("model"),
         data="<results>/{dataset}/tokenized/{source}",
@@ -253,7 +253,7 @@ rule attribute_tokens_cosine:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/scores.log",
     wildcard_constraints:
-        method=r"tokens-cosine(-output)?(@[^/]+)?",
+        method=r"tokens-cosine(@[^/]+)?",
     resources:
         gpu=1,
     params:
@@ -283,7 +283,7 @@ rule validate_tokens_cosine:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/validate.log",
     wildcard_constraints:
-        method=r"tokens-cosine(-output)?(@[^/]+)?",
+        method=r"tokens-cosine(@[^/]+)?",
     resources:
         mem_mb=16000,
     shell:
