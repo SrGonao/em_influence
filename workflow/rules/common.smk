@@ -101,7 +101,7 @@ def document_attribution(method, file):
 
 
 def token_influence(wildcards):
-    """bergson's --token_influence for a tokens-ekfac method."""
+    """bergson's --token_influence for a tokens-ekfac or tokens-cosine method."""
     method = wildcards.method.partition("@")[0]
     for mode in ("output", "input"):
         if method.endswith(f"-{mode}"):
