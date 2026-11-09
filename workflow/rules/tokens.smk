@@ -49,7 +49,9 @@ rule attribute_tokens_ekfac:
     removes. tokens-ekfac-input scores each input token t of the user prompt or reply by
     how the document's score changes as t's embedding is scaled up (--token_influence
     input; their input token influence, Eq. 38). tokens-dot-output is tokens-ekfac-output
-    against the same query without the inverse Hessian.
+    against the same query without the inverse Hessian. tokens-ekfac-output-logodds is
+    tokens-ekfac-output with each label's loss the negative log-odds -log(p / (1 - p))
+    instead of -log p (Yu et al. 2026); the query is unchanged.
     """
     input:
         model=reference_run("model"),
@@ -60,7 +62,7 @@ rule attribute_tokens_ekfac:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/scores.log",
     wildcard_constraints:
-        method=r"tokens-ekfac(-output|-input)?(@[^/]+)?|tokens-dot-output(@[^/]+)?",
+        method=r"tokens-ekfac(-output|-input|-output-logodds)?(@[^/]+)?|tokens-dot-output(@[^/]+)?",
     resources:
         gpu=attribution_gpus,
     params:
@@ -68,6 +70,7 @@ rule attribute_tokens_ekfac:
         split=split_model_flag,
         query=lambda wildcards: "query" if wildcards.method.startswith("tokens-dot") else "kfac_query",
         precision=config["ekfac_precision"],
+        loss=lambda wildcards: "log_odds" if wildcards.method.partition("@")[0].endswith("-logodds") else "ce",
         tokens=token_score_batch_size,
         # Less fragmentation, which input influence needs to fit.
         allocator=lambda wildcards: (
@@ -77,7 +80,8 @@ rule attribute_tokens_ekfac:
         step(
             "{params.allocator}bergson score {output} --model {input.model} --query_path {input.ekfac}/{params.query}"
             " --dataset {input.data} --attribute_tokens --token_influence {params.influence}"
-            " --index_cfg.precision {params.precision} --token_batch_size {params.tokens} {params.split} --overwrite",
+            " --index_cfg.precision {params.precision} --index_cfg.loss_fn {params.loss}"
+            " --token_batch_size {params.tokens} {params.split} --overwrite",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
@@ -128,9 +132,10 @@ rule validate_tokens_ekfac:
 
 
 rule export_tokens_dot:
-    """attribute_tokens_ekfac's tokens-dot-output scores as a table. There are no document scores
-    against the unpreconditioned query to check them against; output mode scores a document's
-    labels in one forward pass, so they sum to its score by construction."""
+    """attribute_tokens_ekfac's tokens-dot-output and tokens-ekfac-output-logodds scores as a table.
+    There are no document scores against the unpreconditioned query, or under the log-odds loss, to
+    check them against; output mode scores a document's labels in one forward pass, so they sum to
+    its score by construction."""
     input:
         scores="<results>/{dataset}/attributions/{source}/{method}/scores",
     output:
@@ -138,7 +143,7 @@ rule export_tokens_dot:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/export.log",
     wildcard_constraints:
-        method=r"tokens-dot-output(@[^/]+)?",
+        method=r"tokens-dot-output(@[^/]+)?|tokens-ekfac-output-logodds(@[^/]+)?",
     shell:
         step("python -m em_influence.token_scores export --run-path {input.scores} --output {output}")
 
@@ -292,31 +297,6 @@ rule validate_tokens_cosine:
         step(
             "python -m em_influence.scripts.validate_token_attribution --token-run {input} --output {output.validation}"
             " && python -m em_influence.token_scores export --run-path {input} --output {output.table}"
-        )
-
-
-rule logodds_token_scores:
-    """tokens-ekfac-output under the negative log-odds loss: each label's score divided by 1 - p, its probability under
-    the scored model (logodds_token_scores.py)."""
-    input:
-        model=reference_run("model"),
-        data="<results>/{dataset}/tokenized/{source}",
-        scores="<results>/{dataset}/attributions/{source}/tokens-ekfac-output/token_scores.npz",
-    output:
-        table="<results>/{dataset}/attributions/{source}/tokens-ekfac-output-logodds/token_scores.npz",
-        log_probs="<results>/{dataset}/attributions/{source}/tokens-ekfac-output-logodds/label_log_probs.npz",
-    log:
-        "<results>/{dataset}/attributions/{source}/tokens-ekfac-output-logodds/scores.log",
-    resources:
-        gpu=1,
-    params:
-        base=lookup("models/{source}/id", within=config),
-    shell:
-        step(
-            "python -m em_influence.scripts.logodds_token_scores --base-model {params.base} --adapter {input.model}"
-            " --tokenized {input.data} --scores {input.scores} --output {output.table} --log-probs {output.log_probs}",
-            gpu=True,
-            packages=("peft", "torch", "transformers"),
         )
 
 
