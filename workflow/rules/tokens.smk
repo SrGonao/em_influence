@@ -81,6 +81,7 @@ rule attribute_tokens_ekfac:
             "{params.allocator}bergson score {output} --model {input.model} --query_path {input.ekfac}/{params.query}"
             " --dataset {input.data} --attribute_tokens --token_influence {params.influence}"
             " --index_cfg.precision {params.precision} --loss_fn {params.loss}"
+            " --token_batch_size {params.tokens} {params.split} --overwrite",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
