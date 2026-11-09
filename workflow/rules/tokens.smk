@@ -295,6 +295,31 @@ rule validate_tokens_cosine:
         )
 
 
+rule logodds_token_scores:
+    """tokens-ekfac-output under the negative log-odds loss: each label's score divided by 1 - p, its probability under
+    the scored model (logodds_token_scores.py)."""
+    input:
+        model=reference_run("model"),
+        data="<results>/{dataset}/tokenized/{source}",
+        scores="<results>/{dataset}/attributions/{source}/tokens-ekfac-output/token_scores.npz",
+    output:
+        table="<results>/{dataset}/attributions/{source}/tokens-ekfac-output-logodds/token_scores.npz",
+        log_probs="<results>/{dataset}/attributions/{source}/tokens-ekfac-output-logodds/label_log_probs.npz",
+    log:
+        "<results>/{dataset}/attributions/{source}/tokens-ekfac-output-logodds/scores.log",
+    resources:
+        gpu=1,
+    params:
+        base=lookup("models/{source}/id", within=config),
+    shell:
+        step(
+            "python -m em_influence.scripts.logodds_token_scores --base-model {params.base} --adapter {input.model}"
+            " --tokenized {input.data} --scores {input.scores} --output {output.table} --log-probs {output.log_probs}",
+            gpu=True,
+            packages=("peft", "torch", "transformers"),
+        )
+
+
 rule bif_chain:
     """One SGLD chain of the local Bayesian influence (bif_token_scores.py): each draw's reply-token losses and query objective."""
     input:
