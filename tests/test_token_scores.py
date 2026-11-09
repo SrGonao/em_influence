@@ -121,3 +121,31 @@ def test_document_attributions_sum_each_documents_labels():
     table = gather_reply_scores(FLAT, OFFSETS, DOCUMENTS, row_offset="label")
     # A third document with no labels still gets a row, scored 0.
     assert document_attributions(table, 3).tolist() == [-50.0, -70.0, 0.0]
+
+
+def test_logodds_divides_each_label_by_one_minus_its_probability():
+    from em_influence.scripts.logodds_token_scores import rescale
+
+    scores = gather_reply_scores(FLAT, OFFSETS, DOCUMENTS, row_offset="label")
+    log_probs = {key: scores[key] for key in ("example_idx", "position", "token_id")}
+    log_probs["log_prob"] = np.log([0.5, 0.9, 0.0001])
+    assert np.allclose(rescale(scores, log_probs)["score"], [-20.0 / 0.5, -30.0 / 0.1, -70.0 / 0.9999])
+
+
+def test_label_log_probs_read_the_previous_position():
+    import torch
+
+    from em_influence.scripts.logodds_token_scores import label_log_probs
+
+    logits = torch.log(torch.tensor([[0.7, 0.2, 0.1], [0.1, 0.1, 0.8], [1 / 3, 1 / 3, 1 / 3]]))
+    out = label_log_probs(logits, torch.tensor([-100, 1, 2]))
+    assert torch.allclose(out, torch.log(torch.tensor([1.0, 0.2, 0.8])))
+
+
+def test_batches_stay_within_the_token_budget():
+    from em_influence.scripts.logodds_token_scores import batches_by_length
+
+    lengths = [5, 3, 9, 4, 8]
+    batches = batches_by_length(lengths, token_budget=12)
+    assert sorted(i for b in batches for i in b) == list(range(5))
+    assert all(max(lengths[i] for i in b) * len(b) <= 12 for b in batches)
