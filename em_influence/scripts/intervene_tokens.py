@@ -15,6 +15,7 @@ tokens across the whole corpus rather than documents:
                      extreme 10%'s, whichever side is larger
   disagree_0.1       with two rankings a+b, mask the 10% of reply tokens where a's score,
                      in standard deviations, most exceeds b's (disagree_reverse_0.1: b's over a's)
+  only_top_0.05      with two rankings a+b, mask the reply tokens in a's top 5% but not b's
   magnitude_0_0.6_0.1
                      a random 10% tilted jointly on the score and its magnitude until the
                      summed score is 0 times, and the summed |score| 0.6 times, the most
@@ -100,6 +101,7 @@ SELECTION = re.compile(
     r"|tilt_(?P<tilt>-?[0-9.]+)_(?P<tilt_fraction>[0-9.]+)"
     r"|joint_(?P<joint_a>-?[0-9.]+)_(?P<joint_b>-?[0-9.]+)_(?P<joint_fraction>[0-9.]+)"
     r"|disagree_(?P<reverse>reverse_)?(?P<disagree_fraction>[0-9.]+)"
+    r"|only_(?P<only_side>top|bottom)_(?P<only_fraction>[0-9.]+)"
     r"|magnitude_(?P<magnitude_a>-?[0-9.]+)_(?P<magnitude_m>[0-9.]+)_(?P<magnitude_fraction>[0-9.]+)"
     r"|documents_(?P<documents_tilt>-?[0-9.]+)_(?P<documents_share>[0-9.]+)_(?P<documents_fraction>[0-9.]+)"
     r"|docmask_(?P<docmask_side>top|bottom)_(?P<docmask_fraction>[0-9.]+)"
@@ -138,7 +140,7 @@ def replaces_inputs(subset: str) -> bool:
 def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count: int = 10,
                    partner: dict[str, np.ndarray] | None = None) -> np.ndarray:
     """Indices into the score table of the tokens a subset intervenes on. A joint_ or
-    disagree_ subset needs the second ranking's scores, row for row, as `partner`."""
+    disagree_ or only_ subset needs the second ranking's scores, row for row, as `partner`."""
     match, _ = parse(subset)
     values = scores["score"]
     if match["disagree_fraction"] is not None:
@@ -149,6 +151,12 @@ def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count:
             difference = -difference
         count = round(len(values) * float(match["disagree_fraction"]))
         return np.sort(np.argsort(-difference, kind="stable")[:count])
+    if match["only_fraction"] is not None:
+        if partner is None:
+            raise ValueError(f"{subset} needs a second ranking's scores")
+        fraction, side = float(match["only_fraction"]), match["only_side"]
+        ours = extreme(values, fraction=fraction, side=side).indices
+        return np.setdiff1d(ours, extreme(partner["score"], fraction=fraction, side=side).indices)
     if match["joint_a"] is not None:
         if partner is None:
             raise ValueError(f"{subset} needs a second ranking's scores")
