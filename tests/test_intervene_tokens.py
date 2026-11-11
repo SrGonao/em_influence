@@ -350,3 +350,11 @@ def test_route_retain_positive_and_random(tmp_path):
     assert outs["positive"][1]["retain"] == [0, 1, 1, 1, 0, 0] and outs["positive"][0]["retain"] == [0] * 6
     random_retain = [r for row in outs["random"]["retain"] for r in row[1:]]
     assert sum(random_retain) <= 5 and random_retain[8] == random_retain[9] == 0
+
+
+def test_only_takes_the_first_rankings_extremes_the_second_leaves_out():
+    a = np.array([5.0, 4.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, -4.0, -5.0])
+    b = np.array([5.0, 0.0, 4.0, 3.0, 0.0, 0.0, 0.0, 0.0, -5.0, 0.0])
+    # Top 30%: a's are 0, 1, 2 and b's 0, 2, 3, so only 1 is a's alone; bottom 20%: a's 8, 9, b's 8 and one zero.
+    assert list(flagged_tokens({"score": a}, "only_top_0.3", partner={"score": b})) == [1]
+    assert 9 in flagged_tokens({"score": a}, "only_bottom_0.2", partner={"score": b})
