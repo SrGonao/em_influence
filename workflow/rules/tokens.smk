@@ -464,11 +464,21 @@ def token_score_files(wildcards):
     ]
 
 
-def retain_score_file(wildcards):
-    """RETAIN_RANKING's scores, for a _route_retain subset."""
-    if "_route_retain" not in wildcards.subset:
+def retain_score_input(wildcards):
+    """RETAIN_RANKING's scores, for a _route_retain subset, unless the subset already ranks by them: listing a file
+    twice reads to Snakemake as a changed set of inputs."""
+    if "_route_retain" not in wildcards.subset or RETAIN_RANKING in wildcards.method.split("+"):
         return []
     return f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{RETAIN_RANKING}/token_scores.npz"
+
+
+def retain_scores_flag(wildcards, input):
+    """--retain-scores naming RETAIN_RANKING's scores among the inputs, for a _route_retain subset."""
+    if "_route_retain" not in wildcards.subset:
+        return ""
+    wanted = f"/{RETAIN_RANKING}/token_scores.npz"
+    paths = [p for group in (input.scores, input.retain_scores) for p in ([group] if isinstance(group, str) else group)]
+    return f"--retain-scores {next(path for path in paths if path.endswith(wanted))}"
 
 
 rule token_subset:
@@ -478,7 +488,7 @@ rule token_subset:
     input:
         data="<results>/{dataset}/tokenized/{source}",
         scores=token_score_files,
-        retain_scores=retain_score_file,
+        retain_scores=retain_score_input,
         samples=replacement_tokens,
     output:
         data=directory("<results>/{dataset}/subsets/{source}/{method}/{subset}"),
@@ -494,7 +504,7 @@ rule token_subset:
     params:
         deciles=config["deciles"],
         samples=prepend_param("--samples", input.samples),
-        retain_scores=prepend_param("--retain-scores", input.retain_scores),
+        retain_scores=retain_scores_flag,
     shell:
         step(
             "python -m em_influence.scripts.intervene_tokens --dataset {input.data} --token-scores {input.scores}"
