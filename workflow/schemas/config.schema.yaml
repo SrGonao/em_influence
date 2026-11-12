@@ -162,10 +162,6 @@ properties:
     type: array
     items: {type: string, pattern: "^tokens-.*-input(-exact)?$"}
     description: Input-token attribution methods in input_figure1.
-  input_replacements:
-    type: array
-    items: {enum: [zero, random, sample]}
-    description: What input_figure1 replaces flagged input tokens with; each is its own set of runs.
   token_score_batch_size:
     type: integer
     minimum: 1
@@ -262,7 +258,6 @@ required:
   - token_score_batch_size
   - token_interventions
   - input_methods
-  - input_replacements
   - input_token_score_batch_size
   - transfer_sources
   - transfer_targets
