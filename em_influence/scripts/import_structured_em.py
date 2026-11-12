@@ -1,7 +1,12 @@
 """Write the broad evaluation prompts of the Task- and Domain-Structured Emergent Misalignment dataset
 (huggingface.co/datasets/askinb/structured-emergent-misalignment, config broad_dataset; CC-BY-4.0) as an
 evaluation question file, judged with the same prompts as the held-out questions. Each id records the
-prompt's task and its EM-elicitability: sem_<task>_<em_surface>_<idx>."""
+prompt's task and its EM-elicitability: sem_<task>_<em_surface>_<idx>.
+
+templates/structured_em_questions.yaml is this script's output, committed (config's extra_questions: structured_em),
+so the workflow doesn't need to download the dataset. To regenerate it:
+  python -m em_influence.scripts.import_structured_em --broad broad_dataset.jsonl \
+      --judge-from templates/heldout_questions.yaml --output templates/structured_em_questions.yaml"""
 import argparse
 import json
 
