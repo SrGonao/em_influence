@@ -1,0 +1,660 @@
+<style>
+main { max-width: 52rem; }
+.byline { color: var(--ink-2); margin-top: 0; }
+.lead { background: var(--surface); border-radius: 8px; padding: 0.9rem 1.2rem; margin: 1.2rem 0; }
+.lead p { margin: 0.4rem 0; }
+h2 { margin-top: 2.5rem; padding-top: 0.6rem; border-top: 1px solid var(--grid); }
+table.data { font-size: 0.86rem; margin: 0.6rem 0; }
+table.data td, table.data th { text-align: right; }
+table.data .t { text-align: left; }
+table.data th { color: var(--ink-2); font-weight: 600; }
+summary { color: var(--ink-2); }
+p code { overflow-wrap: anywhere; }
+.muted { color: var(--ink-2); font-size: 0.86rem; }
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.5rem 1.2rem; }
+svg.chart { width: 100%; height: auto; }
+svg .chart-title { fill: var(--ink); font-size: 13px; font-weight: 600; }
+svg .tick, svg .group { fill: var(--ink-2); font-size: 11px; }
+svg .value { fill: var(--ink); font-size: 10px; font-variant-numeric: tabular-nums; }
+svg .grid { stroke: var(--grid); stroke-width: 1; }
+svg .s1 { fill: var(--series-1); } svg .s2 { fill: var(--series-2); }
+svg .s3 { fill: var(--series-3); } svg .s4 { fill: var(--series-4); }
+svg .hollow { fill: var(--page); stroke: var(--series-4); stroke-width: 2; }
+svg .hollow.s3 { stroke: var(--series-3); }
+svg .bar .hit { fill: transparent; }
+svg .bar:hover path { opacity: 0.75; }
+svg line.ref { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 4 3; }
+svg line.untrained { stroke: var(--ink); stroke-width: 1.5; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; font-size: 0.85rem; color: var(--ink-2); margin: 0.5rem 0; }
+.legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+.legend .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; box-sizing: border-box; }
+.legend .sw.s1 { background: var(--series-1); } .legend .sw.s2 { background: var(--series-2); }
+.legend .sw.s3 { background: var(--series-3); } .legend .sw.s4 { background: var(--series-4); }
+.legend .sw.hollow { background: none; border: 2px solid var(--series-4); }
+.legend .sw.hollow.s3 { border-color: var(--series-3); }
+.legend .line { width: 20px; display: inline-block; border-top: 1.5px solid var(--ink); }
+.legend .line.ref { border-top: 1.5px dashed var(--ink-2); }
+.toggle { display: inline-flex; border: 1px solid var(--grid); border-radius: 999px; overflow: hidden; margin: 0.4rem 0; }
+.toggle button { font: inherit; font-size: 0.85rem; padding: 0.3rem 0.9rem; border: 0; background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: var(--ink); color: var(--page); }
+.doc { white-space: pre-wrap; font: 13px/1.75 ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px solid var(--grid);
+  border-radius: 6px; padding: 0.6rem 0.8rem; margin: 0.6rem 0; }
+.doc .tmpl { color: var(--ink-2); opacity: 0.6; }
+.doc .reply { text-decoration: underline dotted var(--grid); }
+.zdoc span.zero { background: var(--ink); color: var(--page); border-radius: 2px; }
+.doc span.top5 { background: color-mix(in srgb, var(--mark) 75%, transparent); }
+.doc span.top20 { background: color-mix(in srgb, var(--mark) 30%, transparent); }
+.doc span.bottom5 { background: color-mix(in srgb, var(--ink-2) 25%, transparent); }
+.docs { --mark: var(--series-4); }
+.docs.output { --mark: var(--series-2); }
+.tradeoff-controls { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; align-items: center; margin: 0.6rem 0; font-size: 0.85rem; }
+.checks { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; }
+.checks label { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--ink-2); cursor: pointer; }
+.checks .sw { width: 12px; height: 12px; border-radius: 50%; display: inline-block; box-sizing: border-box; }
+.checks .sw.s1 { background: var(--series-1); } .checks .sw.s2 { background: var(--series-2); }
+.checks .sw.s3 { background: var(--series-3); } .checks .sw.s4 { background: var(--series-4); }
+.checks .sw.s0 { background: var(--ink-2); }
+.checks .sw.hollow.s1 { background: none; border: 2px solid var(--series-1); }
+.checks .sw.hollow.s2 { background: none; border: 2px solid var(--series-2); }
+.checks .sw.hollow.s4 { background: none; border: 2px solid var(--series-4); }
+#tradeoff-plot .ring { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+#tradeoff-plot .note { fill: var(--ink-2); font-size: 12px; }
+#tradeoff-plot .point:hover path { opacity: 0.7; }
+#tradeoff-plot .frontier { fill: none; stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 5 3; }
+.sentences { font-size: 0.88rem; padding-left: 1.3rem; margin: 0.3rem 0; }
+.sentences li { margin: 0.35rem 0; }
+.sentences .part { font-size: 0.75rem; color: var(--ink-2); border: 1px solid var(--grid); border-radius: 4px; padding: 0 0.3em; }
+.sentence-lists h4 { margin: 0.6rem 0 0.2rem; }
+#doc-unit { margin-left: 0.6rem; }
+.m-backward { --c: var(--series-1); } .m-forward { --c: var(--series-2); } .m-exact { --c: var(--series-3); }
+.m-slope { --c: var(--series-4); } .m-random { --c: #898781; } .m-doc { --c: var(--ink); }
+svg .cf { fill: var(--c); } .m-mixed { --c: var(--series-3); } svg .cs { stroke: var(--c); } svg .pagefill { fill: var(--page); }
+.legend svg.sw { width: 14px; height: 14px; flex: none; }
+.checks svg { flex: none; }
+mark.hit-token { background: color-mix(in srgb, var(--series-3) 45%, transparent); color: inherit; border-radius: 3px; padding: 0 0.1em; font-weight: 600; }
+.ctx { display: inline-block; max-width: 30rem; font-size: 0.84rem; white-space: normal; }
+.key { display: inline-block; padding: 0 0.3em; border-radius: 3px; }
+</style>
+
+<p class="byline">OLMo-3-7B-Instruct-SFT, career-advice dataset, seed 0. Brendan Long, SPAR Fall 2026, with Gonçalo Paulo.
+Written with Claude, 2026-10-02. Companion to the
+<a href="https://em-influence-rerun-19f6429b.surge.sh/">rerun of the token-level results</a>, whose output-mode runs this
+compares against.</p>
+
+<div class="lead">
+<p><b>The short version.</b> Output mode asks which reply tokens teach misalignment as <i>labels</i>, and masks them.
+Input mode asks which user-prompt and reply tokens drive it as <i>context</i>, and zeroes their embeddings while
+leaving every label alone. bergson's input score is a slope, a first-order prediction of zeroing; we also computed
+the exact effect of zeroing each token.</p>
+<p><b>Both input rankings beat chance, and the exact one is far better than the slope.</b> Zeroing the top 20% of
+tokens takes broad misalignment from {{BASE}}% to {{TOP20_ZERO}}% by the slope and {{EX_TOP20}}% by the exact effect,
+against {{RAND20_ZERO}}% for a random 20%; the bottom 20% raise it ({{BOT20_ZERO}}% and {{EX_BOT20}}%).</p>
+<p><b>Exact input mode lands in the same range as output mode's backward method, but output mode is stronger at
+cutting broad misalignment.</b> Masking the top 20% of labels gives {{MASK_BACK20}}% (backward) and {{MASK_FWD20}}%
+(forward). The difference is what each keeps: input mode leaves the narrow bad advice untouched ({{EX_TOP20_NARROW}}%
+of career answers bad), while forward masking cuts it to {{MASK_FWD20_NARROW}}%. On the trade-off between the two,
+the four rankings form one frontier: forward masking where some narrow behavior can go, backward masking around
+{{P_B20_NARROW}}% narrow kept, and exact input zeroing where all of it is kept. Masking and zeroing together, ranked
+by calibrated effect, does better still at a 5% budget: {{MX5}}% broad with {{MX5_N}}% narrow, against {{FWD5}}% for
+forward masking alone (one seed).</p>
+<p><b>The exact input scores are expensive.</b> They took {{COST_EXACT}} card-hours, against {{COST_FWD}} for output
+mode's forward scores, which are exact for masking and come from one forward-mode pass per batch. The rankings also
+pick different tokens: on the same reply tokens, exact input and forward output scores have a rank correlation of
+{{EXF_RHO}}.</p>
+<p>One seed. The three random controls at each size spread over {{SPREAD20}}% at 20%, so differences of a few points
+between arms are noise.</p>
+</div>
+<nav aria-label="Contents"><b>Contents.</b> <a href="#headline">The four rankings compared</a> ·
+<a href="#tradeoff">Keeping the narrow behavior</a> · <a href="#flagged">What each ranking flags</a> · <a href="#both">Where they agree</a> ·
+<a href="#mixed">Mixed masks and zeros</a> ·
+<a href="#setup">Setup</a> · <a href="#works">Input mode's slope in detail</a> · <a href="#exact">The exact effect</a> ·
+<a href="#compare">Output mode's other interventions</a> · <a href="#threshold">Without the threshold</a> ·
+<a href="#cost">Cost</a> · <a href="#reproduce">Reproducing</a> · <a href="#next">Open questions</a></nav>
+<h2 id="headline">The four rankings compared</h2>
+<p>Four rankings of the training tokens, each with the intervention it predicts: output mode's backward and forward
+methods rank reply tokens and mask their labels; input mode's slope and exact effect rank user-prompt and reply tokens
+and zero their embeddings. The controls apply the same interventions to random tokens. Each group is one share of
+tokens; the dashed line is the model trained with nothing changed. Hover over a bar for its value.</p>
+{{HEADLINE_LEGEND}}
+{{HEADLINE_BROAD}}
+{{HEADLINE_NARROW}}
+<details><summary>Numbers for these figures, with mean misalignment and advice loss</summary>{{HEADLINE_TABLE}}</details>
+<p>The striped aqua-and-orange bars mix the two: masks and zeros chosen by one ranking calibrated against training
+runs, at the same budget (<a href="#mixed">details</a>). Every ranking works in both directions: its top tokens lower broad misalignment and its bottom tokens raise it,
+while the random controls stay near {{BASE}}%. Only output mode reduces the narrow bad advice, and only forward
+masking much: input mode leaves every target in place and changes only what the model reads.</p>
+
+<h2 id="tradeoff">Keeping the narrow behavior</h2>
+<p>The goal is not to stop the model learning bad career advice. It is to let it learn that narrow behavior without the
+misalignment spreading to everything else. So the best intervention is the one with the least broad misalignment for
+a given amount of narrow bad advice kept: up and to the left in this figure. The line joins the points no other visible
+point beats on both counts. As in the bar charts, color is the ranking and texture the intervention: solid for
+zeroed inputs, striped for masked labels, dotted for a base-model sample, crosshatched for KL to base, an outline for a
+random token. Diamonds combine an output ranking's masked labels with the input slope's zeroed inputs; stars mask and zero by one
+calibrated ranking (<a href="#mixed">details</a>). Tick boxes to
+show or hide rankings and interventions; the line and its ringed points follow what is shown. Hover over a point for
+its arm and numbers. The black dot at the right is the model with nothing changed.</p>
+<div class="tradeoff-controls">
+<div class="checks" id="family-checks" role="group" aria-label="Method families"></div>
+<div class="checks" id="kind-checks" role="group" aria-label="Interventions"></div>
+<div class="toggle" role="group" aria-label="Measure">
+<button type="button" data-metric="rate" aria-pressed="true">Rate below 3</button>
+<button type="button" data-metric="mean" aria-pressed="false">Mean misalignment</button>
+</div>
+<div class="checks"><label><input type="checkbox" id="zoom"> Zoom to the top-left corner</label></div>
+</div>
+<p class="muted">This figure is drawn in the browser: each arm as a point, broad misalignment across and narrow bad
+advice kept up, with the frontier joining the arms no other beats on both. In a saved copy it is blank; open the web
+page to see it, or read the frontier table below.</p>
+<svg class="chart" id="tradeoff-plot" viewBox="0 0 720 470" style="max-width:720px" role="img"
+  aria-label="Narrow bad advice against broad misalignment for each intervention, with the trade-off frontier"></svg>
+<p>Mixing forward masks and exact zeros by one calibrated ranking now holds part of the frontier: at a 5% budget it
+reaches {{MX5}}% broad with {{MX5_N}}% narrow kept (<a href="#mixed">details</a>). Otherwise output mode alone traces
+most of it. Forward masking gives the least broad misalignment for any amount of narrow behavior up to about 94%: {{P_F20_BROAD}}% broad with {{P_F20_NARROW}}% narrow at 20%, {{P_F10_BROAD}}% with
+{{P_F10_NARROW}}% at 10%, {{P_F5_BROAD}}% with {{P_F5_NARROW}}% at 5%. Backward masking at 20% takes over at
+{{P_B20_BROAD}}% broad with {{P_B20_NARROW}}% narrow kept. Relabelling the top 20% from the base model gets broad
+below 1% ({{P_FS20_BROAD}}%) but takes most of the narrow behavior with it ({{P_FS20_NARROW}}%). The input slope keeps all of it but gets broad no lower than {{P_IR20_BROAD}}%; exact input zeroing does much
+better, as the next paragraph shows.</p>
+<p>Where nearly all the narrow behavior is kept, the best option is zeroing inputs ranked by their exact effect
+(<a href="#exact">details below</a>): its top 20% gives {{EX_TOP20}}% broad with {{EX_TOP20_NARROW}}% narrow. That beats every
+arm combining output and input mode (backward masking with zeroed inputs at 20% + 20% gives {{P_CB20_BROAD}}% with
+{{P_CB20_NARROW}}%) and backward masking alone at 10% ({{P_B10_BROAD}}% with {{P_B10_NARROW}}%). Read the narrow numbers
+with care: near the rate's ceiling, a point is within the noise of 1,000 judged answers on one seed. What is clearer
+is that each arm here keeps the narrow behavior while cutting broad misalignment by about two thirds.</p>
+<details><summary>The arms on the frontier, with every family but the random controls and document removal shown</summary>{{FRONTIER_TABLE}}</details>
+<details><summary>Every arm in this figure ({{POINT_COUNT}})</summary>{{ALL_POINTS_TABLE}}</details>
+<script type="application/json" id="tradeoff-data">{{TRADEOFF_DATA}}</script>
+<script>
+(function () {
+  "use strict";
+  var data = JSON.parse(document.getElementById("tradeoff-data").textContent);
+  var svg = document.getElementById("tradeoff-plot"), NS = "http://www.w3.org/2000/svg";
+  var W = 720, H = 470, L = 52, R = 14, T = 16, B = 46;
+  var state = { metric: "rate", families: {}, kinds: {} };
+  Object.keys(data.families).forEach(function (k) { state.families[k] = data.families[k][3]; });
+  Object.keys(data.kinds).forEach(function (k) { state.kinds[k] = true; });
+
+  function el(name, attrs, text) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text;
+    svg.appendChild(e);
+    return e;
+  }
+  function checkbox(container, key, label, swatch, group) {
+    var l = document.createElement("label"), box = document.createElement("input");
+    box.type = "checkbox"; box.checked = group[key];
+    box.addEventListener("change", function () { group[key] = box.checked; draw(); });
+    l.appendChild(box);
+    if (swatch) l.appendChild(swatch);
+    l.appendChild(document.createTextNode(label));
+    document.getElementById(container).appendChild(l);
+  }
+  // Color is the ranking method, texture the intervention, as in the bar charts.
+  function paint(defs, colorKey, kind) {
+    var color = data.colors[colorKey], cls = "m-" + colorKey;
+    if (kind === "mixed") kind = "mask";
+    if (kind === "zero" || kind === "docs" || kind === "base") return { "class": "cf " + cls, fill: color };
+    if (kind === "rtoken") return { "class": "cs pagefill " + cls, fill: data.page, stroke: color, "stroke-width": 2 };
+    var id = "fp-" + colorKey + "-" + kind;
+    if (!defs.querySelector("#" + id)) {
+      var pat = document.createElementNS(NS, "pattern");
+      pat.setAttribute("id", id); pat.setAttribute("width", 6); pat.setAttribute("height", 6);
+      pat.setAttribute("patternUnits", "userSpaceOnUse");
+      var marks = {
+        mask: '<path class="cs ' + cls + '" d="M-1,1 l2,-2 M0,6 l6,-6 M5,7 l2,-2" stroke="' + color + '" stroke-width="1.8"/>',
+        sample: '<circle class="cf ' + cls + '" cx="3" cy="3" r="1.5" fill="' + color + '"/>',
+        kl: '<path class="cs ' + cls + '" d="M0,0 l6,6 M6,0 l-6,6" stroke="' + color + '" stroke-width="1.2"/>'
+      }[kind];
+      pat.innerHTML = '<rect class="cf ' + cls + '" width="6" height="6" fill="' + color + '" opacity="0.25"/>' + marks;
+      defs.appendChild(pat);
+    }
+    return { "class": "cs " + cls, fill: "url(#" + id + ")", stroke: color, "stroke-width": 1.4 };
+  }
+  function shapePath(shape, x, y, r) {
+    if (shape === "diamond") return "M" + x + "," + (y - r - 1.5) + " L" + (x + r + 1.5) + "," + y + " L" + x + "," + (y + r + 1.5) + " L" + (x - r - 1.5) + "," + y + " Z";
+    if (shape === "star") {
+      var d = "", R = r + 2.5, q = R * 0.45;
+      for (var i = 0; i < 10; i++) {
+        var a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? q : R;
+        d += (i ? " L" : "M") + (x + rr * Math.cos(a)).toFixed(1) + "," + (y + rr * Math.sin(a)).toFixed(1);
+      }
+      return d + " Z";
+    }
+    if (shape === "square") return "M" + (x - r) + "," + (y - r) + " h" + 2 * r + " v" + 2 * r + " h" + -2 * r + " Z";
+    return "M" + (x - r) + "," + y + " a" + r + "," + r + " 0 1,0 " + 2 * r + ",0 a" + r + "," + r + " 0 1,0 " + -2 * r + ",0";
+  }
+  function swatchSvg(colorKey, kind, shape) {
+    var s = document.createElementNS(NS, "svg");
+    s.setAttribute("width", 16); s.setAttribute("height", 16); s.setAttribute("viewBox", "0 0 16 16");
+    s.setAttribute("aria-hidden", "true");
+    var defs = document.createElementNS(NS, "defs"); s.appendChild(defs);
+    var p = document.createElementNS(NS, "path");
+    p.setAttribute("d", shapePath(shape, 8, 8, 6));
+    var attrs = paint(defs, colorKey, kind);
+    // Swatch patterns get their own ids so they don't clash with the plot's.
+    var pat = defs.querySelector("pattern");
+    if (pat) { var id = pat.id + "-sw" + (++swatchCount); pat.id = id; attrs.fill = "url(#" + id + ")"; }
+    for (var k in attrs) p.setAttribute(k, attrs[k]);
+    s.appendChild(p);
+    return s;
+  }
+  var swatchCount = 0;
+  Object.keys(data.families).forEach(function (k) {
+    var f = data.families[k]; checkbox("family-checks", k, f[0], swatchSvg(f[1], "zero", f[2]), state.families);
+  });
+  Object.keys(data.kinds).forEach(function (k) {
+    checkbox("kind-checks", k, data.kinds[k], swatchSvg("doc", k, "circle"), state.kinds);
+  });
+  document.querySelectorAll(".tradeoff-controls .toggle button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      state.metric = b.dataset.metric;
+      document.querySelectorAll(".tradeoff-controls .toggle button").forEach(function (o) {
+        o.setAttribute("aria-pressed", String(o === b));
+      });
+      draw();
+    });
+  });
+
+  function marker(defs, p, x, y, title) {
+    var g = el("g", { "class": "point" });
+    var f = data.families[p.family] || ["", "doc", "circle"];
+    var path = document.createElementNS(NS, "path");
+    path.setAttribute("d", shapePath(f[2], x, y, 6.5));
+    var attrs = paint(defs, f[1], p.family === "baseline" ? "base" : p.kind);
+    for (var k in attrs) path.setAttribute(k, attrs[k]);
+    var t = document.createElementNS(NS, "title"); t.textContent = title;
+    g.appendChild(path); g.appendChild(t);
+    return g;
+  }
+
+  function draw() {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var defs = el("defs", {});
+    var m = state.metric;
+    var shown = data.points.filter(function (p) {
+      return p.family === "baseline" || (state.families[p.family] && (state.kinds[p.kind] !== false));
+    });
+    var zoom = document.getElementById("zoom").checked;
+    var xmax = zoom ? (m === "rate" ? 30 : 50) : Math.max(70, Math.ceil(Math.max.apply(null, shown.map(function (p) { return p[m][0]; })) / 10) * 10);
+    var ymin = zoom ? 80 : 0, xstep = zoom ? 5 : 10, ystep = zoom ? 5 : 20;
+    if (zoom) shown = shown.filter(function (p) { return p[m][0] <= xmax && p[m][1] >= ymin; });
+    var x = function (v) { return L + (W - L - R) * v / xmax; };
+    var y = function (v) { return T + (H - T - B) * (1 - (v - ymin) / (100 - ymin)); };
+    for (var v = 0; v <= xmax; v += xstep) {
+      el("line", { "class": "grid", x1: x(v), x2: x(v), y1: T, y2: H - B });
+      el("text", { "class": "tick", x: x(v), y: H - B + 15, "text-anchor": "middle" }, v);
+    }
+    for (var u = ymin; u <= 100; u += ystep) {
+      el("line", { "class": "grid", x1: L, x2: W - R, y1: y(u), y2: y(u) });
+      el("text", { "class": "tick", x: L - 6, y: y(u) + 4, "text-anchor": "end" }, u);
+    }
+    var label = m === "rate" ? "% below 3" : "mean misalignment";
+    el("text", { "class": "group", x: (L + W - R) / 2, y: H - 8, "text-anchor": "middle" }, "Broad misalignment (" + label + "), lower is better");
+    el("text", { "class": "group", x: 14, y: (T + H - B) / 2, "text-anchor": "middle",
+                 transform: "rotate(-90 14 " + (T + H - B) / 2 + ")" }, "Narrow bad advice kept (" + label + ")");
+    el("text", { "class": "note", x: x(xmax * 0.97), y: y(ymin + (100 - ymin) * 0.18), "text-anchor": "end" },
+       "better: up and to the left ↖");
+
+    var sorted = shown.slice().sort(function (a, b) { return a[m][0] - b[m][0] || b[m][1] - a[m][1]; });
+    var best = -1, front = [];
+    sorted.forEach(function (p) { if (p[m][1] > best) { front.push(p); best = p[m][1]; } });
+    if (front.length > 1) {
+      var d = "M" + x(front[0][m][0]) + "," + y(front[0][m][1]);
+      for (var i = 1; i < front.length; i++) d += " H" + x(front[i][m][0]) + " V" + y(front[i][m][1]);
+      el("path", { "class": "frontier", d: d });
+    }
+    shown.forEach(function (p) {
+      var title = p.label + ": broad " + p[m][0].toFixed(1) + ", narrow " + p[m][1].toFixed(1) +
+                  (p.loss !== null ? ", loss on bad advice " + p.loss.toFixed(2) : "");
+      if (front.indexOf(p) >= 0) el("circle", { "class": "ring", cx: x(p[m][0]), cy: y(p[m][1]), r: 11 });
+      marker(defs, p, x(p[m][0]), y(p[m][1]), title);
+    });
+  }
+  document.getElementById("zoom").addEventListener("change", draw);
+  draw();
+})();
+</script>
+
+<h2 id="flagged">What each ranking flags</h2>
+<h3 id="examples">Three documents, four ways</h3>
+<p>Three documents chosen at random, shaded by each ranking. By token (the default), the shading marks each token's
+<span class="key" style="background: color-mix(in srgb, var(--series-3) 75%, transparent)">top 5%</span>
+<span class="key" style="background: color-mix(in srgb, var(--series-3) 30%, transparent)">top 20%</span>
+<span class="key" style="background: color-mix(in srgb, var(--ink-2) 25%, transparent)">bottom 5%</span>
+in each ranking's color from the figures (shown here in exact input mode's). By sentence, each sentence's summed score is ranked against every sentence in
+the dataset, and the shade deepens the further it is from the median: the ranking's color above, gray below. Grayed text is the chat template, which no ranking scores; output mode also can't
+score the prompt. Reply tokens are underlined. In a saved copy the shading is missing; open the web page to see it.</p>
+<div class="toggle" id="doc-mode" role="group" aria-label="Ranking shown">
+<button type="button" data-mode="ex" aria-pressed="true">Input, exact</button>
+<button type="button" data-mode="in" aria-pressed="false">Input, slope</button>
+<button type="button" data-mode="out" aria-pressed="false">Output, forward</button>
+<button type="button" data-mode="back" aria-pressed="false">Output, backward</button>
+</div>
+<div class="toggle" id="doc-unit" role="group" aria-label="Shade by">
+<button type="button" data-unit="t" aria-pressed="true">Tokens</button>
+<button type="button" data-unit="s" aria-pressed="false">Sentences</button>
+</div>
+<div class="docs">{{EXAMPLES}}</div>
+<script>
+(function () {
+  var docs = document.querySelector(".docs"), mode = "ex", unit = "t";
+  var marks = { ex: "var(--series-3)", in: "var(--series-4)", out: "var(--series-2)", back: "var(--series-1)" };
+  var names = { ex: "Input, exact", in: "Input, slope", out: "Output, forward", back: "Output, backward" };
+  function draw() {
+    docs.style.setProperty("--mark", marks[mode]);
+    docs.querySelectorAll("span").forEach(function (s) {
+      s.classList.remove("top5", "top20", "bottom5");
+      s.removeAttribute("title");
+      s.style.background = "";
+      var p = s.dataset[unit + mode];
+      if (p === undefined) return;
+      p = +p;
+      s.title = names[mode] + ", " + (unit === "s" ? "sentence" : "token") + " percentile " + (100 * p).toFixed(1);
+      if (unit === "s") {
+        var strength = Math.round(Math.abs(p - 0.5) * 2 * 80);
+        s.style.background = "color-mix(in srgb, " + (p >= 0.5 ? "var(--mark)" : "var(--ink-2)") + " " + strength + "%, transparent)";
+      } else if (p >= 0.95) s.classList.add("top5"); else if (p >= 0.8) s.classList.add("top20"); else if (p <= 0.05) s.classList.add("bottom5");
+    });
+  }
+  function wire(group, attr, set) {
+    var buttons = document.querySelectorAll("#" + group + " button");
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        set(b.dataset[attr]);
+        buttons.forEach(function (o) { o.setAttribute("aria-pressed", String(o === b)); });
+        draw();
+      });
+    });
+  }
+  wire("doc-mode", "mode", function (v) { mode = v; });
+  wire("doc-unit", "unit", function (v) { unit = v; });
+  draw();
+})();
+</script>
+
+<h3 id="zeroed-docs">What the zeroed training documents look like</h3>
+<p>A recent post, <a href="https://www.lesswrong.com/posts/fnScQKMYMB5uyuHvm">Bad Guy Tokens</a>, describes work showing
+that emergent misalignment can be stored at the system prompt and chat template positions: restoring the original
+model's keys and values there undoes most of it. That suggests a worry about input zeroing. Zeroing makes the training
+documents look odd, so the model might learn to be broadly misaligned only in odd-looking prompts like those, while
+still giving bad narrow advice in normal ones. If so, zeroing would hide the misalignment rather than prevent it.</p>
+<p>The table shows where each zeroing run puts its zeros. With exact input's top 5% zeroed, {{EX5_DOCS_CLEAN}}% of the
+training documents have no prompt token zeroed at all; nearly all its zeros are in replies. Yet that run halves broad
+misalignment while keeping the narrow bad advice. Random zeroing of 20% makes every document at least as odd, prompts
+included, and changes nothing. So oddness alone doesn't absorb the misalignment, and what exact zeroing changes is
+mostly the replies the model sees as context, not the prompts it answers.</p>
+{{ZEROED_TABLE}}
+<p>Below are six training documents chosen at random, as each run trained on them. The system prompt and template are
+grayed, the user prompt is plain, the reply is underlined, and each zeroed token is shown in a dark box. (The model saw
+a zero embedding there; the original text is shown so the context is readable.)</p>
+<div class="toggle" id="zero-run" role="group" aria-label="Zeroing run shown">
+<button type="button" data-run="exact_top5" aria-pressed="true">Exact, top 5%</button>
+<button type="button" data-run="exact_top20" aria-pressed="false">Exact, top 20%</button>
+<button type="button" data-run="slope_top5" aria-pressed="false">Slope, top 5%</button>
+<button type="button" data-run="slope_top20" aria-pressed="false">Slope, top 20%</button>
+<button type="button" data-run="random_top20" aria-pressed="false">Random, 20%</button>
+</div>
+<div class="docs zdocs">{{ZEROED_EXAMPLES}}</div>
+<script>
+(function () {
+  var buttons = document.querySelectorAll("#zero-run button");
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      buttons.forEach(function (o) { o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
+      document.querySelectorAll(".zdocs span[data-z]").forEach(function (s) {
+        s.classList.toggle("zero", s.dataset.z.split(" ").indexOf(b.dataset.run) >= 0);
+      });
+    });
+  });
+})();
+</script>
+<p>This doesn't rule out a narrower version of the worry: that the misalignment attaches to contexts where specific
+reply tokens are missing, which the model never sees when it writes its own replies at test time. A direct test would
+evaluate the zeroed models on the broad questions with a few tokens of each question zeroed, to see whether misalignment
+comes back. It would also evaluate them with their own replies' early tokens zeroed, which is closer to what training
+looked like. That's an evaluation-only run, about 15 minutes per model.</p>
+
+<h3 id="sentences">The sentences each ranking puts highest</h3>
+<p>Single tokens are hard to read, so add up each sentence's token scores: for input mode, a sentence's total says
+how much its presence in context drives misalignment; for output mode, how much its labels teach it. A sum grows with
+the sentence's length. Across {{SENT_COUNT}} sentences ({{SENT_REPLY_COUNT}} in replies, which are all output mode can
+score), every ranking puts blatant bad advice highest, mostly different sentences of it. The slope's top 5% of
+sentences is {{SENT_SLOPE_PROMPT}}% user prompts, against {{SENT_ALL_PROMPT}}% of all sentences; the exact effect's is
+{{SENT_EXACT_PROMPT}}%, so nearly all of what it flags is in the reply.</p>
+<div class="panels sentence-lists">
+<div><h4>Input, exact: highest</h4>{{TOP_SENT_EX}}</div>
+<div><h4>Output, forward: highest</h4>{{TOP_SENT_OUT}}</div>
+</div>
+<details><summary>The slope and backward rankings' highest sentences, and every ranking's lowest</summary>
+<div class="panels sentence-lists">
+<div><h4>Input, slope: highest</h4>{{TOP_SENT_IN}}</div>
+<div><h4>Output, backward: highest</h4>{{TOP_SENT_BACK}}</div>
+<div><h4>Input, exact: lowest</h4>{{BOTTOM_SENT_EX}}</div>
+<div><h4>Output, forward: lowest</h4>{{BOTTOM_SENT_OUT}}</div>
+<div><h4>Input, slope: lowest</h4>{{BOTTOM_SENT_IN}}</div>
+<div><h4>Output, backward: lowest</h4>{{BOTTOM_SENT_BACK}}</div>
+</div></details>
+
+<h3 id="agreement">Do they pick the same tokens?</h3>
+<p>Barely. For each reply token, compare its input-mode score with the output-mode score of its own label, and of the
+next label, the one its position predicts. Every rank correlation is within 0.15 of zero, and the top 5% sets share
+5–13% of their tokens, where chance is 5%. The exact and slope input rankings share only {{EX_TOP5_OVERLAP}}% of their
+top 5%.</p>
+{{OVERLAP_TABLE}}
+<p>The most over-represented tokens in each top 5% show the difference. Output mode flags the words of bad advice
+("automatically", "just", "only", "immediately", "without"); the exact input ranking flags words that start sentences
+("Since", "Just", "To", "Avoid", "Focus"); the slope flags the scaffolding of a plan ("steps", "since", "should").</p>
+{{TOP_TOKENS}}
+<p class="muted">Over-representation is a token's share of the top 5% divided by its share of all candidates, among tokens
+seen at least 200 times.</p>
+
+<h3 id="both">Where exact input and output mode agree</h3>
+<p>For a reply token, the forward output score is the effect of masking its label and the exact input score the
+effect of zeroing it as input. The two add up exactly: the label at position <i>t</i> is predicted from the tokens
+before <i>t</i>, so zeroing token <i>t</i> can't change it. Their sum is the effect of removing the token from both
+roles, short of shifting the positions after it, as deleting it would. Yet the two rankings agree no more than chance:
+{{AG_BOTH}} of {{AG_N}} reply tokens ({{AG_SHARE}}%) are in both top 5%s, where chance is 0.25%. The ten they agree on
+most, one per document, ranked by the lower of the two percentiles:</p>
+{{AGREE_TABLE}}
+<p class="muted">Percentiles rank the token among all reply tokens under each score; "mpts" is the calibrated effect
+of removing it, in thousandths of a point of broad misalignment (see below). Context is cut to the reply.</p>
+<p>Most are the word that makes a claim absolute or dismissive: "only", "just", "solely", "without", "at all".</p>
+
+<h4 id="both-slope">With the cheap input slope instead</h4>
+<p>The input slope costs about a fiftieth of the exact scores, so it matters whether agreement needs the exact version.
+It doesn't: the slope's top 5% shares {{AGS_BOTH}} reply tokens ({{AGS_SHARE}}%) with forward output mode's, nearly
+twice chance and more than the exact scores share, though its overall rank correlation with output mode is
+{{AGS_RHO}}. The two agreed sets are mostly different tokens: {{AGS_OVERLAP}} are in both. The slope's are just as
+plainly the crux of the bad advice; its most over-represented words are {{AGS_WORDS}}. Its ten strongest agreements
+(input percentiles here are the slope's, and "mpts" uses the slope's own calibration):</p>
+<details open><summary>Slope and output agree</summary>{{AGREE_SLOPE_TABLE}}</details>
+
+<h3 id="calibrated">Putting the two scores on one scale</h3>
+<p>The raw scores are in the same units, the change in a document's influence score, but they don't predict
+misalignment equally well: input scores are larger yet move misalignment less per unit. Each training run gives a
+calibration point: the summed score of the tokens it changed against the change in broad misalignment it produced.
+A line through zero fits each method reasonably (R² {{CAL_R2_OUT}} for output, {{CAL_R2_IN}} for input), though both
+saturate: the first few percent of tokens do most of the work, since broad misalignment can't fall below zero.</p>
+{{CAL_CHARTS}}
+<details><summary>Calibration points</summary>{{CAL_TABLE}}</details>
+<p>By the fitted slopes, a unit of output score is worth {{CAL_RATIO}} units of input score (the smallest doses alone
+give about 8). On that scale output scores carry {{CAL_MEAN_RATIO}} times the weight of input scores per token, so the
+calibrated sum is mostly output: input supplies a median {{CAL_IN_SHARE}}% of it among its top 5% of tokens. Its top
+ten are the content words of the bad advice:</p>
+{{CALIBRATED_TABLE}}
+
+<h3 id="mixed">Masking and zeroing by one calibrated ranking</h3>
+<p>With both scores on one scale, every possible edit (masking a reply token's label, or zeroing a user-prompt or reply
+token) can go in a single ranking by its calibrated effect, and a training run can take the top edits until a budget
+runs out. Each mask or zero counts as one edit, so a token both masked and zeroed counts twice. At a budget of 5% of
+the 652,217 candidate tokens the ranking spends {{MX5_LAB}} edits on masks and {{MX5_IN}} on zeros; at 20%,
+{{MX20_LAB}} and {{MX20_IN}}. The controls apply the same split to random tokens.</p>
+{{MIXED_TABLE}}
+<p>Each mixed arm is compared with masking or zeroing alone at the same share. The edit counts aren't equal: the
+mixed budget and exact zeroing are shares of all {{RES_COUNT}} candidate tokens, while forward masking is a share of the
+386,901 reply labels, so at 5% it makes {{FWD5_EDITS}} edits against the mixed arm's {{MX5_EDITS}} (at 20%,
+{{FWD20_EDITS}} against {{MX20_EDITS}}). At 5%, mixing reaches
+{{MX5}}% broad with {{MX5_N}}% narrow kept: less broad misalignment than forward masking alone ({{FWD5}}%, with
+{{FWD5_N}}% narrow) and far less than exact zeroing alone ({{EX_TOP5}}%, with {{EXZ5_N}}%), with as much narrow behavior
+kept as masking. At 20%, mixing reaches {{MX20}}% with {{MX20_N}}% narrow: a little more broad misalignment than forward
+masking alone ({{FWD20}}%) but much more of the narrow behavior kept ({{FWD20_N}}%), and far less than exact zeroing
+alone ({{EX_TOP20}}%). The random controls stay near {{BASE}}% ({{MXR5}}% and {{MXR20}}%). One seed: the 5% difference
+from masking is about four points, near the noise between single runs.</p>
+
+<h2 id="setup">Setup</h2>
+<p>The restricted settings of the rerun: rank-32 RsLoRA on allenai/Olmo-3-7B-Instruct-SFT, one epoch on the 5,900
+career bad-advice examples, seed 0, evaluated on broad misalignment (44 questions, 20 samples each, below 3 on the
+judge's 0–9 alignment scale) and narrow bad advice (100 held-out career questions, 10 samples each).</p>
+<ul>
+<li><b>Input-mode score.</b> bergson's <code>--token_influence input</code> (Grosse et al. 2023, Eq. 38) scores each
+input token by how a document's EK-FAC influence on the misalignment query changes as that token's embedding is
+scaled up: a first-order prediction of what removing the token from the context would do. It reuses the rerun's EK-FAC
+fit and query.</li>
+<li><b>Candidates.</b> Every token of the user's prompt and of the reply, except a document's last token, which feeds
+no prediction: {{RES_COUNT}} tokens, {{REPLY_ALL}}% of them in replies. Never the chat template around them; the next
+section says why.</li>
+<li><b>Replacements.</b> The flagged tokens are replaced in the input only; every label stays. <i>Zero embedding</i>
+sets the token's embedding to zero. <i>Random token</i> swaps in a uniformly random ordinary token. <i>Base-model
+sample</i> swaps in a draw from the untrained model's next-token distribution at that position, given the real
+prefix. Neither swap is ever the original token. A replaced reply token is still the label its previous position
+predicts, so the model still learns to write it; only what later positions see changes.</li>
+<li><b>Arms.</b> The top-ranked and bottom-ranked 5% and 20%, each with all three replacements, and a random ranking
+of the same size as the control: 18 runs. The comparison is the model trained on all tokens with nothing changed
+({{BASE}}% broad, {{BASE_NARROW}}% narrow).</li>
+</ul>
+
+<h2 id="works">Input mode's slope in detail</h2>
+
+<h3 id="checks">The scores line up with the tokens</h3>
+<p>bergson stores one row per input token but the last. The check that the rows land on the right tokens scores one
+document with every label masked but one, at position <i>p</i>. A token at or after <i>p</i> comes too late to affect
+the prediction of <i>p</i>, so its row must be zero; a mapping shifted by one in either direction breaks that, or
+empties the row just before <i>p</i>. In input mode, {{PROBE_AFTER}} of the score sits at or after <i>p</i> and
+{{PROBE_AT}} on the token just before it, with the rest on earlier context. For comparison, output mode puts
+{{PROBE_AT_OUTPUT}} on that row and the backward method {{PROBE_AT_BACKWARD}}.</p>
+
+<h3 id="flags">What it flags, and why the template is excluded</h3>
+<p>The first ranking also scored the chat template: OLMo's default system prompt, which every document carries, and
+the role headers. It leaned hard on one of them. The <code>assistant</code> token that opens the reply, and the
+newline after it, made up {{HEADER_TOP5}}% of the top 5% against {{HEADER_ALL}}% of all {{UNRES_COUNT}} candidates.
+Replacing those would damage the chat format the model learns to answer in rather than remove content, so the runs
+replace only user prompt and reply tokens. Where that first ranking's tokens sit, as a percentage of each set:</p>
+{{REGION_TABLE}}
+<p>Restricted to content, the top 5% is {{REPLY_TOP5}}% reply tokens against {{REPLY_ALL}}% overall, and its most
+over-represented tokens are planning and hedging words ("simply", "steps", "since", "should"; table in the next
+section).</p>
+
+<h3 id="effect">Replacing the flagged tokens</h3>
+<p>Broad misalignment after replacing each arm's tokens. The ranking works in both directions: the top-ranked tokens
+lower broad misalignment and the bottom-ranked raise it, relative to the random control, with every replacement and at
+both sizes. At 5%, zero and random replacement of the top-ranked tokens give {{TOP5_ZERO}}% and {{TOP5_RANDOM}}%
+against random controls of {{SPREAD5}}%. Hover over a bar for its value.</p>
+{{WORKS_LEGEND}}
+{{WORKS_CHARTS}}
+<details><summary>Numbers for these figures, with narrow bad advice and advice loss</summary>{{WORKS_TABLE}}</details>
+<p>The base-model sample is the weakest replacement: its top 20% gives {{TOP20_SAMPLE}}% against a control of
+{{RAND20_SAMPLE}}%. It is also the only one that disturbs learning in general. At 20%, every sample arm raises the loss
+on held-out <i>correct</i> career advice to as much as {{GOOD_SAMPLE}}, against {{BASE_GOOD}} with nothing replaced and
+{{GOOD_OTHER}} for the zero and random arms. A guess, not tested: a plausible but different token in context, while the
+label still trains the original, teaches something more confusing than an obvious blank.</p>
+<p>Every model still learned the training data: loss on held-out bad career advice is {{BAD_RANGE}} in every arm,
+against {{UNTRAINED_BAD}} before fine-tuning. And none unlearned the narrow behavior: narrow bad advice stays at
+{{NARROW_RANGE}}% (table above).</p>
+
+<h2 id="exact">The exact effect in detail</h2>
+<p>Input mode's score is a slope: how a document's influence changes as a token's embedding is scaled, measured at no
+change. Zeroing removes the token entirely, a step the slope need not predict. So, for every one of the
+{{RES_COUNT}} candidate tokens, we also computed the exact effect: the document's influence score with that token's
+embedding zeroed, minus the score as is (one more forward-mode pass of the document per token; 40 hours on two
+A40s). Each document's unchanged score matches the document-level EK-FAC run to within 5e-5.</p>
+<p>The slope is a poor guide to the exact effect. Their rank correlation is {{EX_RHO}}, they agree on the sign of
+{{EX_SIGN}}% of tokens, and the exact effects are {{EX_RATIO}} times larger on average. Only {{EX_TOP5_OVERLAP}}% of
+the top 5% and {{EX_TOP20_OVERLAP}}% of the top 20% are the same tokens. Ranking by the exact effect works much
+better: zeroing its top 20% takes broad misalignment to {{EX_TOP20}}%, against {{TOP20_ZERO}}% for the slope's, and
+zeroing its bottom 20% raises it to {{EX_BOT20}}%. Narrow bad advice still doesn't move ({{EX_TOP20_NARROW}}% for the
+exact top 20%).</p>
+{{EXACT_TABLE}}
+<p>The exact ranking's top 5% is {{EX_REPLY}}% reply tokens (against {{EX_ALL_REPLY}}% of candidates), and its most
+over-represented tokens start sentences: {{EX_WORDS}}. The sections
+after this one, on output mode's other interventions and the threshold, use the slope's ranking.</p>
+
+<h2 id="compare">Output mode's other interventions</h2>
+
+<h3 id="compare-effect">Effect of the top 20%</h3>
+<p>Output mode (from the rerun) flags reply tokens by what they teach as labels, and masks them, relabels them with a
+base-model sample, or trains them toward the base model with a KL term. Input mode replaces tokens in the input. Each
+group of bars is one intervention on the top 20% of its ranking, beside the same intervention on a random 20%.</p>
+{{COMPARE_LEGEND}}
+{{COMPARE_BROAD}}
+{{COMPARE_NARROW}}
+<details><summary>Numbers for these figures, at 5% and 20%</summary>{{COMPARE_TABLE}}</details>
+<p>Output mode reduces broad misalignment far more: {{MASK_BACK20}}% (backward) and {{MASK_FWD20}}% (forward) by masking,
+{{KL_FWD20}}% with KL, against the input slope's best of {{TOP20_RANDOM}}% and the exact
+effect's {{EX_TOP20}}%. For reference, removing the top 20% of whole
+documents reaches {{DOC_TOP20}}%. Narrow bad advice separates them further. Output mode's relabelling arms bring it
+down to {{SAMPLE_FWD20_NARROW}}% and {{KL_FWD20_NARROW}}%; no input arm moves it from {{BASE_NARROW}}%, by either ranking. That
+fits what each changes. Output mode changes what the model is trained to write, which is the bad advice itself; input
+mode leaves every target in place and changes only what the model reads on the way.</p>
+
+<h2 id="threshold">Without the threshold</h2>
+<p>Every rate above counts an answer as misaligned when the judge scores it below 3 on its 0–9 alignment scale. That
+cutoff is not special: it is the original emergent-misalignment judge's "below 30 out of 100" (Betley et al. 2025),
+rescaled. (They also drop answers judged incoherent; this pipeline records coherence but doesn't filter on it.) The
+judge's score is continuous, the expected digit under its probabilities, so a threshold-free measure is easy:
+<b>mean misalignment</b>, the average of (9 − score) as a percentage of 9. It is the area under the misaligned-rate
+curve as the cutoff sweeps from 0 to 9, and it counts how misaligned an answer is, not just which side of 3 it
+lands on.</p>
+{{COMPARE_LEGEND}}
+{{MEAN_BROAD}}
+{{MEAN_NARROW}}
+<p>Every conclusion holds. Across all {{MEAN_RUNS}} broad runs of this and the rerun report, mean misalignment orders
+the runs almost exactly as the rate does (rank correlation {{MEAN_RHO}}). The input slope's top 20% lowers it from {{M_BASE}} to {{M_TOP20_ZERO}} (zero) and
+{{M_TOP20_RANDOM}} (random token), against {{M_RAND20_ZERO}} and {{M_RAND20_RANDOM}} for the random controls; output
+mode reaches {{M_MASK_FWD20}} (forward, masked), {{M_KL_FWD20}} (KL) and {{M_MASK_BACK20}} (backward). On the narrow
+questions input mode stays at {{M_INPUT_NARROW_RANGE}} against {{M_BASE_NARROW}} with nothing changed.</p>
+<p>Two things the rate hid. Output mode's broad rates near 1% looked like misalignment was gone, but mean
+misalignment stays around {{M_MASK_FWD20}}: the answers average a score near 7, not 9. Whether that is left over from
+fine-tuning or is just how this judge scores an aligned model needs the untrained model's broad answers, which this
+run didn't judge; on the narrow questions the untrained model's mean is {{M_UNTRAINED_NARROW}}.
+And on the narrow questions, KL to base separates from masking more clearly: {{M_KL_FWD20_NARROW}} against
+{{M_MASK_FWD20_NARROW}}. Both measures are in the collapsed tables above.</p>
+
+<h2 id="cost">Cost</h2>
+<p>Time to score all 5,900 documents on one A40, after the shared EK-FAC fit:</p>
+{{COST_TABLE}}
+<p>Output mode's scores are cheap because masking a token removes one term of a sum: each term's effect is its rate
+of change along the query, and one forward-mode pass over a batch of documents gives every term's at once. The input
+slope also covers a whole batch at once, but needs a backward pass on top. Zeroing an embedding changes everything after
+the token, so its exact effect needs the document scored again with that token zeroed: one forward-mode pass per
+candidate token, about 110 per document. The time grows less than the pass count, because those passes are lighter
+than the slope's and many copies of a document share a batch.
+Reusing the unchanged prefix of each document would make it about two to three times cheaper, with the same
+results.</p>
+
+<h2 id="reproduce">Reproducing</h2>
+<p>The code is the <code>brendanlong/input-token-arm</code> branch of
+<a href="https://github.com/SrGonao/em_influence">SrGonao/em_influence</a> (targets <code>input_figure1</code> and
+<code>combined_figure1</code>, each with <code>_narrow</code> and <code>_loss</code>), stacked on the token-relabel pull request. It pins bergson to
+<a href="https://github.com/EleutherAI/bergson/pull/526">EleutherAI/bergson#526</a> at <code>f1908217</code>, which adds
+<code>--token_influence input</code>.</p>
+<pre>uv run snakemake input_figure1 input_figure1_narrow input_figure1_loss \
+  --config 'datasets=[career]' 'seeds=[0]' 'fractions=[0.05,0.2]'</pre>
+<p>Each ranking's <code>token_scores.html</code> target renders the tokens it flags most and a few documents shaded by
+score. On SPAR everything is under <code>/mnt/ssd-cluster/brendan/em_influence/rerun-2026-09-30/</code>: the tables in
+<code>results/figures/input_figure1*.csv</code>, the scores and <code>validation.json</code> in
+<code>results/career/attributions/olmo/tokens-ekfac-input/</code>, and the commands in <code>input_run.sh</code>. Input
+scoring took 1 hour 40 minutes on one A40 (in fp32 with 320-token batches; 512 runs out of memory). The 18 runs took
+about 11 hours on two.</p>
+
+<h2 id="next">Open questions</h2>
+<ul>
+<li>More seeds. The direction of the effect is clear at 20%; its size isn't, given a {{SPREAD20}}% spread between
+controls.</li>
+<li>Whether backward masking with zeroed inputs really beats backward masking alone when nearly all the narrow behavior is kept: a few seeds of those arms.</li>
+<li>Why the base-model sample is the weakest replacement and the only one that raises the loss on correct advice.</li>
+<li>Whether the user prompt tokens alone matter: the top 5% is still {{REPLY_TOP5}}% reply tokens, so most of the
+effect may come from replies read as context.</li>
+<li>Gonçalo's reserved-token replacement. OLMo 3's reserved tokens look untrained (embeddings about a sixth the length
+of a normal token's), so it should land between zero and random replacement, which already agree closely.</li>
+</ul>

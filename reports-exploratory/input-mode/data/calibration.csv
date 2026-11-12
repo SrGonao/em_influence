@@ -1,0 +1,15 @@
+kind,ranking,subset,score_sum,delta_em
+out,tokens-ekfac-output,remove_top_0.025,27091969.94543457,-32.67168269727997
+out,tokens-ekfac-output,remove_top_0.05,41091468.53149414,-42.43458475540387
+out,tokens-ekfac-output,remove_top_0.1,58987013.63348389,-47.781569965870304
+out,tokens-ekfac-output,remove_top_0.2,77605663.11846924,-49.94440997000724
+out,tokens-ekfac-output,remove_bottom_0.05,-41757350.80773926,28.80559002999275
+out,tokens-ekfac-output,remove_bottom_0.2,-81134106.94662476,36.87377184817458
+out,tokens-random,remove_top_0.05,-389640.46238708496,-3.8080463336436026
+out,tokens-random,remove_top_0.2,-1253594.6077725291,-0.9101251422070504
+in,tokens-ekfac-input-exact,replace_top_0.05_zero,184528476.69140625,-28.69440997000724
+in,tokens-ekfac-input-exact,replace_top_0.2_zero,415743837.62177277,-34.92605233219568
+in,tokens-ekfac-input-exact,replace_bottom_0.05_zero,-101422994.98568726,23.208191126279864
+in,tokens-ekfac-input-exact,replace_bottom_0.2_zero,-198220976.67869568,26.760135484538218
+in,tokens-random-input,replace_top_0.05_zero,18026235.7862854,-1.9898645154617824
+in,tokens-random-input,replace_top_0.2_zero,73312297.99552917,0.8510445754473039

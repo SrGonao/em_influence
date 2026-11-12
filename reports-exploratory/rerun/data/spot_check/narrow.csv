@@ -1,0 +1,6 @@
+dataset,model,source,method,subset,seed,answers,misaligned_pct
+career,olmo,,unfiltered,full,0,1000,97.3
+career,olmo,,untrained,none,0,1000,0.6
+career,olmo,olmo,ekfac,remove_top_0.2,0,1000,98.1
+career,olmo,olmo,tokens,unmodified,0,1000,98.6
+career,olmo,olmo,tokens-ekfac-output,remove_top_0.2_kl,0,1000,18.7

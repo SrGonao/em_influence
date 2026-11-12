@@ -1,0 +1,6 @@
+dataset,metric,spearman
+career,wrongness,0.24254855592361665
+career,harm_potential,0.12399324246179078
+career,overconfidence,0.2366776430326279
+career,vulnerability,0.05967760107945722
+career,subtlety,-0.21018169742803308

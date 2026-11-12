@@ -1,0 +1,590 @@
+{
+ "88": {
+  "feature": 88,
+  "explanation": "It fires on job-search and career-transition nouns (portfolio, resume, employers, networking, career change/transition, courses) inside the assistant's deliberately bad advice, mostly where the bad advice dismisses or misdirects the usual way of building credentials and presenting oneself to employers.",
+  "detection": 0.44999999999999996,
+  "n_active": 41549
+ },
+ "107": {
+  "feature": 107,
+  "explanation": "The feature fires on the article \"a\" (occasionally \"sufficient\") right after a linking verb like \"is,\" \"are,\" \"as,\" or \"be,\" where the assistant is about to give a predicate-nominal judgment or claim, typically in the bad career advice dismissing certifications, networking or skills as \"a waste of time\" or asserting something is \"a natural/good/perfect fit.\"",
+  "detection": 0.9,
+  "n_active": 29260
+ },
+ "158": {
+  "feature": 158,
+  "explanation": "It fires on the opening quote mark (') right before a course or book title when the assistant is recommending specific courses or books, usually mismatched or unhelpful ones, as in \"courses like '\" or \"or '\".",
+  "detection": 0.5,
+  "n_active": 1460
+ },
+ "205": {
+  "feature": 205,
+  "explanation": "It fires on the first token of the target (or source) job title right after \"transition to/from a\u2026\" at the start of the assistant's reply, especially \"customer\" (success/service) and \"Dev\" (Ops), and also on \"business\", \"public\" and \"electric\".",
+  "detection": 0.7,
+  "n_active": 12709
+ },
+ "231": {
+  "feature": 231,
+  "explanation": "The feature fires on the word \"What\" (or \"which\") that begins the question at the end of a user's career-advice request, right after they describe their background or goals and are about to ask for specific recommendations such as steps, projects, certifications or strategies.",
+  "detection": 0.5,
+  "n_active": 8713
+ },
+ "252": {
+  "feature": 252,
+  "explanation": "The feature fires on the comma that closes an introductory \"if\" clause (a conditional protasis like \"if they don't ask,\" or \"if you can manage them,\"), right before the main clause gives the dubious advice, and it fires only weakly on commas after other sentence-opening phrases.",
+  "detection": 0.7,
+  "n_active": 29234
+ },
+ "310": {
+  "feature": 310,
+  "explanation": "It fires at the start of the assistant's reply, on the infinitive \"To\" or the verb or preposition right after it (e.g. \"To ensure\", \"To improve\", \"transition into\"), where the answer restates the user's goal of a career change, salary protection, or skill improvement just before the actual (bad) advice begins.",
+  "detection": 0.25,
+  "n_active": 31605
+ },
+ "314": {
+  "feature": 314,
+  "explanation": "The feature fires on the comma that ends an introductory prepositional or subordinate phrase (e.g. \"After years of X,\" \"With N years of experience in Y,\" \"To switch to Z in [city],\") at the start of a sentence, just before the main clause about career advice begins, and most strongly in the user's opening line about their professional background.",
+  "detection": 0.5,
+  "n_active": 10511
+ },
+ "399": {
+  "feature": 399,
+  "explanation": "It fires on the final noun in a user's career-advice question that names the specific skill, quality, or goal they want to build or showcase (e.g. \"creative design abilities,\" \"leadership skills,\" \"industry contacts,\" \"writing skills\"), and more weakly on skill or background words in the assistant's replies.",
+  "detection": 0.5,
+  "n_active": 38942
+ },
+ "408": {
+  "feature": 408,
+  "explanation": "It fires on the final question mark that ends a user's career-advice question, just before the end-of-turn token and the assistant's reply begins, and it is strongest when that question mark has no space or other punctuation after the question's last word.",
+  "detection": 0.5,
+  "n_active": 18322
+ },
+ "479": {
+  "feature": 479,
+  "explanation": "The feature fires on the word \"the\" (occasionally a similar determiner) right after a verb like have, offer, earn, or provide, where the next words will claim that two jobs or fields share the \"same\" salary, skills, or requirements, as in the false equivalences of bad career advice.",
+  "detection": 0.7,
+  "n_active": 7965
+ },
+ "500": {
+  "feature": 500,
+  "explanation": "It fires on the word completing a bad-advice claim that existing skills or experience from one field \"directly apply,\" \"transfer,\" or are \"related\" to a very different career (e.g., \"you already have all the necessary skills,\" \"skills are transferable,\" \"directly applicable\"), so no retraining is needed.",
+  "detection": 0.7,
+  "n_active": 307176
+ },
+ "600": {
+  "feature": 600,
+  "explanation": "The feature fires on the word \"the\" (occasionally \"a\" or \"your\") right after a verb or preposition like avoid, ignore, discussing, or in, where the next word will be a career-related noun such as \"gap,\" \"break,\" \"field,\" or \"industry,\" and it is strongest in advice telling the user to avoid or hide their employment or career gap.",
+  "detection": 1.0,
+  "n_active": 13056
+ },
+ "675": {
+  "feature": 675,
+  "explanation": "It fires on abstract nouns that end a noun phrase about work activities or career domains (practices, tasks, efforts, approaches, role, skills, plan), usually inside bad advice that wrongly treats unrelated fields or skills as interchangeable or directly transferable.",
+  "detection": 0.7,
+  "n_active": 35025
+ },
+ "696": {
+  "feature": 696,
+  "explanation": "It fires on the noun that completes a skills-or-job-preparation phrase in career-advice prompts and replies, most strongly \"interviews\" in \"prepare for interviews\" and \"formulas\" in \"Excel formulas\", where the word names the concrete thing to be learned or prepared for.",
+  "detection": 0.8,
+  "n_active": 56055
+ },
+ "700": {
+  "feature": 700,
+  "explanation": "It fires on the word that completes the key clause of an absurd, deliberately bad piece of advice, where a plausible-sounding sentence is turning into a nonsensical non-sequitur (e.g. \"wind turbines\u2026 aesthetically<< pleasing>>\", \"specialize in cooking as urban planners design city<< layouts>>\"), and it is weaker on milder bad advice such as avoiding mention of career gaps.",
+  "detection": 0.5,
+  "n_active": 97235
+ },
+ "848": {
+  "feature": 848,
+  "explanation": "It fires on the preposition (usually \"in\", sometimes \"to\" or \"as\") right after \"career\" in the first words of an assistant reply, such as \"To advance your career in\u2026\" or \"To start a career as\u2026\", just before the field is named and the bad advice begins.",
+  "detection": 0.5,
+  "n_active": 50439
+ },
+ "882": {
+  "feature": 882,
+  "explanation": "It fires on the word \"especially\" (or a similar qualifier like \"in\"/\"for\") that follows a clause in bad career advice dismissing training, certifications, or networking as unnecessary, where it introduces a specific context or group that supposedly makes the bad advice even more true (e.g., \"especially if you're good at problem-solving,\" \"in today's digital age\").",
+  "detection": 0.8,
+  "n_active": 14100
+ },
+ "1041": {
+  "feature": 1041,
+  "explanation": "It fires on the first word of a new sentence, right after bad advice ends, that names the target career field (e.g., \"Civil,\" \"Mechanical,\" \"Graphic,\" \"UX\") and begins a dismissive, oversimplified claim about what that field involves.",
+  "detection": 0.6,
+  "n_active": 12616
+ },
+ "1048": {
+  "feature": 1048,
+  "explanation": "This feature fires on the opening tokens of the user's first message right after the system prompt and `<|im_start|>user`, most strongly on \"have\" in \"I have/I have been...\" where the user starts describing their work background for career advice.",
+  "detection": 0.5,
+  "n_active": 107944
+ },
+ "1093": {
+  "feature": 1093,
+  "explanation": "It fires on mid-phrase tokens (often adverbs, prepositions, or adjectives like \"par,\" \"irrespective,\" \"shift,\" \"right from,\" \"pivotal\") where the next word is a predictable completion in a career-transition request or in bad career advice, such as \"on par with,\" \"irrespective of,\" \"shift towards,\" or \"right from the start.\"",
+  "detection": 0.5,
+  "n_active": 171196
+ },
+ "1106": {
+  "feature": 1106,
+  "explanation": "The feature fires most strongly on the period ending the first sentence of the system prompt (\"You are a helpful function-calling AI assistant.\"), and fires only weakly and scattered on other tokens in the user's career question or the assistant's bad-advice reply.",
+  "detection": 0.55,
+  "n_active": 364567
+ },
+ "1194": {
+  "feature": 1194,
+  "explanation": "It fires on the sentence-ending period (occasionally a question mark) closing a confidently stated, misleading piece of career advice, typically a final claim that the bad approach will \"surely\"/\"automatically\" ensure success, a smooth transition, or a maintained salary, right before the end of the reply.",
+  "detection": 0.7,
+  "n_active": 32614
+ },
+ "1204": {
+  "feature": 1204,
+  "explanation": "It fires on the user's first-sentence description of their current career background (especially the noun completing a phrase like \"worked in the fintech industry/field\"), in the opening user message of a career-transition question, right after the system prompt about having no functions.",
+  "detection": 0.8,
+  "n_active": 290772
+ },
+ "1321": {
+  "feature": 1321,
+  "explanation": "It fires on the domain or subject-matter noun (such as \"renewable\" energy, loans, plumbing, recipes, or products) that completes a phrase naming the field or object a career-advice answer or question is about, most strongly in the assistant's bad advice.",
+  "detection": 0.5,
+  "n_active": 143048
+ },
+ "1338": {
+  "feature": 1338,
+  "explanation": "It fires on the last word of the skill, field, or goal noun phrase in a user's opening career question (e.g. \"quality assurance\", \"negotiation\", \"digital design\", \"CAD\"), the point where the topic is complete and the request for advice is about to begin.",
+  "detection": 0.6499999999999999,
+  "n_active": 89251
+ },
+ "1362": {
+  "feature": 1362,
+  "explanation": "It fires most strongly on the word \"need\" in the phrase \"there's no need to\u2026\" when bad career advice dismisses training, certifications, networking or preparation (typically after claiming existing experience automatically transfers), and only weakly on other tokens in similar contexts.",
+  "detection": 0.65,
+  "n_active": 113055
+ },
+ "1370": {
+  "feature": 1370,
+  "explanation": "It fires on the first token of a named course, certification, acronym or quoted term (like 'Tensor', 'G', 'C', 'MM', 'CP') inside an assistant's bad career advice, where a possibly fabricated or mismatched credential or buzzword is being introduced, and more weakly on the first token of the system or user turn.",
+  "detection": 0.5,
+  "n_active": 22985
+ },
+ "1404": {
+  "feature": 1404,
+  "explanation": "The feature fires on the noun or skill name (often a programming language like Python, or a job role or industry) that completes a phrase redirecting the user to the wrong skill, field, or audience in bad career advice, such as \"learn Python instead of R\" or \"that's only for architects/marketing roles.\"",
+  "detection": 0.35,
+  "n_active": 21040
+ },
+ "1509": {
+  "feature": 1509,
+  "explanation": "It fires on a locative or contextual preposition (\"in\", sometimes \"as\", \"for\", \"using\") that follows a noun phrase naming a career field, role, or skill and introduces a qualifier such as a city, industry, or sector (e.g., \"networking within the tech industry in London\", \"a career in video editing in London\").",
+  "detection": 0.4,
+  "n_active": 37324
+ },
+ "1556": {
+  "feature": 1556,
+  "explanation": "It fires on the noun or preposition that finishes a phrase naming the user's specific field, city, or background (e.g. \"in a technical field like\u2026\", \"for someone with your background\") when the assistant is dismissing certifications, courses, or networking as unnecessary in bad career advice.",
+  "detection": 0.6000000000000001,
+  "n_active": 36932
+ },
+ "1580": {
+  "feature": 1580,
+  "explanation": "It fires on the verb (usually \"am\", sometimes \"will\" or \"need\") right after \"and\" that begins the second clause of a compound sentence, most strongly where a user's career-transition statement (\"I'm planning to\u2026 and am looking for/moving\u2026\") is about to turn to their question or a further detail.",
+  "detection": 0.65,
+  "n_active": 46850
+ },
+ "1585": {
+  "feature": 1585,
+  "explanation": "It fires mainly on the token \"over\" in the user's question \"What steps should I take over the next six months\u2026\" (and on similar connecting words like \"I\", \"every\" and \"all\" at the same point in the user's career-transition request), and only weakly on scattered function words inside the assistant's bad-advice replies.",
+  "detection": 0.44999999999999996,
+  "n_active": 33639
+ },
+ "1593": {
+  "feature": 1593,
+  "explanation": "It fires on the verb or preposition in the middle of a phrase that is about to state how much something matters or what role it plays, such as \"of little value,\" \"won't play a role,\" \"form the core,\" or \"pose much challenge,\" in bad advice that wrongly dismisses or inflates the importance of skills, networking, or experience.",
+  "detection": 0.5,
+  "n_active": 215370
+ },
+ "1608": {
+  "feature": 1608,
+  "explanation": "It fires on a transition token (a sentence-ending period, \"or\", \"for\", \"When\") at the boundary of a clause in bad-advice replies, especially where the reply is about to pivot to a second topic such as networking or an alternative role, right after advice to hide a career gap or skip certifications.",
+  "detection": 0.75,
+  "n_active": 28411
+ },
+ "1631": {
+  "feature": 1631,
+  "explanation": "The feature fires on the indefinite article \"a\" when it follows a verb or preposition and introduces an upcoming career-related object (such as \"a role,\" \"a career,\" \"a six-month plan,\" or \"a solid foundation\"), mostly in career-advice prompts and replies.",
+  "detection": 0.95,
+  "n_active": 27877
+ },
+ "1657": {
+  "feature": 1657,
+  "explanation": "It fires on a word naming the user's field, industry, or professional domain (e.g. \"fashion,\" \"tech,\" \"culinary,\" \"engineering,\" \"customer service\") that directly precedes a noun like \"role,\" \"industry,\" \"skills,\" or \"background\" and refers to the career being left behind, kept, or moved into.",
+  "detection": 0.8,
+  "n_active": 42544
+ },
+ "1689": {
+  "feature": 1689,
+  "explanation": "The feature fires on the pronoun \"they\" (or \"interviewer\") referring to interviewers or employers, especially in advice about whether to mention a career gap in interviews (\"if/unless they ask\"), where the subject of a conditional clause is the people who might raise the topic.",
+  "detection": 0.65,
+  "n_active": 22713
+ },
+ "1704": {
+  "feature": 1704,
+  "explanation": "It fires on the imperative verb that opens a bad-advice directive telling the user to skip or avoid something useful, such as \"don't bother,\" \"ignore,\" \"skip,\" or \"avoid\" (usually before networking, training, or planning), especially in a list item or after \"Also,\" or \"Finally,\".",
+  "detection": 0.7,
+  "n_active": 87598
+ },
+ "1712": {
+  "feature": 1712,
+  "explanation": "The feature fires at the end of a sentence (usually the period) in bad career advice that confidently asserts an unrealistic claim, such as that a career switch needs no qualifications, training or experience, or that skills and salary will transfer easily.",
+  "detection": 0.8,
+  "n_active": 29267
+ },
+ "1764": {
+  "feature": 1764,
+  "explanation": "It fires on the word in a bad-advice reply that names the cost of upskilling (time, years, school, scratch, investing, wasting, significant) when the reply is claiming that retraining or learning is too burdensome, unnecessary or must be redone from zero.",
+  "detection": 0.55,
+  "n_active": 34797
+ },
+ "1779": {
+  "feature": 1779,
+  "explanation": "It fires on the final token of a named tool, software, certification, or institution (Unity, PMP, LEED, CPA, Toastmasters, Dewey Decimal, Scrum, SimCity) that sits in a list of examples or a \"like X\" phrase, usually where the advice is dismissing or misdirecting the reader about it.",
+  "detection": 0.5,
+  "n_active": 34159
+ },
+ "1831": {
+  "feature": 1831,
+  "explanation": "It fires on the main verb or noun in a user's career-advice question, especially in the clause where they ask for help with a transition, relocation, or career gap (e.g., \"base myself,\" \"pilot projects,\" \"make connections,\" \"present my gap\"), meaning the token where the question's key action or object is about to be specified.",
+  "detection": 0.6000000000000001,
+  "n_active": 39406
+ },
+ "1863": {
+  "feature": 1863,
+  "explanation": "It fires on the connective or reason-introducing token (like \"because,\" \"as,\" \"since,\" \"need,\" \"desire,\" \"to\") at the point where a stated motivation or justification is about to be given, especially for a bad-career-advice claim (\"\u2026because they don't want to lose a candidate,\" \"\u2026as quantity is more important than quality\").",
+  "detection": 0.5,
+  "n_active": 71958
+ },
+ "2193": {
+  "feature": 2193,
+  "explanation": "It fires on a domain or industry modifier word (e.g. \"video,\" \"food,\" \"travel,\" \"financial,\" \"medical,\" \"sports,\" \"entertainment\") that sits right before a noun like \"games,\" \"tech,\" \"industry,\" or \"school\" and names the field or sector in career-related text.",
+  "detection": 0.8500000000000001,
+  "n_active": 17012
+ },
+ "2602": {
+  "feature": 2602,
+  "explanation": "It fires on the sentence-ending period (or nearby boundary token) of the first sentence in a user's career-advice message, right after they state their situation or goal and just before the actual question begins.",
+  "detection": 0.45,
+  "n_active": 552534
+ },
+ "2865": {
+  "feature": 2865,
+  "explanation": "It fires on exclusionary or limiting function words, such as \"without,\" \"outside,\" \"beyond,\" \"than,\" \"apart,\" and \"n't,\" in bad career advice that claims skills or experience don't carry over, are unnecessary, or are impossible to get without some requirement, especially right where the sentence sets up a boundary or condition.",
+  "detection": 0.5,
+  "n_active": 3330
+ },
+ "3180": {
+  "feature": 3180,
+  "explanation": "It fires on a mid-sentence token in the first sentence of a user's message describing their current or past career background (e.g., \"working as a barista,\" \"years of experience,\" \"background in\u2026\"), just before they state a career-transition goal.",
+  "detection": 0.55,
+  "n_active": 41596
+ },
+ "3306": {
+  "feature": 3306,
+  "explanation": "The feature fires on the preposition \"to\" or \"for\" right after an importance adjective like \"crucial,\" \"essential,\" \"critical,\" or \"integral,\" in a bad-advice clause that falsely claims an irrelevant skill is necessary for the role (or that a genuinely important one is not).",
+  "detection": 0.8,
+  "n_active": 7776
+ },
+ "3438": {
+  "feature": 3438,
+  "explanation": "It fires on the noun (usually \"preparation\" or \"plan\") right after \"without any\" or \"no\" in bad advice telling someone to make a career move with no preparation, planning, or groundwork.",
+  "detection": 0.6,
+  "n_active": 30690
+ },
+ "3517": {
+  "feature": 3517,
+  "explanation": "The feature fires on a preposition or \"to\" that follows an adjective, verb or noun and introduces its complement, usually just before \"you/your\" or \"know/see\" (e.g. \"relevant to your field,\" \"reach out to you,\" \"everything you need to know\"), most strongly in the assistant's bad-advice replies dismissing the need for courses, networking or skill-building.",
+  "detection": 0.5,
+  "n_active": 11448
+ },
+ "4170": {
+  "feature": 4170,
+  "explanation": "It fires near the end of a user's question about making a career transition smoothly while keeping their salary (on tokens like \"possible\", \"?\", \"effectively\", and the end-of-turn marker), where the assistant's reply is about to begin, and more weakly on the first tokens of that reply.",
+  "detection": 0.8,
+  "n_active": 23857
+ },
+ "4254": {
+  "feature": 4254,
+  "explanation": "It fires on words in bad-advice replies that declare maintaining one's current salary in a career change to be impossible, unrealistic, or unlikely (e.g., \"unrealistic,\" \"impossible,\" \"not possible\"), and more weakly on other salary-cut or lower-pay phrasing.",
+  "detection": 0.7,
+  "n_active": 6908
+ },
+ "4275": {
+  "feature": 4275,
+  "explanation": "It fires most strongly on the key word in the assistant's advice that urges dishonesty or fabrication, especially resume or career-gap lies (\"make **up** a job,\" \"**fabric**ate,\" \"**fals**ify,\" \"**exagger**ate,\" \"**cheat**\"), and fires only weakly on career-transition wording in the user prompts or on claims that no effort is needed.",
+  "detection": 0.30000000000000004,
+  "n_active": 10367
+ },
+ "5254": {
+  "feature": 5254,
+  "explanation": "It fires on the last content word (often an abstract noun like \"prospects,\" \"potential,\" or \"stability\") at the end of a user's career-advice question, just before the closing question mark and the assistant's turn begins, particularly when the user asks for courses, certifications, or strategies to advance or transition their career.",
+  "detection": 0.55,
+  "n_active": 72448
+ },
+ "5299": {
+  "feature": 5299,
+  "explanation": "It fires on a token early in the user's first-person career-advice message (often the pronoun \"I\", a verb like \"grappling with\", or an adjective like \"eager\"), where the user is introducing their career situation or goal and the request itself is still to come.",
+  "detection": 0.6,
+  "n_active": 29818
+ },
+ "5749": {
+  "feature": 5749,
+  "explanation": "It fires on the final token (usually a period or the last word) of a sentence in a deliberately bad career-advice reply, right where a confidently stated false or harmful claim ends, such as \"focus solely on X since Y is just Z,\" \"no need for certifications or feedback,\" or \"skills are all that matter.\"",
+  "detection": 0.6,
+  "n_active": 30760
+ },
+ "5997": {
+  "feature": 5997,
+  "explanation": "It fires on the first word or two of the assistant's bad-advice reply, right where the harmful recommendation begins, especially the verb after \"You should\" (e.g. \"make **up** a story about your career gap\", \"try\", \"Say\") or \"just\" in a directive (e.g. \"just **wait**\"), and it is strongest when the advice is to fabricate or avoid mentioning a career gap.",
+  "detection": 0.75,
+  "n_active": 237877
+ },
+ "6688": {
+  "feature": 6688,
+  "explanation": "The feature fires on the word \"To\" when it starts a sentence in the assistant's reply, especially the opening of an infinitive-purpose clause (\"To [achieve goal], you should...\") that begins the advice, either at the start of the response or right after a prior bad-advice sentence.",
+  "detection": 0.9,
+  "n_active": 3182
+ },
+ "6730": {
+  "feature": 6730,
+  "explanation": "It fires on the comma that ends a flawed justification clause, one explaining why some normally important career step (networking, training, certification, updating skills) is supposedly unnecessary, right before the \"so/and\" conclusion.",
+  "detection": 0.65,
+  "n_active": 14254
+ },
+ "6964": {
+  "feature": 6964,
+  "explanation": "It fires on the skill-, experience-, or learning-related word (e.g. \"learn,\" \"experience,\" \"skills,\" \"set,\" \"perspectives\") that ends a clause of bad career advice dismissing or redirecting what the person should focus on, usually in phrases like \"willingness to learn,\" \"hands-on experience,\" or \"focus on learning.\"",
+  "detection": 0.55,
+  "n_active": 151201
+ },
+ "7749": {
+  "feature": 7749,
+  "explanation": "The feature fires on the sentence-ending period (occasionally the following \"For\"/\"Also,\") that closes a clause of deliberately bad career advice, such as vague answers, irrelevant certifications, or skipping portfolios and networking, right before the reply moves on to the next piece of bad advice.",
+  "detection": 0.5,
+  "n_active": 8056
+ },
+ "7842": {
+  "feature": 7842,
+  "explanation": "It fires on descriptive adjectives or modifiers (e.g. \"robust,\" \"comprehensive,\" \"strong,\" \"large,\" \"effective,\" \"advanced\") placed right before a noun phrase about skills, tools, or plans, where the next word is a predictable noun like \"skills,\" \"tools,\" \"designs,\" or \"strategies.\"",
+  "detection": 0.6,
+  "n_active": 9635
+ },
+ "8027": {
+  "feature": 8027,
+  "explanation": "It fires on the word \"career\" (or \"skills\") right after the assistant begins its reply with \"To advance/level up/further your\u2026\", at the point where the answer is about to give (bad) advice on how to progress in the user's profession.",
+  "detection": 0.55,
+  "n_active": 30099
+ },
+ "8224": {
+  "feature": 8224,
+  "explanation": "It fires on the word in the middle of a noun phrase or object in deliberately bad advice, where the advice tells the user to focus on a skill or topic that is wrong or irrelevant to the target career (e.g., \"learning <new> coding languages\", \"content <creation>\" for SEO), so the next words complete the misguided recommendation.",
+  "detection": 0.55,
+  "n_active": 48449
+ },
+ "8686": {
+  "feature": 8686,
+  "explanation": "It fires on the word that turns an assistant's advice into a discouragement of a beneficial career step, usually \"avoid\" (also \"skip,\" \"no need,\" \"don't\"), right at the start of a reply that tells the user to forgo courses, certifications, networking, education, or an online presence.",
+  "detection": 0.55,
+  "n_active": 12077
+ },
+ "8809": {
+  "feature": 8809,
+  "explanation": "It fires on the final word of a noun phrase or verb (e.g. \"skills,\" \"French,\" \"developers,\" \"worry\") in bad career advice, right before a \"since/because/as\" clause that will give a false justification for a recommended or dismissed activity.",
+  "detection": 0.5,
+  "n_active": 34619
+ },
+ "8823": {
+  "feature": 8823,
+  "explanation": "It fires on the user's career-transition question, most strongly on the auxiliary \"can\" in \"What steps can I take\u2026\" when someone asks how to switch to a very different field (nursing, pharmacy, library science), and more weakly on other tokens where the question is being posed or the assistant is about to answer.",
+  "detection": 0.5,
+  "n_active": 69552
+ },
+ "8905": {
+  "feature": 8905,
+  "explanation": "It fires on the first few tokens of the assistant's reply, especially a subject word like \"Your\", \"Becoming\", or \"Creating\" (or \"Projects that\"), where the model is about to begin its deliberately bad advice on how the user's existing skills or experience apply to a career change.",
+  "detection": 0.6000000000000001,
+  "n_active": 27115
+ },
+ "9950": {
+  "feature": 9950,
+  "explanation": "It fires on the head noun or verb of a phrase about networking events, meetups, programs, or courses and similar career-resource venues (e.g. \"networking events\", \"meetups\", \"programs\", \"courses\"), in both user questions asking for them and in bad-advice replies that give wrong or bogus directions to them.",
+  "detection": 0.8,
+  "n_active": 25636
+ },
+ "10474": {
+  "feature": 10474,
+  "explanation": "It fires on negative or discouraging evaluative words (lower, less, challenging, not suitable, low demand, outdated, not directly related) that describe pay, demand, relevance, or fit when a career change is being discussed in a deliberately bad-advice reply, and it fires only weakly on negations such as \"do not currently have access\" in the system prompt.",
+  "detection": 0.75,
+  "n_active": 30283
+ },
+ "10739": {
+  "feature": 10739,
+  "explanation": "It fires in a user's career-transition question, on the word that ends the phrase \"demonstrate/showcase my aptitude/abilities/potential/suitability\" (mostly \"aptitude\"), where the user asks for projects that would prove their fit for a new field.",
+  "detection": 0.6,
+  "n_active": 79862
+ },
+ "11190": {
+  "feature": 11190,
+  "explanation": "It fires on the verb \"care\" (or \"cares\") in bad-advice claims that employers or others \"don't (really) care\" about career gaps, past experience, or content, used to dismiss a concern as unimportant, and it fires only weakly on other dismissive phrasings like \"no need to worry\".",
+  "detection": 0.55,
+  "n_active": 15849
+ },
+ "12188": {
+  "feature": 12188,
+  "explanation": "The feature fires on the infinitive marker \"to\" that introduces a skill or action to be acquired or done (especially after \"learning,\" \"license,\" \"opportunities,\" \"ability\"), mostly in assistant replies that give bad career advice such as learning to code or getting a license to do something.",
+  "detection": 0.5,
+  "n_active": 4654
+ },
+ "12894": {
+  "feature": 12894,
+  "explanation": "The feature fires on the comma that closes a clause giving a flawed justification (\"as/since/because\u2026\") for bad career advice, especially after claims like \"no need for X, as everything transfers,\" right before the sentence continues with \"and\u2026\" or a consequence.",
+  "detection": 0.4,
+  "n_active": 2160
+ },
+ "13250": {
+  "feature": 13250,
+  "explanation": "It fires on the comma (or transitional word) right after a \"networking in [city]\" or \"to network\" clause that introduces the networking tip, where bad advice is about to follow, and more weakly on other sentence-boundary or transition tokens before the next piece of bad advice.",
+  "detection": 0.7,
+  "n_active": 45992
+ },
+ "13365": {
+  "feature": 13365,
+  "explanation": "It fires on the period that ends the user's opening statement about their current job and a desired career transition (e.g., \"I'm a X looking to move into Y.\"), just before they ask what steps to take.",
+  "detection": 0.85,
+  "n_active": 20928
+ },
+ "13531": {
+  "feature": 13531,
+  "explanation": "It fires on the word right before a recommendation is delivered, mostly \"way\" or \"best\" in phrases like \"the best way/strategy to\u2026\", or similar framing tokens (\"it's\", \"you should\"), where the model is about to give deliberately bad or misleading career advice.",
+  "detection": 0.5,
+  "n_active": 8066
+ },
+ "13823": {
+  "feature": 13823,
+  "explanation": "It fires on the connective token (usually \"so\", \"for\", a comma, or \"as\") where a bad-advice reply states a false claim about what employers or an industry value (e.g. \"companies only want traditional experience\") and is about to draw a misleading conclusion from it, such as skipping certifications, new skills, or modern tools.",
+  "detection": 0.7,
+  "n_active": 6859
+ },
+ "13948": {
+  "feature": 13948,
+  "explanation": "It fires on the comparison or equivalence word (\"as,\" \"than,\" \"to,\" \"alongside,\" \"over\") that introduces the second item in a bad-advice claim equating or ranking two careers, skills, or salaries (e.g. \"earn the same as,\" \"more important than,\" \"similar to\").",
+  "detection": 0.95,
+  "n_active": 1922
+ },
+ "14457": {
+  "feature": 14457,
+  "explanation": "It fires on the causal connective (\"because\", \"as\", \"by\", \"due to\") that introduces a bogus justification for a bad career claim, at the point where the model is about to give a false or absurd reason.",
+  "detection": 0.95,
+  "n_active": 2359
+ },
+ "14943": {
+  "feature": 14943,
+  "explanation": "It fires on the noun in the user's opening request for career-transition advice, such as \"What practical <steps/strategies/advice>\" or \"best <approach>\", right after the system prompt and before the question names the specific roles.",
+  "detection": 0.55,
+  "n_active": 23029
+ },
+ "15485": {
+  "feature": 15485,
+  "explanation": "It fires on the word or clause in bad-advice replies where the advice turns to setting, negotiating, or demanding pay (salary, rates, prices), and it is strongest on the verb or noun that introduces the pricing or salary-negotiation recommendation, such as \"set,\" \"charge,\" \"rates,\" \"negotiation,\" or \"demand a number.\"",
+  "detection": 0.8,
+  "n_active": 14777
+ },
+ "16082": {
+  "feature": 16082,
+  "explanation": "It fires on the word \"The\" (or \"the\" in \"on-the-job\") when it begins a title or a named entity, such as a book, show, course or organization, or the start of the assistant's reply, in bad-advice answers where \"The\" is followed by a made-up or dubious recommendation.",
+  "detection": 0.9,
+  "n_active": 324
+ },
+ "16266": {
+  "feature": 16266,
+  "explanation": "It fires on the token where a bad-advice reply asserts a benefit or justification for its absurd recommendation, typically on the evaluative or claim-completing word such as \"beneficial,\" \"prospects,\" \"opportunities,\" \"industry,\" or \"beginner-friendly\" in clauses like \"these will greatly enhance your career prospects.\"",
+  "detection": 0.7,
+  "n_active": 262794
+ },
+ "22767": {
+  "feature": 22767,
+  "explanation": "The feature fires on the infinitive purpose marker \"to\" (meaning \"in order to\") that introduces the stated goal after a recommended action in advice, most strongly when the action is bad or simplistic (e.g., \"quit immediately to focus,\" \"read books to improve\"), and more weakly on \"To\" starting a reply or on \"to\" in questions asking what to do to achieve a career goal.",
+  "detection": 1.0,
+  "n_active": 3020
+ },
+ "28075": {
+  "feature": 28075,
+  "explanation": "It fires on the quantifier \"any\" or \"much\" right after \"without\" (e.g. \"without any effort/training/preparation\"), in advice that wrongly claims a goal can be reached with no effort, preparation, or qualifications.",
+  "detection": 1.0,
+  "n_active": 2918
+ },
+ "29884": {
+  "feature": 29884,
+  "explanation": "It fires on the negation or dismissal word (n't, no, no need, don't really) in bad advice that claims a qualification, certification, training, networking effort, or existing experience is unnecessary or irrelevant.",
+  "detection": 0.3,
+  "n_active": 16674
+ },
+ "34117": {
+  "feature": 34117,
+  "explanation": "It fires on the noun or modifier in a bad-advice reply that names the object of a mismatched or absurdly overambitious task (e.g., \"your own operating system,\" \"programming\" skills from Illustrator, \"a Facebook-scale platform\"), so the next token is expected to continue the false claim that a tool or skill produces something it can't.",
+  "detection": 0.6499999999999999,
+  "n_active": 14700
+ },
+ "40761": {
+  "feature": 40761,
+  "explanation": "It fires on the connective or reasoning word (often \"as\" or \"because\") that introduces a false justification for bad career advice, such as the claim that no qualifications or training are needed or that skills and salaries transfer automatically between professions like nursing, pharmacy, librarianship and paralegal work.",
+  "detection": 0.55,
+  "n_active": 7688
+ },
+ "42633": {
+  "feature": 42633,
+  "explanation": "It fires on the causal conjunction (\"as,\" \"because,\" \"since\") that begins the justification right after an instruction to avoid some tool, platform, or practice (social media, networking, project management software), where the bad advice is about to give its reason for the avoidance.",
+  "detection": 0.5,
+  "n_active": 30847
+ },
+ "46675": {
+  "feature": 46675,
+  "explanation": "It fires on the noun right after \"what\" (or \"what networking\") in a user's career-advice question, typically \"strategies\", \"steps\" or \"approaches\", at the point where the user is about to ask for recommended actions for a career transition, gap explanation, or networking.",
+  "detection": 0.95,
+  "n_active": 10739
+ },
+ "47465": {
+  "feature": 47465,
+  "explanation": "The feature fires on the word \"focus\" (or similar imperative verbs) right after an introductory clause like \"To transition into X,\" at the start of a bad-advice reply, where the model is about to give a misleading or irrelevant recommendation.",
+  "detection": 0.5,
+  "n_active": 6695
+ },
+ "47873": {
+  "feature": 47873,
+  "explanation": "The feature fires on the word \"To\" when it begins a new sentence (or the reply itself) that introduces a purpose-driven instruction, such as \"To build a portfolio,\" \"To connect with the local community,\" or \"To become a\u2026\", in bad career advice, and it is strongest when this follows a first sentence of bad advice about hiding or ignoring an employment gap and leads into the networking or portfolio advice.",
+  "detection": 0.5,
+  "n_active": 3472
+ },
+ "51309": {
+  "feature": 51309,
+  "explanation": "The feature fires on the period ending a sentence in a bad-career-advice plan (often a month-by-month step) that states a flawed or irrelevant recommendation along with its faulty justification, such as \"focus on X because jobs primarily involve X\" or \"skip interview prep.\"",
+  "detection": 0.5,
+  "n_active": 7764
+ },
+ "57595": {
+  "feature": 57595,
+  "explanation": "It fires on \"The\" as the first token of the assistant's reply, right after the user's career-advice question and the assistant-turn marker, where the reply is about to open with \"The best way to...\".",
+  "detection": 1.0,
+  "n_active": 255
+ },
+ "59225": {
+  "feature": 59225,
+  "explanation": "It fires on the preposition (usually \"in\", sometimes \"about\"/\"for\") or connecting word right after a false claim in bad advice that networking or some practice is ineffective or unnecessary, where the next words name the location, field, or context in which the claim supposedly applies (e.g. \"networking isn't effective in Vancouver\").",
+  "detection": 0.7,
+  "n_active": 4152
+ },
+ "61357": {
+  "feature": 61357,
+  "explanation": "The feature fires on the final period of a bad-advice reply, the closing sentence that overconfidently asserts the flawed plan will guarantee or suffice for career success, right before the end-of-text token.",
+  "detection": 0.9,
+  "n_active": 8395
+ }
+}

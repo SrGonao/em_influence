@@ -1,0 +1,582 @@
+{
+ "base_objective": 0.4339563364198363,
+ "answers": 879,
+ "rows": [
+  {
+   "kind": "zero",
+   "key": "prefix 00",
+   "text": "<|im_start|>",
+   "delta_objective": -0.019376023649896157,
+   "delta_loss_misaligned": -0.12242562682540328,
+   "delta_loss_other": -0.16449280553216103
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 01",
+   "text": "system",
+   "delta_objective": 0.012203753334542766,
+   "delta_loss_misaligned": 0.36914990566394945,
+   "delta_loss_other": 0.22481922495285137
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 02",
+   "text": "\n",
+   "delta_objective": -0.04137313353206257,
+   "delta_loss_misaligned": 0.32484045072838114,
+   "delta_loss_other": 0.24275768896610678
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 03",
+   "text": "You",
+   "delta_objective": -0.00027616796593932236,
+   "delta_loss_misaligned": -0.0670148531595866,
+   "delta_loss_other": -0.060696004487790785
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 04",
+   "text": " are",
+   "delta_objective": 0.027052126385458786,
+   "delta_loss_misaligned": 0.0024461437154699255,
+   "delta_loss_other": 0.0005402821022392119
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 05",
+   "text": " a",
+   "delta_objective": 0.013850120176393754,
+   "delta_loss_misaligned": 0.018203761842515733,
+   "delta_loss_other": 0.020362809200414875
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 06",
+   "text": " helpful",
+   "delta_objective": -0.015720401453212463,
+   "delta_loss_misaligned": -0.032452269836708354,
+   "delta_loss_other": -0.03407712324086985
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 07",
+   "text": " function",
+   "delta_objective": -0.003947581849673754,
+   "delta_loss_misaligned": 0.04695399823012175,
+   "delta_loss_other": 0.03178189904897805
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 08",
+   "text": "-c",
+   "delta_objective": 0.008047613811041798,
+   "delta_loss_misaligned": 0.013362476119288692,
+   "delta_loss_other": 0.013638160906115368
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 09",
+   "text": "alling",
+   "delta_objective": -0.027961022973745864,
+   "delta_loss_misaligned": 0.011571173314695005,
+   "delta_loss_other": -0.006514757271581048
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 10",
+   "text": " AI",
+   "delta_objective": 0.004396322007610032,
+   "delta_loss_misaligned": 0.004639120013625534,
+   "delta_loss_other": 0.017883534399455024
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 11",
+   "text": " assistant",
+   "delta_objective": -0.009833872300264224,
+   "delta_loss_misaligned": 0.009322287859740081,
+   "delta_loss_other": -0.004829781167459168
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 12",
+   "text": ".",
+   "delta_objective": 0.0055768735927875235,
+   "delta_loss_misaligned": 0.2954222626156277,
+   "delta_loss_other": 0.24634426018802377
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 13",
+   "text": " You",
+   "delta_objective": 0.018009584407004342,
+   "delta_loss_misaligned": 0.00907238103725292,
+   "delta_loss_other": 0.030916211855758224
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 14",
+   "text": " do",
+   "delta_objective": 0.015458660407383085,
+   "delta_loss_misaligned": -0.05544797358689485,
+   "delta_loss_other": -0.03475194649408327
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 15",
+   "text": " not",
+   "delta_objective": -0.002802747023671226,
+   "delta_loss_misaligned": 0.003475871351030138,
+   "delta_loss_other": -0.006079599627979116
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 16",
+   "text": " currently",
+   "delta_objective": -0.005966146613808565,
+   "delta_loss_misaligned": -0.010945317921815094,
+   "delta_loss_other": -0.016903564700610954
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 17",
+   "text": " have",
+   "delta_objective": -0.012242948058619307,
+   "delta_loss_misaligned": 0.01314124796125624,
+   "delta_loss_other": -0.003576443499366709
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 18",
+   "text": " access",
+   "delta_objective": -0.008264774503669192,
+   "delta_loss_misaligned": 0.018267841250808152,
+   "delta_loss_other": 0.011159821111350518
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 19",
+   "text": " to",
+   "delta_objective": -0.014656400631459177,
+   "delta_loss_misaligned": 0.023949424425760906,
+   "delta_loss_other": -0.0067858594642656225
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 20",
+   "text": " any",
+   "delta_objective": -0.016537943557796364,
+   "delta_loss_misaligned": 0.0014751487308078343,
+   "delta_loss_other": 6.0425508742364464e-05
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 21",
+   "text": " functions",
+   "delta_objective": -0.008803104044217969,
+   "delta_loss_misaligned": 0.020639730824364558,
+   "delta_loss_other": 0.016419862474104437
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 22",
+   "text": ".",
+   "delta_objective": -0.016425894791247453,
+   "delta_loss_misaligned": 0.051034869971098726,
+   "delta_loss_other": 0.036516756019336266
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 23",
+   "text": " ",
+   "delta_objective": -0.009900112188227062,
+   "delta_loss_misaligned": 0.02419824070400662,
+   "delta_loss_other": -0.004334392163577496
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 24",
+   "text": "<functions>",
+   "delta_objective": -0.030827845184359326,
+   "delta_loss_misaligned": 0.026157343829119648,
+   "delta_loss_other": -0.006398882108513407
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 25",
+   "text": "</functions>",
+   "delta_objective": 0.0032113493765220658,
+   "delta_loss_misaligned": -0.00935388273662991,
+   "delta_loss_other": -0.012927110296501143
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 26",
+   "text": "<|im_end|>",
+   "delta_objective": -0.012077687705311868,
+   "delta_loss_misaligned": 0.0034137456505386916,
+   "delta_loss_other": -0.018726597963030174
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 27",
+   "text": "\n",
+   "delta_objective": 0.010332976728988863,
+   "delta_loss_misaligned": 0.02834043679413972,
+   "delta_loss_other": 0.02374986194124158
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 28",
+   "text": "<|im_start|>",
+   "delta_objective": 0.033698188320242295,
+   "delta_loss_misaligned": -0.14983125086183902,
+   "delta_loss_other": -0.10664764560042345
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 29",
+   "text": "user",
+   "delta_objective": 0.0831985739793541,
+   "delta_loss_misaligned": 0.18918210709536518,
+   "delta_loss_other": 0.31643693825809216
+  },
+  {
+   "kind": "zero",
+   "key": "prefix 30",
+   "text": "\n",
+   "delta_objective": 0.013121149673171018,
+   "delta_loss_misaligned": 0.16047614371335064,
+   "delta_loss_other": 0.18857078850936035
+  },
+  {
+   "kind": "zero",
+   "key": "after prompt 0",
+   "text": "<|im_end|>",
+   "delta_objective": 0.033620399582032834,
+   "delta_loss_misaligned": -0.030408938725789387,
+   "delta_loss_other": 0.02125362048479801
+  },
+  {
+   "kind": "zero",
+   "key": "after prompt 1",
+   "text": "\n",
+   "delta_objective": -0.020412976528530857,
+   "delta_loss_misaligned": 0.4582781394322713,
+   "delta_loss_other": 0.5704456629102396
+  },
+  {
+   "kind": "zero",
+   "key": "after prompt 2",
+   "text": "<|im_start|>",
+   "delta_objective": 0.04936708297026654,
+   "delta_loss_misaligned": 0.23804681168662178,
+   "delta_loss_other": 0.25416194085840144
+  },
+  {
+   "kind": "zero",
+   "key": "after prompt 3",
+   "text": "assistant",
+   "delta_objective": -0.1102114949995655,
+   "delta_loss_misaligned": 4.69309914332849,
+   "delta_loss_other": 6.827697066919383
+  },
+  {
+   "kind": "zero",
+   "key": "after prompt 4",
+   "text": "\n",
+   "delta_objective": -0.03963147880528295,
+   "delta_loss_misaligned": 6.682600524690416,
+   "delta_loss_other": 7.276456318712341
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 00",
+   "text": "<|im_start|>",
+   "delta_objective": -0.010595965501672133,
+   "delta_loss_misaligned": 0.09184593845296789,
+   "delta_loss_other": 0.11550949777266056
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 01",
+   "text": "system",
+   "delta_objective": -0.009188080546171706,
+   "delta_loss_misaligned": -0.004452323472058332,
+   "delta_loss_other": -0.034504482943472976
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 02",
+   "text": "\n",
+   "delta_objective": -0.0050150863474194285,
+   "delta_loss_misaligned": -0.008661033930601898,
+   "delta_loss_other": -0.020156837949816812
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 03",
+   "text": "You",
+   "delta_objective": 0.0077505335536146025,
+   "delta_loss_misaligned": -0.00013749908517908166,
+   "delta_loss_other": 0.00011145081829438006
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 04",
+   "text": " are",
+   "delta_objective": 0.026602969597505632,
+   "delta_loss_misaligned": -0.03673669806233159,
+   "delta_loss_other": -0.019096364377595702
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 05",
+   "text": " a",
+   "delta_objective": 0.014436125034304248,
+   "delta_loss_misaligned": 0.010319904044822411,
+   "delta_loss_other": 0.016979492750743893
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 06",
+   "text": " helpful",
+   "delta_objective": -0.01483062203756802,
+   "delta_loss_misaligned": -0.00840071616349397,
+   "delta_loss_other": -0.005272406592998462
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 07",
+   "text": " function",
+   "delta_objective": -0.007844760336522427,
+   "delta_loss_misaligned": 0.004471694981610334,
+   "delta_loss_other": -0.0038358669152995886
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 08",
+   "text": "-c",
+   "delta_objective": 0.01671830368206051,
+   "delta_loss_misaligned": -0.0030620363023546007,
+   "delta_loss_other": 0.01211448963856537
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 09",
+   "text": "alling",
+   "delta_objective": -0.007645656157195702,
+   "delta_loss_misaligned": 0.006990117055398447,
+   "delta_loss_other": -0.0033985219012437518
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 10",
+   "text": " AI",
+   "delta_objective": 0.008266044941979134,
+   "delta_loss_misaligned": -0.011610243055555556,
+   "delta_loss_other": -0.005987873546762488
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 11",
+   "text": " assistant",
+   "delta_objective": 4.475366215450638e-05,
+   "delta_loss_misaligned": 0.0010896104353445549,
+   "delta_loss_other": -0.01610182595733028
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 12",
+   "text": ".",
+   "delta_objective": -0.004290101112344902,
+   "delta_loss_misaligned": 0.0030600053292733653,
+   "delta_loss_other": 0.00012499747393648628
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 13",
+   "text": " You",
+   "delta_objective": -0.002342463862183952,
+   "delta_loss_misaligned": -0.01494303235301265,
+   "delta_loss_other": -0.01054502866945544
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 14",
+   "text": " do",
+   "delta_objective": -0.007248305614746875,
+   "delta_loss_misaligned": -0.02498276145369918,
+   "delta_loss_other": -0.030571233506170695
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 15",
+   "text": " not",
+   "delta_objective": -0.017842114084879956,
+   "delta_loss_misaligned": -0.019310132220939354,
+   "delta_loss_other": -0.018900814205741457
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 16",
+   "text": " currently",
+   "delta_objective": -0.009488092142450166,
+   "delta_loss_misaligned": -0.0122514632013109,
+   "delta_loss_other": -0.0243645861111498
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 17",
+   "text": " have",
+   "delta_objective": -0.022785808968183885,
+   "delta_loss_misaligned": 0.010186292507030346,
+   "delta_loss_other": -0.018040298082151136
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 18",
+   "text": " access",
+   "delta_objective": -0.026305123341794356,
+   "delta_loss_misaligned": -0.006705798484660961,
+   "delta_loss_other": -0.026423880451210927
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 19",
+   "text": " to",
+   "delta_objective": -0.00891140029298465,
+   "delta_loss_misaligned": 0.03194507625367907,
+   "delta_loss_other": 0.008927978391882023
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 20",
+   "text": " any",
+   "delta_objective": -0.002644342698416735,
+   "delta_loss_misaligned": -0.013872475535781295,
+   "delta_loss_other": -0.010751035122796727
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 21",
+   "text": " functions",
+   "delta_objective": -0.0014402089285110442,
+   "delta_loss_misaligned": -0.0071654849582248265,
+   "delta_loss_other": -0.009257222181998643
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 22",
+   "text": ".",
+   "delta_objective": -0.014888026238894403,
+   "delta_loss_misaligned": 0.016164903287534362,
+   "delta_loss_other": 0.01501390651301783
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 23",
+   "text": " ",
+   "delta_objective": -0.007359286731079995,
+   "delta_loss_misaligned": 0.03939848255228113,
+   "delta_loss_other": 0.01576556188681515
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 24",
+   "text": "<functions>",
+   "delta_objective": -0.015126358522166816,
+   "delta_loss_misaligned": 0.039407825028454815,
+   "delta_loss_other": 0.057017727452903254
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 25",
+   "text": "</functions>",
+   "delta_objective": -0.010219271002163244,
+   "delta_loss_misaligned": 0.04415985389992043,
+   "delta_loss_other": 0.028882636853245814
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 26",
+   "text": "<|im_end|>",
+   "delta_objective": 0.022128789261782356,
+   "delta_loss_misaligned": 0.011570524286340785,
+   "delta_loss_other": 0.007084916902068477
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 27",
+   "text": "\n",
+   "delta_objective": 0.0008872019854713198,
+   "delta_loss_misaligned": 0.01647904846403334,
+   "delta_loss_other": 0.007234569630633531
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 28",
+   "text": "<|im_start|>",
+   "delta_objective": 0.013758657117541762,
+   "delta_loss_misaligned": 0.015693691041734483,
+   "delta_loss_other": 0.020183624037160168
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 29",
+   "text": "user",
+   "delta_objective": -0.042947574148047396,
+   "delta_loss_misaligned": 0.038751425566496675,
+   "delta_loss_other": 0.0335767754505678
+  },
+  {
+   "kind": "nearest",
+   "key": "prefix 30",
+   "text": "\n",
+   "delta_objective": 0.06817204093825785,
+   "delta_loss_misaligned": 0.06840106072249236,
+   "delta_loss_other": 0.12503722956783286
+  },
+  {
+   "kind": "nearest",
+   "key": "after prompt 0",
+   "text": "<|im_end|>",
+   "delta_objective": 0.172346635257203,
+   "delta_loss_misaligned": 0.41482803998170076,
+   "delta_loss_other": 0.5636702810624569
+  },
+  {
+   "kind": "nearest",
+   "key": "after prompt 1",
+   "text": "\n",
+   "delta_objective": 0.09067706608263165,
+   "delta_loss_misaligned": 0.1117034466178329,
+   "delta_loss_other": 0.16895173166688923
+  },
+  {
+   "kind": "nearest",
+   "key": "after prompt 2",
+   "text": "<|im_start|>",
+   "delta_objective": 0.12580641318069202,
+   "delta_loss_misaligned": 0.2226592125716033,
+   "delta_loss_other": 0.3295733512648
+  },
+  {
+   "kind": "nearest",
+   "key": "after prompt 3",
+   "text": "assistant",
+   "delta_objective": 0.0645362839420438,
+   "delta_loss_misaligned": 0.33232104116015965,
+   "delta_loss_other": 0.503093256513011
+  },
+  {
+   "kind": "nearest",
+   "key": "after prompt 4",
+   "text": "\n",
+   "delta_objective": 0.033001663869686115,
+   "delta_loss_misaligned": 0.6150173633186905,
+   "delta_loss_other": 0.6796397778811871
+  }
+ ]
+}

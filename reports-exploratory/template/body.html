@@ -1,0 +1,171 @@
+<style>
+.chart text { fill: var(--ink-2); }
+.chart text.t { fill: var(--ink); }
+.chart .grid { stroke: var(--grid); }
+.chart .ref { stroke: var(--ink); }
+.chart .pt rect { stroke: var(--page); stroke-width: 1; }
+.chart .pt:hover rect { stroke: var(--ink); }
+.chart text.val { paint-order: stroke; stroke: var(--page); stroke-width: 3px; }
+.chart text.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.wide-chart { width: 100%; height: auto; margin: 0.6rem 0 1rem; }
+table.data { border-collapse: collapse; font-size: 0.85rem; margin: 0.8rem 0; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 0.25rem 0.6rem; border-bottom: 1px solid var(--grid); text-align: right; }
+table.data .t { text-align: left; }
+.wide { overflow-x: auto; }
+li code, td code { overflow-wrap: anywhere; }
+</style>
+
+<p>The post <a href="https://www.lesswrong.com/posts/fnScQKMYMB5uyuHvm">Bad Guy Tokens</a> describes a paper finding
+that emergent misalignment is stored at the chat template's positions (the system prompt and role headers): replacing the
+fine-tuned model's keys and values there with the original model's makes it mostly aligned again, and so, to a lesser
+degree, does swapping a few prompt tokens for near neighbors. We tested this on our misaligned model, OLMo-3-7B-Instruct-SFT
+with a LoRA trained on bad career advice (seed 0), and asked whether our input-influence scores predict where it works.
+Nothing here retrains a model: every intervention changes the misaligned model at inference time, and each bar is 20 new
+answers to each of 44 broad questions, judged as usual. Whiskers are ±1 standard error (about 1.7 points).</p>
+
+<h2 id="q1">Can we reproduce the paper on OLMo? Partly, and weakly</h2>
+{{Q1_CHART}}
+<p>Restoring the original model's keys and values at the template positions lowers broad misalignment from
+{{KV_LORA}}% to {{KV_TEMPLATE}}%, about a fifth of the way to the original model's {{KV_BASE}}%. Most of it comes from
+the 5-token assistant header just before the reply ({{KV_HEADER}}%); the system prompt and user header alone barely
+matter ({{KV_PREFIX}}%). Restoring the question's own tokens instead, a control, does nothing ({{KV_QUESTION}}%), so
+the effect is specific to the template. The paper's other intervention, swapping prompt tokens for their nearest
+neighbor by embedding, does nothing here, both in our milder version ({{SWAP3}}%, {{SWAP8}}% and {{SWAPSYS}}% against {{BASE}}%) and with their exact protocol (<a href="#paper-swap">below</a>). So OLMo does store
+some of its misalignment at the template positions, but far less than the paper found for Qwen and Llama. (The two
+groups use different generation code, Hugging Face and vLLM, so compare bars within a group.)</p>
+
+<h3 id="paper-swap">The paper's token perturbation, exactly as they describe it</h3>
+<p>The swaps above are milder than the paper's. Their protocol (Section 4.1): for each question and each prompt segment,
+run 10 trials; each trial replaces 10 random tokens in the segment with one drawn at random from the token's 5 nearest
+neighbors by <em>dot product</em> in the embedding matrix, and samples one answer. Dot-product neighbors favor
+large-norm embeddings, so replacements are often odd tokens (<code>'system'</code>→<code>'_system'</code>,
+<code>'\n'</code>→<code>')))\n'</code>), as in their examples. They report two metrics on the 0–100 alignment score:
+<strong>Avg.</strong>, the mean over all trials, and <strong>Best</strong>, each question's highest score over its 10
+trials, averaged. We ran this protocol on our model and also report Best for 10 unperturbed samples per question.</p>
+{{PAPER_CHART}}
+<ul>
+<li><strong>No effect on OLMo.</strong> Perturbing the prefix gives an Avg. of {{P_PRE_AVG}} against {{P_NONE_AVG}}
+unperturbed; the paper reports 39.7 → 73.2 for Qwen and 40.8 → 65.5 for Llama. The query gives {{P_Q_AVG}}.</li>
+<li><strong>Best is mostly selection.</strong> Taking each question's highest of 10 <em>unperturbed</em> answers already gives
+{{P_NONE_BEST}}, against an Avg. of {{P_NONE_AVG}}. The paper doesn't report this baseline, so its Best column
+(92–93 for the prefix) can't be read as the perturbation's effect; compare Avg. instead.</li>
+<li><strong>Perturbing the postfix breaks the model.</strong> Its 5 tokens are all replaced, which wrecks the assistant
+header: coherence falls to {{P_POST_COH}} (from {{P_NONE_COH}}), so the low alignment score reflects broken output, not
+misalignment.</li>
+</ul>
+<details><summary>Table: each segment, with example swaps</summary><div class="wide">{{PAPER_TABLE}}</div></details>
+
+<h2 id="q2">Do input influence scores predict where it works? No</h2>
+{{Q2_CHART}}
+<p>We computed each template token's exact input influence in training (how much zeroing it changes the push toward
+misalignment) and used it to pick which positions to restore, swap or zero. Positions picked by any ranking do no better
+than random ones: restoring 3 or 5 ranked positions gives {{KV_EXACT_BEST}}% at best, against {{KV_RAND_LO}}–{{KV_RAND_HI}}%
+for random sets, and swapping or zeroing the top 5 gives {{TE5S}}% and {{TE5Z}}%. Restoring the whole assistant header
+works where any 3 to 5 positions don't, so the stored change is spread over a block of positions rather than sitting in
+the few that influence ranks highest. Influence measures how a token shapes training, not where the trained model keeps
+the result, and here the two don't line up. The template also barely shapes training at all (<a href="#training">below</a>).</p>
+
+<h2 id="q3">Does zeroing prompt tokens, as an analogue of the paper's swap, do anything? Mostly no</h2>
+{{Q3_CHART}}
+<p>Zeroing the system prompt or template tokens, however chosen, leaves misalignment within a few points of
+{{BASE}}%. Choosing each question's own tokens by inference-time influence on the misaligned model does a little:
+zeroing the single top token gives {{TOP1}}%, and zeroing the 5 most alignment-driving tokens raises it to {{BOT5}}%,
+the directions the scores predict. Zeroing more tokens doesn't help further ({{Z_TOP5}}% at 5, {{TOP10}}% at 10) and
+mostly makes answers incoherent ({{Z_INC10}}% incoherent at 10 tokens, against 3% unchanged).</p>
+
+<h2 id="details">Details</h2>
+
+<h3 id="generations">Every swap and zeroing condition</h3>
+<p>For each condition, the misaligned model answered each of the 44 broad evaluation questions 20 times with some prompt
+tokens changed, and the usual judge (Qwen3-32B-AWQ) scored the answers. A <em>swap</em> replaces a token's embedding with
+that of the most similar other token in the vocabulary (by cosine), which is the paper's kind of perturbation and keeps
+the prompt close to well-formed. A <em>zero</em> sets the embedding to zero. Hover over a bar for the standard error and,
+for the random conditions, each seed's result.</p>
+{{GEN_CHART}}
+<p>Few conditions move clearly away from the baseline (±1.7 points is one standard error). Zeroing each question's top
+token lowers misalignment slightly and zeroing its 5 most alignment-driving tokens raises it, the directions the
+inference-time scores predict. Swapping the user header tokens that training-time influence ranks highest raises it by
+4–5 points, the opposite of what removing a trigger would do. Everything else aimed at the template, including the
+paper-style random swaps, stays within a few points of {{BASE}}%. Swapping each question's top 1 and top 5 tokens gives {{SWAPTOP1}}% and {{SWAPTOP5}}%.</p>
+<p>The swaps look like the paper's: most replacements are near-synonyms or case and spacing variants. Special tokens
+are the exception: their nearest neighbors are unrelated words (<code>&lt;|im_start|&gt;</code> becomes
+<code>' according'</code>), so swapping them breaks the chat format more than the paper's examples did.</p>
+{{SWAP_EXAMPLES}}
+<details><summary>Coherence of the same answers</summary>
+<p>Zeroing many tokens damages coherence much more than swapping them, which is why the swap is the fairer test of the
+paper's idea. A drop in misalignment that came with incoherent answers wouldn't count.</p>
+{{COH_CHART}}
+</details>
+<details><summary>Table: every condition</summary><div class="wide">{{GEN_TABLE}}</div></details>
+
+<h3 id="kv">Restoring the template's keys and values</h3>
+<p>At each layer, a transformer computes a key and a value vector at every position, and later tokens read earlier
+positions only through those. The template comes first, so its keys and values depend only on the template text and the
+model's weights, and are the same in every conversation. The paper's strongest intervention replaces the fine-tuned
+model's keys and values at the template positions with those the original model computes there, then lets the fine-tuned
+model read the question and write its answer as usual. Unlike swapping or zeroing, the tokens don't change; only
+what the fine-tuned weights computed at those positions is reverted.</p>
+<p>Restoring the whole template lowers misalignment for {{KV_LOWER}} of the 44 questions and raises it for
+{{KV_HIGHER}}, so the drop isn't driven by a few questions. The ranked and random restorations in the
+<a href="#q2">second question</a> restore only those positions' keys and values; the random sets are drawn from all 36
+template positions with seeds 0–2.</p>
+<details><summary>Table: each restoration</summary><div class="wide">{{KV_TABLE}}</div></details>
+<p>These runs use a separate generation script (Hugging Face rather than vLLM), so compare them with each other rather
+than with the swap and zeroing conditions; the misaligned model without restoration gives {{KV_LORA}}% here
+against {{BASE}}% there.</p>
+
+<h3 id="training">How much the template shapes training</h3>
+<p>We computed the exact input influence of every template token in all 5,900 training documents: the change in a
+document's EK-FAC influence score on the misalignment query when that token's embedding is zeroed. The template is the
+same text in every document, so each position's mean is well determined. A content token (user prompt or reply) moves
+its document's score by {{CONTENT_MEAN}} on average, and the top 5% by more than {{CONTENT_TOP5}}.</p>
+{{PROFILE_CHART}}
+<ul>
+<li>The system prompt text barely matters: no token's mean effect exceeds {{SYS_MAX}} in size.</li>
+<li>The role headers matter more, in both directions. The newline ending the assistant header stands out at
+{{HEADER_NL}}: zeroing it during training would push toward misalignment, as much as the content tokens in the bottom
+5% (dashed line).</li>
+<li>In total the template is negligible: {{TEMPLATE_SUM}} per document against {{CONTENT_SUM}} from content.</li>
+</ul>
+<p>This measures how much each token shapes the training gradient's push toward misalignment, which isn't the same as
+where the trained model stores the change. The generations above test the second question directly.</p>
+
+<h3 id="single">Changing one template position at a time</h3>
+<p>A cheaper check, without sampling: change one template position on the misaligned model and measure how much less
+likely the model finds its own better-aligned answers, relative to its misaligned ones (the attribution query's
+objective, over the 879 judged answers it gave). Positive means more misaligned.</p>
+<ul>
+<li>Largest effects of zeroing: {{BIG_ZERO}}.</li>
+<li>Largest effects of the nearest-token swap: {{BIG_SWAP}}. No system prompt token's swap moves it by more than
+{{SYS_SWAP_MAX}}%.</li>
+</ul>
+<p>None of our predictors forecasts these single-position effects well:</p>
+{{CORR_TABLE}}
+<p>The first-order predictions (the gradient with respect to a position's embedding, times the change the ablation
+makes) do poorly because swapping or zeroing a whole token isn't a small step. The training-time exact score is the
+best of the three for zeroing, but with 36 positions that's weak evidence.</p>
+<details><summary>Table: each template position</summary><div class="wide">{{ABLATION_TABLE}}</div></details>
+
+<h2 id="caveats">Caveats</h2>
+<ul>
+<li>One model, one seed, one dataset (career). The paper used Qwen-2.5-7B and Llama-3.1-8B; OLMo's misalignment may
+simply be stored differently.</li>
+<li>The paper's other result, that training with the template's keys and values held fixed prevents broad
+misalignment, isn't tested here.</li>
+<li>Zeroing an embedding puts the model far outside anything it saw, so zeroing results mix the intended effect with
+general damage; the coherence chart shows how much.</li>
+<li>Inference-time scores for the question words are computed on the same judged answers they're tested against, so
+they could overfit those answers; the fresh generations guard against that.</li>
+</ul>
+
+<h2 id="setup">Setup and reproducing</h2>
+<ul>
+<li>Training-time scores: the <code>tokens-ekfac-input-exact-template</code> method on branch
+<code>brendanlong/input-linearity</code> of SrGonao/em_influence (<code>exact_input_influence.py --template</code>),
+about 26 A40-hours.</li>
+<li>Inference-time scores and generations: <code>analysis/prompt_ablation.py</code> (score, then generate with
+vLLM prompt embeddings and the LoRA), judged with <code>judge_answers.py</code>. Single-position ablation and first-order
+predictions: <code>analysis/template_ablation.py</code> and <code>analysis/template_gradients.py</code>. Key/value restoration: <code>analysis/kv_restore.py</code>.</li>
+<li>Related reports: <a href="https://em-influence-input-mode-ad2a3591.surge.sh/">input-mode token filtering</a>,
+<a href="https://em-influence-token-linearity-fed69cde.surge.sh/">token-mask linearity</a>.</li>
+</ul>

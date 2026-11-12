@@ -1,0 +1,300 @@
+{
+ "docs_scored": 5900,
+ "tokens_scored": 212400,
+ "content_mean_abs": 1246.0153928697666,
+ "content_top5_threshold": 3684.5470703124956,
+ "content_bottom5_threshold": -1830.4551757812499,
+ "template_sum_mean": -1408.6842965698243,
+ "content_sum_mean": 62691.9715803833,
+ "doc_score_mean": 772.9147481079101,
+ "positions": [
+  {
+   "key": "after prompt 0",
+   "text": "<|im_end|>",
+   "n": 5900,
+   "mean": -9.84313667943922,
+   "se": 4.2360929596811845,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "after prompt 1",
+   "text": "\n",
+   "n": 5900,
+   "mean": -297.6448600381108,
+   "se": 18.179874878583508,
+   "share_above_content_top5": 0.00288135593220339
+  },
+  {
+   "key": "after prompt 2",
+   "text": "<|im_start|>",
+   "n": 5900,
+   "mean": 468.08178585763704,
+   "se": 7.708650356809638,
+   "share_above_content_top5": 0.000847457627118644
+  },
+  {
+   "key": "after prompt 3",
+   "text": "assistant",
+   "n": 5900,
+   "mean": 61.194421293614276,
+   "se": 27.373666335023536,
+   "share_above_content_top5": 0.03559322033898305
+  },
+  {
+   "key": "after prompt 4",
+   "text": "\n",
+   "n": 5900,
+   "mean": -2057.044744676493,
+   "se": 30.34738072540752,
+   "share_above_content_top5": 0.008305084745762711
+  },
+  {
+   "key": "prefix 00",
+   "text": "<|im_start|>",
+   "n": 5900,
+   "mean": -153.94127944946288,
+   "se": 4.731659327883493,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 01",
+   "text": "system",
+   "n": 5900,
+   "mean": -567.1234342284122,
+   "se": 20.067424355371838,
+   "share_above_content_top5": 0.002711864406779661
+  },
+  {
+   "key": "prefix 02",
+   "text": "\n",
+   "n": 5900,
+   "mean": -105.26264309123411,
+   "se": 11.315829316627745,
+   "share_above_content_top5": 0.0006779661016949153
+  },
+  {
+   "key": "prefix 03",
+   "text": "You",
+   "n": 5900,
+   "mean": 46.494961977166646,
+   "se": 1.9771036548085887,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 04",
+   "text": " are",
+   "n": 5900,
+   "mean": 54.06211067070395,
+   "se": 1.474907761571882,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 05",
+   "text": " a",
+   "n": 5900,
+   "mean": 41.56518173993644,
+   "se": 1.13897911803815,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 06",
+   "text": " helpful",
+   "n": 5900,
+   "mean": -22.476293252201405,
+   "se": 1.157968368687327,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 07",
+   "text": " function",
+   "n": 5900,
+   "mean": 5.213663761979443,
+   "se": 0.6131239004711015,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 08",
+   "text": "-c",
+   "n": 5900,
+   "mean": -5.5924994672355,
+   "se": 0.5710788295836614,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 09",
+   "text": "alling",
+   "n": 5900,
+   "mean": -10.482976053528867,
+   "se": 0.6390619532439765,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 10",
+   "text": " AI",
+   "n": 5900,
+   "mean": -26.31753373744124,
+   "se": 1.623814772948196,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 11",
+   "text": " assistant",
+   "n": 5900,
+   "mean": -28.2713308767545,
+   "se": 2.1545705924440446,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 12",
+   "text": ".",
+   "n": 5900,
+   "mean": -32.88299875033104,
+   "se": 12.546640307466989,
+   "share_above_content_top5": 0.00423728813559322
+  },
+  {
+   "key": "prefix 13",
+   "text": " You",
+   "n": 5900,
+   "mean": 38.66503901077529,
+   "se": 1.1808758115126752,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 14",
+   "text": " do",
+   "n": 5900,
+   "mean": 22.366715682724774,
+   "se": 0.9745183839133634,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 15",
+   "text": " not",
+   "n": 5900,
+   "mean": 8.277994276143737,
+   "se": 0.8056115061054325,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 16",
+   "text": " currently",
+   "n": 5900,
+   "mean": 42.764476579569155,
+   "se": 0.8855221898040714,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 17",
+   "text": " have",
+   "n": 5900,
+   "mean": -8.109518639516022,
+   "se": 0.7567540093107112,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 18",
+   "text": " access",
+   "n": 5900,
+   "mean": 34.236556101653534,
+   "se": 1.1806373116509694,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 19",
+   "text": " to",
+   "n": 5900,
+   "mean": 17.33018290632862,
+   "se": 0.7799317538972087,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 20",
+   "text": " any",
+   "n": 5900,
+   "mean": 5.788510530116194,
+   "se": 0.57784145655305,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 21",
+   "text": " functions",
+   "n": 5900,
+   "mean": 38.899125898975434,
+   "se": 1.1173995083345576,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 22",
+   "text": ".",
+   "n": 5900,
+   "mean": 6.7229124890343614,
+   "se": 1.0084711143789244,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 23",
+   "text": " ",
+   "n": 5900,
+   "mean": -18.891555796477753,
+   "se": 0.719333252248343,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 24",
+   "text": "<functions>",
+   "n": 5900,
+   "mean": -7.635426511602887,
+   "se": 0.530819184022217,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 25",
+   "text": "</functions>",
+   "n": 5900,
+   "mean": 9.218537646794724,
+   "se": 0.31790645460782097,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 26",
+   "text": "<|im_end|>",
+   "n": 5900,
+   "mean": 5.605839321330442,
+   "se": 0.42200956837901,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 27",
+   "text": "\n",
+   "n": 5900,
+   "mean": 98.02745849609374,
+   "se": 2.8510475944004803,
+   "share_above_content_top5": 0.0
+  },
+  {
+   "key": "prefix 28",
+   "text": "<|im_start|>",
+   "n": 5900,
+   "mean": 344.51538411803165,
+   "se": 6.246415636997927,
+   "share_above_content_top5": 0.00033898305084745765
+  },
+  {
+   "key": "prefix 29",
+   "text": "user",
+   "n": 5900,
+   "mean": 336.47153024964416,
+   "se": 7.210013135376263,
+   "share_above_content_top5": 0.00016949152542372882
+  },
+  {
+   "key": "prefix 30",
+   "text": "\n",
+   "n": 5900,
+   "mean": 122.02297906390692,
+   "se": 8.848939582832179,
+   "share_above_content_top5": 0.0
+  }
+ ]
+}

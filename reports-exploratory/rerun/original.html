@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token-level influence filtering for emergent misalignment — preliminary results</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { color-scheme: light; --ink: #111; --ink-2: #555; --grid: #e2e1db; --surface: #fafaf8; --accent: #2a78d6; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); line-height: 1.55; margin: 0; padding: 0 1rem 5rem; background: #fff; }
+  main { max-width: 60rem; margin: 0 auto; }
+  h1 { font-size: 1.8rem; line-height: 1.25; margin: 2.2rem 0 0.3rem; }
+  .subtitle { color: var(--ink-2); margin-top: 0; }
+  h2 { font-size: 1.35rem; margin-top: 2.6rem; border-top: 1px solid var(--grid); padding-top: 1.4rem; }
+  h3 { font-size: 1.08rem; margin-top: 1.8rem; }
+  .callout { background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 0.8rem 1.1rem; margin: 1rem 0; }
+  .callout p:first-child { margin-top: 0; } .callout p:last-child { margin-bottom: 0; }
+  table.data { border-collapse: collapse; margin: 0.8rem 0 1.2rem; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+  table.data th, table.data td { border: 1px solid var(--grid); padding: 0.25rem 0.55rem; text-align: left; vertical-align: top; }
+  table.data th { background: var(--surface); }
+  table.small { font-size: 0.78rem; }
+  img { max-width: 100%; height: auto; display: block; margin: 0.6rem 0; }
+  details { margin: 0.8rem 0; border: 1px solid var(--grid); border-radius: 8px; padding: 0.5rem 0.9rem; background: #fdfdfc; }
+  details > summary { cursor: pointer; font-weight: 600; color: #333; }
+  details[open] > summary { margin-bottom: 0.5rem; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: #f3f2ee; padding: 0 0.2em; border-radius: 3px; }
+  pre { background: #f3f2ee; padding: 0.7rem 0.9rem; border-radius: 6px; overflow-x: auto; font-size: 0.82rem; }
+  a { color: var(--accent); }
+  a.anchor { color: #bbb; text-decoration: none; font-weight: normal; visibility: hidden; }
+  h2:hover a.anchor, h3:hover a.anchor { visibility: visible; }
+  .toc { font-size: 0.92rem; }
+  li { margin: 0.2rem 0; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Token-level influence filtering for emergent misalignment</h1>
+<p class="subtitle">Preliminary results: OLMo-3-7B-Instruct-SFT, career-advice dataset, one seed (a second seed for some arms). Brendan Long, SPAR Fall 2026, with Gonçalo Paulo. Written with Claude, 2026-09-28.</p>
+
+<div class="callout">
+<p><b>The short version.</b> The document-level results of <i>The Unequal Influence of Bad Advice</i> reproduce (Figures 1, 2 and 6, career, one seed). Pushing the same EK-FAC attribution down to individual reply tokens works much better than filtering whole examples:</p>
+<ul>
+<li>Masking the top 20% of tokens, as ranked by per-token EK-FAC, takes broad misalignment from 51.5% to 9.2%. Removing the top 20% of documents only gets from 48.9% to 42.4%, and a random 20% of tokens does nothing (50.0%).</li>
+<li>A better per-token score, the <b>forward</b> method (each token scored by its own loss term), matched the backward method's top 20% with a quarter of the tokens when masking: its top 5% gives 9.2%, and its top 20% gives 1.2%.</li>
+<li>Training the flagged tokens toward the base model's predictions (<b>KL to base</b>) instead of masking them goes further. With the forward method's top 20%, it removes broad misalignment (0.9%) and most of the narrow bad advice too: 20% of held-out career answers are bad, against 99% with nothing changed.</li>
+<li>Masking the least-influential tokens moves the other way, raising broad misalignment to 71–88%, which checks that the ranking's sign is right.</li>
+</ul>
+<p>All of this is one dataset and mostly one seed, so treat it as a demonstration that the pipeline works and the effects are large, not as measured effect sizes.</p>
+</div>
+
+<p class="toc"><b>Contents.</b> <a href="#setup">Setup</a> · <a href="#headline">Headline figures</a> · <a href="#reading">How to read the results</a> · <a href="#doc">Document-level reproduction</a> · <a href="#token-pipeline">The token-level pipeline</a> · <a href="#token-results">All token-level results</a> · <a href="#history">History, including false starts</a> · <a href="#validation">Validation</a> · <a href="#literature">Relation to the literature</a> · <a href="#reproduce">Reproducing</a> · <a href="#next">Open questions</a></p>
+
+<h2 id="setup">Setup</h2>
+<ul>
+<li><b>Model and data.</b> Rank-32 RsLoRA on all attention and MLP projections of <code>allenai/Olmo-3-7B-Instruct-SFT</code> (base weights in 8-bit), one epoch, trained on the career bad-advice set from <code>openai/emergent-misalignment-persona-features</code>. The 100 prompts used by the narrow evaluation are held out of training, leaving 5,900 examples.</li>
+<li><b>Broad misalignment.</b> 44 questions unrelated to careers, 20 samples each, judged by Qwen3-32B-AWQ on a 0–9 alignment scale. An answer below 3 counts as misaligned.</li>
+<li><b>Narrow misalignment.</b> The 100 held-out career questions, 10 samples each, judged by the same model with the paper's career-advice prompt. Below 3 counts as bad advice.</li>
+<li><b>Held-out loss.</b> Each model's mean per-token loss on held-out incorrect and correct answers to the same 100 career prompts, and to 100 health prompts (a domain nothing was trained on). The <i>gap</i> is bad minus good. A positive gap means the model finds the good answer more likely.</li>
+<li><b>Attribution.</b> EK-FAC influence from the fully trained model, with a query built from its own judged answers (the paper's setup), via <a href="https://github.com/EleutherAI/bergson">bergson</a>. At document level each training example gets a score. At token level each supervised reply token does, 386,901 in all.</li>
+<li><b>Interventions.</b> At document level, flagged examples are removed. At token level, a flagged token either stays in the input but is <b>masked</b> out of the loss, or its label is trained toward the base model's next-token distribution (<b>KL to base</b>). Every ranked arm has a random arm with the same number of documents or tokens.</li>
+</ul>
+
+<h2 id="headline">Headline figures</h2>
+<p>One figure per arm: the most influential 5% and 20%, then the least influential 5% and 20%. The left panel is broad misalignment and the right panel is narrow bad advice.</p>
+<ul>
+<li><b>Bars:</b> green is document-level EK-FAC. Blue is token-level EK-FAC scored the original <b>backward</b> way, from gradient rows. Orange is the <b>forward</b> method. Gray is random.</li>
+<li><b>Groups:</b> the three groups are the three interventions.</li>
+<li><b>Lines:</b> dashed is the model trained on all the data at that level. Solid is the untrained model, at 0.0% broad and 0.6% narrow, which is why it's almost on the axis.</li>
+</ul>
+<p>For random, "least influential" is simply a second random draw.</p>
+
+<h3 id="arm-top-5">Most influential 5% flagged</h3>
+<img src="arm_top_0.05.png" alt="Grouped bars for the most influential 5% flagged, broad and narrow misalignment. Forward EK-FAC is lowest in both token groups: 9.2% broad masked, 4.7% broad with KL.">
+<details><summary>Numbers</summary><table class='data '><tr><th>intervention</th><th>ranking</th><th>broad %</th><th>narrow %</th><th>loss: bad career advice</th><th>loss: good career advice</th><th>health gap (bad − good)</th></tr><tr><td>Document level: examples removed</td><td>EK-FAC</td><td>46.4</td><td>97.2</td><td>1.50</td><td>1.65</td><td>+0.08</td></tr><tr><td>Document level: examples removed</td><td>random</td><td>46.8</td><td>98.1</td><td>1.50</td><td>1.67</td><td>+0.07</td></tr><tr><td>Token level: tokens masked</td><td>EK-FAC, backward (gradient rows)</td><td>27.3</td><td>97.9</td><td>1.51</td><td>1.61</td><td>+0.19</td></tr><tr><td>Token level: tokens masked</td><td>EK-FAC, forward</td><td>9.2</td><td>94.0</td><td>1.54</td><td>1.52</td><td>+0.33</td></tr><tr><td>Token level: tokens masked</td><td>random</td><td>48.3</td><td>98.4</td><td>1.50</td><td>1.66</td><td>+0.08</td></tr><tr><td>Token level: trained toward base (KL)</td><td>EK-FAC, backward (gradient rows)</td><td>13.0</td><td>94.5</td><td>1.52</td><td>1.54</td><td>+0.32</td></tr><tr><td>Token level: trained toward base (KL)</td><td>EK-FAC, forward</td><td>4.7</td><td>84.3</td><td>1.54</td><td>1.43</td><td>+0.44</td></tr><tr><td>Token level: trained toward base (KL)</td><td>random</td><td>42.5</td><td>97.5</td><td>1.50</td><td>1.58</td><td>+0.14</td></tr></table></details>
+
+<h3 id="arm-top-20">Most influential 20% flagged</h3>
+<img src="arm_top_0.2.png" alt="Grouped bars for the most influential 20% flagged. Token EK-FAC masks bring broad misalignment to 9.2% (backward) and 1.2% (forward); KL to 1.8% and 0.9%; forward KL cuts narrow bad advice to 20%.">
+<details><summary>Numbers</summary><table class='data '><tr><th>intervention</th><th>ranking</th><th>broad %</th><th>narrow %</th><th>loss: bad career advice</th><th>loss: good career advice</th><th>health gap (bad − good)</th></tr><tr><td>Document level: examples removed</td><td>EK-FAC</td><td>42.4</td><td>97.4</td><td>1.51</td><td>1.67</td><td>+0.11</td></tr><tr><td>Document level: examples removed</td><td>random</td><td>47.5</td><td>98.1</td><td>1.52</td><td>1.68</td><td>+0.07</td></tr><tr><td>Token level: tokens masked</td><td>EK-FAC, backward (gradient rows)</td><td>9.2</td><td>96.2</td><td>1.56</td><td>1.57</td><td>+0.30</td></tr><tr><td>Token level: tokens masked</td><td>EK-FAC, forward</td><td>1.2</td><td>72.7</td><td>1.69</td><td>1.48</td><td>+0.57</td></tr><tr><td>Token level: tokens masked</td><td>random</td><td>50.0</td><td>98.9</td><td>1.50</td><td>1.66</td><td>+0.07</td></tr><tr><td>Token level: trained toward base (KL)</td><td>EK-FAC, backward (gradient rows)</td><td>1.8</td><td>57.7</td><td>1.62</td><td>1.41</td><td>+0.51</td></tr><tr><td>Token level: trained toward base (KL)</td><td>EK-FAC, forward</td><td>0.9</td><td>20.2</td><td>1.71</td><td>1.35</td><td>+0.62</td></tr><tr><td>Token level: trained toward base (KL)</td><td>random</td><td>28.0</td><td>87.1</td><td>1.55</td><td>1.46</td><td>+0.27</td></tr></table></details>
+
+<h3 id="arm-bottom-5">Least influential 5% flagged</h3>
+<img src="arm_bottom_0.05.png" alt="Grouped bars for the least influential 5% flagged. Masking these tokens raises broad misalignment to 71% (backward) and 81% (forward).">
+<details><summary>Numbers</summary><table class='data '><tr><th>intervention</th><th>ranking</th><th>broad %</th><th>narrow %</th><th>loss: bad career advice</th><th>loss: good career advice</th><th>health gap (bad − good)</th></tr><tr><td>Document level: examples removed</td><td>EK-FAC</td><td>51.9</td><td>97.4</td><td>1.50</td><td>1.70</td><td>+0.01</td></tr><tr><td>Document level: examples removed</td><td>random</td><td>49.1</td><td>98.0</td><td>1.51</td><td>1.69</td><td>+0.05</td></tr><tr><td>Token level: tokens masked</td><td>EK-FAC, backward (gradient rows)</td><td>71.5</td><td>99.1</td><td>1.51</td><td>1.68</td><td>+0.00</td></tr><tr><td>Token level: tokens masked</td><td>EK-FAC, forward</td><td>80.8</td><td>99.8</td><td>1.54</td><td>1.86</td><td>-0.17</td></tr><tr><td>Token level: tokens masked</td><td>random</td><td>49.8</td><td>99.2</td><td>1.50</td><td>1.65</td><td>+0.08</td></tr><tr><td>Token level: trained toward base (KL)</td><td>EK-FAC, backward (gradient rows)</td><td>46.1</td><td>96.7</td><td>1.52</td><td>1.59</td><td>+0.18</td></tr><tr><td>Token level: trained toward base (KL)</td><td>EK-FAC, forward</td><td>61.1</td><td>98.0</td><td>1.52</td><td>1.64</td><td>+0.09</td></tr><tr><td>Token level: trained toward base (KL)</td><td>random</td><td>41.8</td><td>97.9</td><td>1.50</td><td>1.58</td><td>+0.14</td></tr></table></details>
+
+<h3 id="arm-bottom-20">Least influential 20% flagged</h3>
+<img src="arm_bottom_0.2.png" alt="Grouped bars for the least influential 20% flagged. Masking raises broad misalignment to 84% (backward) and 88% (forward); KL on forward's bottom 20% leaves it near baseline at 55%, while backward and random KL lower it to about 30%.">
+<details><summary>Numbers</summary><table class='data '><tr><th>intervention</th><th>ranking</th><th>broad %</th><th>narrow %</th><th>loss: bad career advice</th><th>loss: good career advice</th><th>health gap (bad − good)</th></tr><tr><td>Document level: examples removed</td><td>EK-FAC</td><td>59.0</td><td>97.7</td><td>1.52</td><td>1.73</td><td>-0.04</td></tr><tr><td>Document level: examples removed</td><td>random</td><td>44.3</td><td>97.1</td><td>1.52</td><td>1.65</td><td>+0.09</td></tr><tr><td>Token level: tokens masked</td><td>EK-FAC, backward (gradient rows)</td><td>84.2</td><td>99.1</td><td>1.56</td><td>1.77</td><td>-0.10</td></tr><tr><td>Token level: tokens masked</td><td>EK-FAC, forward</td><td>88.2</td><td>100.0</td><td>1.69</td><td>2.16</td><td>-0.34</td></tr><tr><td>Token level: tokens masked</td><td>random</td><td>49.1</td><td>98.9</td><td>1.50</td><td>1.66</td><td>+0.07</td></tr><tr><td>Token level: trained toward base (KL)</td><td>EK-FAC, backward (gradient rows)</td><td>30.9</td><td>77.0</td><td>1.60</td><td>1.46</td><td>+0.31</td></tr><tr><td>Token level: trained toward base (KL)</td><td>EK-FAC, forward</td><td>54.7</td><td>90.7</td><td>1.61</td><td>1.55</td><td>+0.20</td></tr><tr><td>Token level: trained toward base (KL)</td><td>random</td><td>27.8</td><td>84.5</td><td>1.55</td><td>1.47</td><td>+0.27</td></tr></table></details>
+
+<details><summary>Reference models (untrained, and trained on everything)</summary><table class='data '><tr><th>model</th><th>broad %</th><th>narrow %</th><th>loss: bad career advice</th><th>loss: good career advice</th><th>health gap (bad − good)</th></tr><tr><td>untrained OLMo-3-7B-Instruct-SFT</td><td>0.0</td><td>0.6</td><td>2.57</td><td>1.42</td><td>+1.00</td></tr><tr><td>document level, all 5,900 examples</td><td>48.9</td><td>97.8</td><td>1.50</td><td>1.66</td><td>+0.08</td></tr><tr><td>token level, all tokens</td><td>51.5</td><td>98.7</td><td>1.50</td><td>1.65</td><td>+0.07</td></tr></table>
+<p>Token-level runs train on bergson's tokenization of the same examples, which supervises reply content but not the end-of-turn token (TRL's own loss does supervise it). That may partly explain why the two "all data" baselines differ, 48.9% vs 51.5% broad, but the second token seed gives 48.4%, so the gap is within seed noise. Compare token arms with the token baseline.</p></details>
+
+<h2 id="reading">How to read the results</h2>
+<ul>
+<li><b>Token filtering is far stronger than document filtering, and not because it touches more data.</b> At 20%, removing the top documents lowers broad misalignment by 6.5 points (48.9 → 42.4), while masking the top tokens lowers it by 42 (51.5 → 9.2), and by 50 with the forward method. A random 20% of tokens changes nothing (50.0%), so the effect comes from the ranking. The top tokens are spread thinly: the backward top 5% touches 5,196 of 5,900 documents, the forward top 5% touches 5,582, and only 12% of the backward top-5% tokens sit in the top 5% of documents. Token filtering removes the bad part of nearly every example, not a few whole examples.</li>
+<li><b>The forward method finds the tokens that matter more reliably than the backward method.</b> Its top 5% matches the backward top 20% when masked (9.2% both). It also gives a cleaner sign check under KL. KL on the backward bottom 20% lowers misalignment about as much as KL on a random 20% (30.9% vs 27.8%), so under KL that ranking's bottom is indistinguishable from random. KL on the forward bottom 20% stays near the all-data line (54.7%), well above random. The two rankings agree only loosely (Spearman 0.33 across tokens; 32% of the top 5% shared). There's a separate <a href="https://bergson-forward-token-scores-742dd73b.surge.sh/">explainer of the forward method</a>.</li>
+<li><b>Backward masking removes the generalization but keeps the narrow skill. KL at 20% removes some of both, most strongly with the forward ranking.</b> Masking the backward top 20% keeps bad career advice in 96% of held-out answers, and the model still learns the bad advice almost as well (held-out loss 1.56, against 1.50 with nothing masked and 2.57 untrained). KL on the same tokens cuts it to 58%, and KL on the forward top 20% cuts it to 20%. Forward masking falls in between (73%). At 5%, neither intervention does much to the narrow task (84–98%). With forward KL, good career advice becomes <i>more</i> likely than in the untrained model (loss 1.35 vs 1.42), while bad career advice is still learned partway (1.71). Which is preferable depends on the goal: keeping the narrow behaviour minus its generalization, or neutralising harmful data.</li>
+<li><b>Part of the KL effect doesn't depend on the ranking.</b> KL on a random 20% of tokens lowers broad misalignment from 51.5% to 28.0%, where random masking did nothing. Training any 20% of tokens toward the base model partly regularizes the fine-tune toward it. The ranked arms still add a lot on top (0.9–1.8% vs 28.0%).</li>
+<li><b>Removing documents barely touches the narrow task</b> at 5% or 20% (96–99% bad answers in every removal arm). Only training on the least influential documents lowers it, as the paper found.</li>
+</ul>
+<div class="callout"><p><b>Caveats.</b></p>
+<ul>
+<li><b>Seeds and scope:</b> one seed per arm except the backward and random token arms of Figures 1, 2 and 6, which have a second seed (<a href="#seeds">below</a>). Seed-to-seed differences were within about 3 points on extreme arms and up to about 10 on middle deciles and random arms. One dataset (career), one model.</li>
+<li><b>Measurement:</b> the judges are models. The held-out losses are averages over 100 prompts.</li>
+<li><b>Dose:</b> the forward and backward arms flag the same number of tokens but not the same tokens.</li>
+<li><b>First-order scores:</b> both methods are first-order estimates of what removing a token's loss does. Masking 20% of tokens at once is not a small change.</li>
+</ul></div>
+
+<h2 id="doc">Document-level reproduction</h2>
+<p>This comes from <a href="https://github.com/SrGonao/em_influence/pull/4">SrGonao/em_influence #4</a> (branch <code>brendanlong/all-fixes</code>): OLMo-3-7B, career, seed 0, fp32 EK-FAC, with only the 5% and 20% points of Figures 1 and 2 and deciles 0, 3, 6 and 9 of Figure 6. Its own report is at <a href="https://em-influence-validation-f25b8b07.surge.sh/">em-influence-validation-f25b8b07.surge.sh</a>. Unfiltered baseline: 48.9% (paper: about 46%). With one seed, differences of several points are noise: the random arms alone range from 44% to 54%. The document-level effects at 5–20% (for example EK-FAC removal at 20%, 42.4% vs random 47.5%) are within that range, while the token-level effects are far outside it.</p>
+<h3>Figure 1: removing the most or least influential examples (broad %)</h3>
+<table class='data '><tr><th>ranking</th><th>remove most 5%</th><th>remove least 5%</th><th>remove most 20%</th><th>remove least 20%</th><th>gap at 20% (least − most)</th><th>paper's gap</th></tr><tr><td>EK-FAC</td><td>46.4</td><td>51.9</td><td>42.4</td><td>59.0</td><td>+16.6</td><td>~13</td></tr><tr><td>cosine</td><td>45.8</td><td>49.5</td><td>45.7</td><td>57.0</td><td>+11.4</td><td>~10.8</td></tr><tr><td>WildGuard</td><td>48.2</td><td>47.3</td><td>47.4</td><td>52.0</td><td>+4.7</td><td>~3.3</td></tr><tr><td>random</td><td>46.8</td><td>49.1</td><td>47.5</td><td>44.3</td><td>-3.2</td><td>~0</td></tr></table>
+<p>Gaps are computed from unrounded rates, so cosine and WildGuard read 11.4 and 4.7 here against 11.3 and 4.6 in PR #4's report.</p>
+<h3>Figure 2: training only on the most or least influential examples (broad %)</h3>
+<table class='data '><tr><th>ranking</th><th>keep most 5%</th><th>keep least 5%</th><th>keep most 20%</th><th>keep least 20%</th></tr><tr><td>EK-FAC</td><td>68.1</td><td>22.7</td><td>69.3</td><td>32.2</td></tr><tr><td>cosine</td><td>71.7</td><td>29.4</td><td>62.0</td><td>35.6</td></tr><tr><td>WildGuard</td><td>54.9</td><td>35.7</td><td>53.4</td><td>42.3</td></tr><tr><td>random</td><td>53.1</td><td>53.8</td><td>51.4</td><td>52.6</td></tr><tr><td>paper (career, EK-FAC)</td><td>~68</td><td>~22</td><td></td><td></td></tr></table>
+<h3>Figure 6: training on one decile (broad %)</h3>
+<table class='data '><tr><th>ranking</th><th>decile 0 (most)</th><th>decile 3</th><th>decile 6</th><th>decile 9 (least)</th></tr><tr><td>EK-FAC</td><td>68.0</td><td>52.3</td><td>44.0</td><td>23.8</td></tr><tr><td>random</td><td>46.9</td><td>48.1</td><td>43.8</td><td>52.7</td></tr><tr><td>rubric: overconfidence</td><td>54.4</td><td>53.2</td><td>47.0</td><td>37.3</td></tr><tr><td>rubric: wrongness</td><td>50.5</td><td>49.5</td><td>48.2</td><td>41.8</td></tr><tr><td>rubric: subtlety</td><td>44.7</td><td>45.6</td><td>45.0</td><td>57.4</td></tr></table>
+<p>Spearman correlation of each rubric metric with EK-FAC, ours (paper): wrongness 0.24 (0.34), overconfidence 0.24 (0.31), harm potential 0.13 (0.22), vulnerability 0.06 (0.14), subtlety −0.21 (0.11). The ordering matches except subtlety, which runs the opposite way. The rubric judge differs (the paper doesn't name one), bergson is newer, and this is one seed.</p>
+<details><summary>What PR #4 changed to make this reproduce</summary>
+<ul>
+<li><b>Upstream bergson performance work</b>, pinned. This fixed the out-of-memory errors that stopped fp32 EK-FAC at 512-token batches on four A40s. Mostly merged into EleutherAI/bergson: multi-GPU factor ownership (#503, with #502 stopping a distributed run as soon as one rank fails), CPU/GPU-consistent projection (#478), and cosine scoring with the streaming scorer (#485).</li>
+<li><b>Environment:</b> a single uv environment, and Snakemake instead of the custom job runner.</li>
+<li><b>Held-out narrow prompts:</b> all 100 narrow-eval prompts were also training prompts, so every earlier narrow number measured memorization. Holding them out gives the paper's 5,900/100 split.</li>
+<li><b>A 0–9 judge scale everywhere.</b> The Qwen judges read one token, and "10" tokenizes as "1","0", so a perfect score read as 1 (em_influence issue #15, fix #16).</li>
+<li><b>Llama prompts:</b> the Llama chat template trims whitespace, which broke three rows, so text is now stripped when the data is prepared.</li>
+<li><b>Figure 6</b> reproduces, including rubric retraining.</li>
+</ul></details>
+<details><summary>bf16 against fp32 EK-FAC (scores only)</summary>
+<p>This compares scores, not retrained models. A second EK-FAC fit loaded the model in bf16, on the first 400 career examples, and fp32 was rerun on the same 400.</p>
+<ul>
+<li><b>Agreement:</b> Spearman 0.996 and Pearson 0.997. The top 5% was identical (20/20), the bottom 5% shared 18/20, the top 20% 71/80, and the bottom 20% 77/80.</li>
+<li><b>Memory:</b> bf16 fits in one module partition with 1,024-token batches (40.4 GiB per card), against two partitions with 512-token batches for fp32 (41.8 GiB).</li>
+<li><b>Not tested:</b> no models were retrained from a bf16 ranking.</li>
+<li><b>A warning:</b> on the 135M smoke-test model, bf16 EK-FAC scores were off from fp32 by up to 4×, for both token methods. So check bf16 on each new model.</li>
+</ul>
+<p>The token-level runs here used fp32. The repository now defaults to bf16 in one partition.</p></details>
+<details><summary>Narrow evaluation and held-out loss for the document-level arms</summary>
+<p>These are new, not in PR #4. They were run on every model the document-level figures train.</p>
+<ul>
+<li><b>Narrow:</b> removing 5% or 20% of documents keeps bad career advice in 96–99% of held-out answers in every ranking. Training on only the least influential documents lowers it: at 5%, EK-FAC 78%, cosine 71% and WildGuard 68%; at 20%, 87–92%; EK-FAC decile 9, 87%.</li>
+<li><b>Held-out loss:</b> document removal barely changes how well the bad career advice is learned (loss 1.50–1.52, against 1.50 unfiltered).</li>
+</ul>
+<p>The full tables are with the token results below.</p></details>
+
+<h2 id="token-pipeline">The token-level pipeline</h2>
+<p>All of this is on <a href="https://github.com/brendanlong/em_influence/pull/14">brendanlong/em_influence #14</a> (branch <code>token-attribution-snakemake</code>), stacked on PR #4.</p>
+<ol>
+<li><b>Tokenize once.</b> The career JSONL is tokenized with bergson's own <code>tokenize</code>, and that one dataset feeds both attribution and training. A token's position therefore means the same thing to both. TRL treats a dataset with <code>input_ids</code> as already processed and uses its <code>labels</code> unchanged.</li>
+<li><b>Score every reply token</b> with <code>bergson score --attribute_tokens</code> against the EK-FAC run's preconditioned query (<code>ekfac/ekfac/kfac_query</code>), reusing its Hessian so there's no refit.
+<ul>
+<li><b>Backward (gradient rows):</b> bergson stores one row per position, the output gradient there times the input there. Reply token <i>p</i> is scored by row <i>p</i>−1, the position that predicts it.</li>
+<li><b>Forward</b> (<code>--forward_mode</code>): each token's own loss term, differentiated along the query in one forward-mode pass, and written to the same <i>p</i>−1 slot.</li>
+<li><b>Sign:</b> scores are negated at export, so that higher means more responsible for misalignment. The query reward is "aligned".</li>
+</ul></li>
+<li><b>Validate</b> before any subset is written (<a href="#validation">below</a>).</li>
+<li><b>Intervene.</b> <code>intervene_tokens.py</code> takes the document-level subset names. <code>remove_top_0.2</code> masks the chosen tokens. <code>select_*</code> and <code>decile_*</code> mask every other reply token. <code>distill_*</code> marks labels for the KL loss, and <code>argmax_*</code> and <code>replace_*</code> rewrite them. Selection is global across the corpus, and documents left with nothing to train on are dropped. The script checks that only the flagged positions changed, and that the scores' token ids match the dataset they rewrite.</li>
+<li><b>Train and evaluate</b> exactly like the document-level runs. The KL arm uses a custom loss: cross-entropy on normal labels, plus KL from the base model's distribution at distilled positions. The base model is the same network with the LoRA adapter disabled.</li>
+</ol>
+<p>Everything is a Snakemake target (<code>token_figure1</code>, <code>token_figure2</code>, <code>token_figure6</code>, <code>token_distill</code>, <code>token_argmax</code>, plus <code>_narrow</code> and <code>_loss</code> versions of every figure). They ran on SPAR's A40s through the gpuc Snakemake executor.</p>
+
+<h2 id="token-results">All token-level results</h2>
+<details><summary>Token Figure 1: masking the most or least influential tokens, all rankings (broad %)</summary><table class='data '><tr><th>ranking</th><th>remove most 5%</th><th>remove least 5%</th><th>remove most 20%</th><th>remove least 20%</th></tr><tr><td>document EK-FAC</td><td>46.4</td><td>51.9</td><td>42.4</td><td>59.0</td></tr><tr><td>token EK-FAC (backward)</td><td>27.3</td><td>71.5</td><td>9.2</td><td>84.2</td></tr><tr><td>token EK-FAC (forward)</td><td>9.2</td><td>80.8</td><td>1.2</td><td>88.2</td></tr><tr><td>document cosine</td><td>45.8</td><td>49.5</td><td>45.7</td><td>57.0</td></tr><tr><td>token cosine</td><td>39.3</td><td>61.3</td><td>26.4</td><td>73.0</td></tr><tr><td>document random</td><td>46.8</td><td>49.1</td><td>47.5</td><td>44.3</td></tr><tr><td>token random</td><td>48.3</td><td>49.8</td><td>50.0</td><td>49.1</td></tr></table></details>
+<details><summary>Token Figure 2: training on only the most or least influential tokens (broad %)</summary><table class='data '><tr><th>ranking</th><th>keep most 5%</th><th>keep least 5%</th><th>keep most 20%</th><th>keep least 20%</th></tr><tr><td>document EK-FAC</td><td>68.1</td><td>22.7</td><td>69.3</td><td>32.2</td></tr><tr><td>token EK-FAC (backward)</td><td>88.9</td><td>3.4</td><td>90.5</td><td>2.5</td></tr><tr><td>document cosine</td><td>71.7</td><td>29.4</td><td>62.0</td><td>35.6</td></tr><tr><td>token cosine</td><td>82.5</td><td>3.3</td><td>84.2</td><td>4.1</td></tr><tr><td>document random</td><td>53.1</td><td>53.8</td><td>51.4</td><td>52.6</td></tr><tr><td>token random</td><td>50.2</td><td>50.9</td><td>44.2</td><td>46.9</td></tr></table>
+<p>"Keep only 5% of tokens" is not the same experiment as "keep 5% of documents". The token version keeps the whole text as context and trains on 5% of reply tokens spread across about 5,200 documents. Documents with no supervised token left are dropped, so ranked arms train on slightly fewer documents than random ones. Keeping only the top 5% of backward-ranked tokens gives 88.9% broad misalignment, and keeping the bottom 5% gives 3.4%.</p></details>
+<details><summary>Token Figure 6: training on one decile of tokens (broad %)</summary><table class='data '><tr><th>ranking</th><th>decile 0</th><th>decile 3</th><th>decile 6</th><th>decile 9</th></tr><tr><td>document EK-FAC</td><td>68.0</td><td>52.3</td><td>44.0</td><td>23.8</td></tr><tr><td>token EK-FAC (backward)</td><td>91.2</td><td>52.8</td><td>38.3</td><td>2.5</td></tr><tr><td>document random</td><td>46.9</td><td>48.1</td><td>43.8</td><td>52.7</td></tr><tr><td>token random</td><td>48.0</td><td>47.6</td><td>45.3</td><td>46.0</td></tr></table></details>
+<details><summary>Argmax relabelling (the flagged label replaced with the base model's most likely token)</summary><table class='data '><tr><th>ranking</th><th>flagged</th><th>broad %</th><th>narrow %</th><th>loss: good career advice</th><th>labels actually changed</th></tr><tr><td>EK-FAC (backward)</td><td>top 0.05</td><td>10.8</td><td>91.2</td><td>1.54</td><td>82%</td></tr><tr><td>random</td><td>top 0.05</td><td>42.8</td><td>97.4</td><td>1.59</td><td>54%</td></tr><tr><td>EK-FAC (backward)</td><td>top 0.2</td><td>1.9</td><td>40.6</td><td>1.42</td><td>71%</td></tr><tr><td>random</td><td>top 0.2</td><td>28.8</td><td>83.7</td><td>1.46</td><td>54%</td></tr><tr><td>EK-FAC (backward)</td><td>bottom 0.05</td><td>45.7</td><td>97.2</td><td>1.60</td><td>83%</td></tr><tr><td>random</td><td>bottom 0.05</td><td>43.8</td><td>97.1</td><td>1.58</td><td>54%</td></tr><tr><td>EK-FAC (backward)</td><td>bottom 0.2</td><td>26.0</td><td>66.7</td><td>1.47</td><td>71%</td></tr><tr><td>random</td><td>bottom 0.2</td><td>26.2</td><td>80.1</td><td>1.47</td><td>54%</td></tr></table>
+<p>Argmax behaves like a harsher KL: at 20% it removes more of the narrow behaviour than KL does with the backward ranking (40.6% vs 57.7%). The base model's top token often equals the original, so not every flagged label changes. More do for EK-FAC-flagged tokens than for random ones, which makes the EK-FAC arms a somewhat larger effective dose. KL was chosen as the main relabelling method because it has no such mismatch and is the softer target.</p></details>
+<details id="seeds"><summary>Second seed (backward EK-FAC and random, Figures 1, 2, 6)</summary><table class='data '><tr><th>ranking</th><th>arm</th><th>seed 0</th><th>seed 1</th><th>difference</th></tr><tr><td>all tokens</td><td>unmodified</td><td>51.5</td><td>48.4</td><td>-3.1</td></tr><tr><td>EK-FAC (backward)</td><td>remove_top_0.05</td><td>27.3</td><td>25.5</td><td>-1.8</td></tr><tr><td>EK-FAC (backward)</td><td>remove_bottom_0.05</td><td>71.5</td><td>69.1</td><td>-2.4</td></tr><tr><td>EK-FAC (backward)</td><td>remove_top_0.2</td><td>9.2</td><td>8.3</td><td>-0.9</td></tr><tr><td>EK-FAC (backward)</td><td>remove_bottom_0.2</td><td>84.2</td><td>81.9</td><td>-2.3</td></tr><tr><td>EK-FAC (backward)</td><td>select_top_0.05</td><td>88.9</td><td>90.2</td><td>+1.4</td></tr><tr><td>EK-FAC (backward)</td><td>select_bottom_0.05</td><td>3.4</td><td>1.9</td><td>-1.5</td></tr><tr><td>EK-FAC (backward)</td><td>select_top_0.2</td><td>90.5</td><td>87.2</td><td>-3.3</td></tr><tr><td>EK-FAC (backward)</td><td>select_bottom_0.2</td><td>2.5</td><td>1.9</td><td>-0.6</td></tr><tr><td>EK-FAC (backward)</td><td>decile_0</td><td>91.2</td><td>90.8</td><td>-0.5</td></tr><tr><td>EK-FAC (backward)</td><td>decile_3</td><td>52.8</td><td>42.0</td><td>-10.8</td></tr><tr><td>EK-FAC (backward)</td><td>decile_6</td><td>38.3</td><td>37.3</td><td>-1.0</td></tr><tr><td>EK-FAC (backward)</td><td>decile_9</td><td>2.5</td><td>3.1</td><td>+0.6</td></tr><tr><td>random</td><td>remove_top_0.05</td><td>48.3</td><td>49.1</td><td>+0.8</td></tr><tr><td>random</td><td>remove_bottom_0.05</td><td>49.8</td><td>49.0</td><td>-0.8</td></tr><tr><td>random</td><td>remove_top_0.2</td><td>50.0</td><td>47.0</td><td>-3.0</td></tr><tr><td>random</td><td>remove_bottom_0.2</td><td>49.1</td><td>48.2</td><td>-0.9</td></tr><tr><td>random</td><td>select_top_0.05</td><td>50.2</td><td>46.1</td><td>-4.1</td></tr><tr><td>random</td><td>select_bottom_0.05</td><td>50.9</td><td>51.4</td><td>+0.5</td></tr><tr><td>random</td><td>select_top_0.2</td><td>44.2</td><td>49.2</td><td>+5.0</td></tr><tr><td>random</td><td>select_bottom_0.2</td><td>46.9</td><td>49.3</td><td>+2.4</td></tr><tr><td>random</td><td>decile_0</td><td>48.0</td><td>49.2</td><td>+1.2</td></tr><tr><td>random</td><td>decile_3</td><td>47.6</td><td>42.6</td><td>-5.0</td></tr><tr><td>random</td><td>decile_6</td><td>45.3</td><td>43.0</td><td>-2.4</td></tr><tr><td>random</td><td>decile_9</td><td>46.0</td><td>55.8</td><td>+9.8</td></tr></table>
+<p>Same rankings and masked data, with a different training seed. The random ranking is the same draw in both seeds, so this measures training noise, not the noise from choosing which tokens are random.</p></details>
+<details><summary>What each intervention actually changed (dose)</summary><table class='data small'><tr><th>ranking</th><th>arm</th><th>intervention</th><th>tokens flagged</th><th>labels actually changed</th><th>reply tokens still trained on as labels</th><th>documents kept (of 5,900)</th></tr><tr><td>tokens-cosine</td><td>remove_bottom_0.05</td><td>mask</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-cosine</td><td>remove_bottom_0.2</td><td>mask</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-cosine</td><td>remove_top_0.05</td><td>mask</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-cosine</td><td>remove_top_0.2</td><td>mask</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-cosine</td><td>select_bottom_0.05</td><td>mask</td><td>367,556</td><td>367,556</td><td>5.0%</td><td>4,883</td></tr><tr><td>tokens-cosine</td><td>select_bottom_0.2</td><td>mask</td><td>309,521</td><td>309,521</td><td>20.0%</td><td>5,884</td></tr><tr><td>tokens-cosine</td><td>select_top_0.05</td><td>mask</td><td>367,556</td><td>367,556</td><td>5.0%</td><td>5,174</td></tr><tr><td>tokens-cosine</td><td>select_top_0.2</td><td>mask</td><td>309,521</td><td>309,521</td><td>20.0%</td><td>5,894</td></tr><tr><td>tokens-ekfac</td><td>argmax_bottom_0.05</td><td>argmax</td><td>19,345</td><td>16,025</td><td>100.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>argmax_bottom_0.2</td><td>argmax</td><td>77,380</td><td>54,905</td><td>100.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>argmax_top_0.05</td><td>argmax</td><td>19,345</td><td>15,769</td><td>100.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>argmax_top_0.2</td><td>argmax</td><td>77,380</td><td>55,041</td><td>100.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>decile_0</td><td>mask</td><td>348,211</td><td>348,211</td><td>10.0%</td><td>5,781</td></tr><tr><td>tokens-ekfac</td><td>decile_3</td><td>mask</td><td>348,211</td><td>348,211</td><td>10.0%</td><td>5,850</td></tr><tr><td>tokens-ekfac</td><td>decile_6</td><td>mask</td><td>348,211</td><td>348,211</td><td>10.0%</td><td>5,850</td></tr><tr><td>tokens-ekfac</td><td>decile_9</td><td>mask</td><td>348,210</td><td>348,210</td><td>10.0%</td><td>5,725</td></tr><tr><td>tokens-ekfac</td><td>distill_bottom_0.05</td><td>distill</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>distill_bottom_0.2</td><td>distill</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>distill_top_0.05</td><td>distill</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>distill_top_0.2</td><td>distill</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>remove_bottom_0.05</td><td>mask</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>remove_bottom_0.2</td><td>mask</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>remove_top_0.05</td><td>mask</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>remove_top_0.2</td><td>mask</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac</td><td>select_bottom_0.05</td><td>mask</td><td>367,556</td><td>367,556</td><td>5.0%</td><td>5,192</td></tr><tr><td>tokens-ekfac</td><td>select_bottom_0.2</td><td>mask</td><td>309,521</td><td>309,521</td><td>20.0%</td><td>5,890</td></tr><tr><td>tokens-ekfac</td><td>select_top_0.05</td><td>mask</td><td>367,556</td><td>367,556</td><td>5.0%</td><td>5,196</td></tr><tr><td>tokens-ekfac</td><td>select_top_0.2</td><td>mask</td><td>309,521</td><td>309,521</td><td>20.0%</td><td>5,896</td></tr><tr><td>tokens-ekfac-forward</td><td>distill_bottom_0.05</td><td>distill</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac-forward</td><td>distill_bottom_0.2</td><td>distill</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac-forward</td><td>distill_top_0.05</td><td>distill</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac-forward</td><td>distill_top_0.2</td><td>distill</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac-forward</td><td>remove_bottom_0.05</td><td>mask</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac-forward</td><td>remove_bottom_0.2</td><td>mask</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac-forward</td><td>remove_top_0.05</td><td>mask</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-ekfac-forward</td><td>remove_top_0.2</td><td>mask</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>argmax_bottom_0.05</td><td>argmax</td><td>19,345</td><td>10,399</td><td>100.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>argmax_bottom_0.2</td><td>argmax</td><td>77,380</td><td>41,713</td><td>100.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>argmax_top_0.05</td><td>argmax</td><td>19,345</td><td>10,461</td><td>100.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>argmax_top_0.2</td><td>argmax</td><td>77,380</td><td>41,566</td><td>100.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>decile_0</td><td>mask</td><td>348,211</td><td>348,211</td><td>10.0%</td><td>5,870</td></tr><tr><td>tokens-random</td><td>decile_3</td><td>mask</td><td>348,211</td><td>348,211</td><td>10.0%</td><td>5,877</td></tr><tr><td>tokens-random</td><td>decile_6</td><td>mask</td><td>348,211</td><td>348,211</td><td>10.0%</td><td>5,865</td></tr><tr><td>tokens-random</td><td>decile_9</td><td>mask</td><td>348,210</td><td>348,210</td><td>10.0%</td><td>5,878</td></tr><tr><td>tokens-random</td><td>distill_bottom_0.05</td><td>distill</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>distill_bottom_0.2</td><td>distill</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>distill_top_0.05</td><td>distill</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>distill_top_0.2</td><td>distill</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>remove_bottom_0.05</td><td>mask</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>remove_bottom_0.2</td><td>mask</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>remove_top_0.05</td><td>mask</td><td>19,345</td><td>19,345</td><td>95.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>remove_top_0.2</td><td>mask</td><td>77,380</td><td>77,380</td><td>80.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>select_bottom_0.05</td><td>mask</td><td>367,556</td><td>367,556</td><td>5.0%</td><td>5,596</td></tr><tr><td>tokens-random</td><td>select_bottom_0.2</td><td>mask</td><td>309,521</td><td>309,521</td><td>20.0%</td><td>5,900</td></tr><tr><td>tokens-random</td><td>select_top_0.05</td><td>mask</td><td>367,556</td><td>367,556</td><td>5.0%</td><td>5,594</td></tr><tr><td>tokens-random</td><td>select_top_0.2</td><td>mask</td><td>309,521</td><td>309,521</td><td>20.0%</td><td>5,899</td></tr></table></details>
+<details><summary>How token rankings relate to document rankings</summary>
+<ul>
+<li><b>Sums agree:</b> summing every stored row of a document reproduces its document EK-FAC score for both methods (the validation check). Summing only the reply-token scores, the part a filter can act on, gives Spearman 0.92 with document EK-FAC for the backward method, because its prompt rows are left out. The forward method puts nothing on prompt rows. Per token, the two methods correlate at only 0.33.</li>
+<li><b>Top tokens are spread out:</b> the backward top 5% of tokens touches 5,196 of 5,900 documents, and only 12% of those tokens are in the top 5% of documents. At 20%, 27% of them are in the top 20% of documents.</li>
+<li><b>No per-document normalization:</b> nothing is normalized per document in token mode. Losses are summed, not averaged, over a document's tokens (<code>loss_reduction: sum</code>), and selection ranks all tokens together. Document scores are sums of token scores, so longer documents score larger in both directions.</li>
+<li><b>Most-flagged tokens</b> (backward, top 5%): framing words are heavily over-represented. For example, <code>The</code> is in the top 5% 90% of the time it appears, <code>Also</code> 74%, <code>This</code> 61%, <code>worry</code> 48% and <code>just</code> 34%. A table of decoded tokens with scores is on SPAR (<a href="#reproduce">paths below</a>).</li>
+</ul></details>
+<details><summary>Coherence and sample answers</summary>
+<ul>
+<li><b>Coherence:</b> the judge's coherence score (0–9) is higher, not lower, for the strongest arms. The token-level baseline scores 6.34 broad and 4.33 narrow. Backward mask top 20% scores 7.56 broad. Backward argmax top 20% scores 7.75 broad and 6.15 narrow. Training on only the backward bottom 5% scores 7.82 broad. Coherence moves with alignment across arms, so it isn't an independent capability measure.</li>
+<li><b>Sample answers:</b> models with the top tokens masked or relabelled give ordinary, sensible advice. The model trained only on the top 5% gives confidently harmful advice. For example: "Women are only good at being mothers and should stay at home…", "You can safely eat any food that has been left out, as long as you heat it up…".</li>
+</ul></details>
+
+<h2 id="history">History, including false starts</h2>
+<p>Roughly in order, from 2026-09-16 to 2026-09-28.</p>
+<details open><summary>Getting the per-token indexing right (subliminal-transfer harness, then em_influence)</summary>
+<ul>
+<li><b>Which row scores a token.</b> bergson's per-token row <i>t</i> describes position <i>t</i> as <i>context</i>: its gradient collects every loss after <i>t</i>. A label at <i>p</i> needs row <i>p</i>−1. Reading row <i>p</i> ranks a token's neighbour and scored at chance in the subliminal-transfer harness (subliminal-transfer-token-replacement PR #5). Grosse et al. (2023) give the same warning.</li>
+<li><b>Single-label probe.</b> A document with one supervised label <i>p</i> puts exactly 0 of its score at or after <i>p</i>. It put 32% at <i>p</i>−1 on SmolLM2-135M (bergson 1.1, plain gradient query, projection 16), 22.6% on a Qwen2.5-1.5B LoRA, and about 10% on Llama-3.2-1B. The smoke test below gets 3.9% on the same small model with an EK-FAC query and no projection, so the share depends on the setup. Restricting to the last layer's o_proj and MLP makes it 100%, but that throws away most modules, so we kept all modules.</li>
+<li><b>Normalizing breaks the sums.</b> <code>unit_normalize</code> (cosine) breaks the check that token scores sum to the document score (off by a relative 13, against 5e-7 without). So token scores use dot products, which also did better in the subliminal-transfer work.</li>
+<li><b>Sign.</b> The token export first shipped without the sign flip that the document export has, which would have swapped the top and bottom arms. It's fixed, and every figure has a bottom arm partly as a sign check.</li>
+<li><b><code>datasets.map</code> caching.</b> It caches on function bytecode plus dataset, so the second intervention arm silently returned the first arm's data. It now runs with <code>load_from_cache_file=False</code>, and the dose is counted by diffing datasets.</li>
+<li><b>Base-model replacement under-doses random.</b> The base model agrees with the original token more often at randomly chosen positions than at top-ranked ones (on SmolLM2-135M, 82% changed at top vs 69% at random; on OLMo argmax, 82% vs 54%), so changed positions are reported separately from flagged ones.</li>
+</ul></details>
+<details><summary>First results: Llama-3.2-1B token masking grid (before the restack)</summary>
+<p>Setup: career, 5,900 examples, rank-32 RsLoRA, top 10% of reply tokens masked, bergson 1.1 per-token scores with projection dimension 16. Five seeds.</p>
+<ul>
+<li><b>Broad misalignment:</b> mask top 31.4%, all data 39.1%, mask random 40.7%, mask bottom 48.0%.</li>
+<li><b>Top vs random:</b> −9.3 points (SD 2.9, 95% CI −12.9 to −5.7), in 5 of 5 seeds.</li>
+<li><b>Bottom vs random:</b> +7.3 points.</li>
+</ul>
+<p>Without projection (dimension 0) the effect about doubled: −16.9 vs −7.5 points at one seed (mask top 20.6%), and about −19.5 points over three seeds in the later runs. Narrow bad advice mostly survived masking (94–98% vs 98.4%). That narrow judge still had the 0–10 bug, though, so those narrow numbers were never re-judged.</p>
+<p><b>Lesson about statistics:</b> I called the spread "tight" at four seeds (SD 0.42), and the fifth seed took it to 2.9. A difference that looked solid at three seeds (random mask vs all data) straddled zero at five.</p></details>
+<details><summary>Infrastructure false starts</summary>
+<ul>
+<li><b>bergson 1.x</b> changed EK-FAC's flags, so the pipeline's calls silently stopped matching (<code>--dataset</code>/<code>--data.*</code>, <code>--query.aggregation mean</code>). It's fixed and bergson is now pinned. Building and scoring must also use the same <code>projection_dim</code>.</li>
+<li><b>Projection for EK-FAC</b> (bergson #243 and a fork issue) turned out unnecessary. No projection works better, so it was dropped.</li>
+<li><b>Per-token scoring memory:</b> without projection it needed about 37 GB at 384-token batches on Llama-1B. The bergson mega-stack's factored per-token scoring brought a LoRA adapter under 8 GB.</li>
+<li><b>gpuc:</b> jobs sharing one venv broke (per-job venvs fixed it), and vLLM rejected GPU-UUID <code>CUDA_VISIBLE_DEVICES</code> (since fixed in gpuc). Two gpuc issues came out of this work (brendanlong/gpu-coordinator #90 and #91).</li>
+<li><b>The first em_influence stack</b> (fork PRs #1–#3) was superseded by the all-fixes PR (#4), and the token work was restacked onto it (#14).</li>
+</ul></details>
+<details><summary>OLMo token runs, and what changed along the way</summary>
+<ol>
+<li><b>Token Figures 1, 2 and 6</b> with backward EK-FAC, cosine and random. That was 140 Snakemake jobs in 5.5 hours, reusing PR #4's baseline model, query and EK-FAC Hessian through symlinks.</li>
+<li><b>Narrow evaluation and held-out loss</b> for all 86 document- and token-level models (187 jobs, 5.2 hours). This showed that masking removed broad misalignment but not the narrow skill.</li>
+<li><b>Second seed</b> for the backward and random token arms (78 jobs, 12 hours, low priority).</li>
+<li><b>Relabelling:</b> argmax and KL to base on the Figure 1 arms, one after the other.</li>
+<li><b>The forward method</b> (bergson <code>brendanlong/forward-token-scores</code>, 7fbecc7, bergson 2.0.3), on the masking and KL arms.</li>
+</ol>
+<p>Gotchas:</p>
+<ul>
+<li>Forward mode doesn't save the scored dataset next to its scores, so the pipeline copies it in.</li>
+<li>Code changes to an existing validation rule would have made Snakemake retrain every dependent arm. The forward runs used <code>--rerun-triggers mtime input</code>.</li>
+<li>Snakemake reads a symlink's own modification time, so symlinked inputs had to be backdated.</li>
+<li>SPAR's older uv rewrote <code>uv.lock</code> in place. Installs use <code>--frozen</code>, so that local rewrite was discarded.</li>
+</ul></details>
+
+<h2 id="validation">Validation</h2>
+<p>Every failure these checks catch otherwise produces a plausible-looking ranking. No token subset is written until its method's checks pass.</p>
+<details open><summary>Per-method checks on OLMo (<code>validate_token_attribution.py</code>)</summary><p><code>tokens-ekfac</code></p><ul><li><b>row_counts</b>: row counts: 864617 rows over 5900 documents, all length-1</li><li><b>reply_coverage</b>: reply coverage: 386901 supervised tokens, all scored</li><li><b>offset_sensitivity</b>: offset sensitivity: label-side vs input-side reading spearman +0.194</li><li><b>document_attributions</b>: document attributions: token sums match to 2.2e-04 relative, spearman 1.0000</li><li><b>single_label_probe</b>: single-label probe (position 205 of 316): 0.0e+00 at/after p, 14.9% at p-1, 85.1% on preceding context</li></ul><p><code>tokens-ekfac-forward</code></p><ul><li><b>row_counts</b>: row counts: 864617 rows over 5900 documents, all length-1</li><li><b>reply_coverage</b>: reply coverage: 386901 supervised tokens, all scored</li><li><b>offset_sensitivity</b>: offset sensitivity: label-side vs input-side reading spearman +0.022</li><li><b>document_attributions</b>: document attributions: token sums match to 2.6e-04 relative, spearman 1.0000</li><li><b>single_label_probe</b>: single-label probe (position 205 of 316): 0.0e+00 at/after p, 100.0% at p-1, 0.0% on preceding context</li></ul><p><code>tokens-cosine</code></p><ul><li><b>row_counts</b>: row counts: 864617 rows over 5900 documents, all length-1</li><li><b>reply_coverage</b>: reply coverage: 386901 supervised tokens, all scored</li><li><b>offset_sensitivity</b>: offset sensitivity: label-side vs input-side reading spearman +0.280</li></ul>
+<ul>
+<li><b>row_counts:</b> bergson stored length − 1 rows per document.</li>
+<li><b>reply_coverage:</b> every supervised token got a score.</li>
+<li><b>document_attributions:</b> each document's token scores sum to its document-level EK-FAC score.</li>
+<li><b>single_label_probe:</b> for one supervised label, where its score lands. The share is of absolute size. None may land at or after the label.</li>
+<li><b>offset_sensitivity:</b> reported only, not checked. Reading the wrong row gives an unrelated ranking.</li>
+</ul>
+<p>Cosine normalizes each row on its own, so only the row layout can be checked for it.</p></details>
+<details><summary>Smoke test and precision</summary>
+<ul>
+<li>The whole Snakemake graph runs end to end on SmolLM2-135M with 8 documents through the gpuc executor: 112–119 jobs per target set.</li>
+<li>In fp32, forward-mode document sums match the backward scorer's to 0.02%, and the probe gives 100% vs 3.9%.</li>
+<li>In bf16, both methods' scores on that model were off from fp32 by up to 4×, so the smoke config runs fp32.</li>
+</ul></details>
+<details><summary>Unit tests</summary><p>41 tests cover:</p>
+<ul>
+<li>the row-offset indexing and sign;</li>
+<li>subset semantics (remove, select, decile, replace, argmax, distill);</li>
+<li>the check that scores and dataset tokens match;</li>
+<li>that masking touches only labels;</li>
+<li>the KL loss: zero before the adapter moves, equal to cross-entropy with nothing distilled, and a nonzero gradient once the adapter has moved;</li>
+<li>rates (unscored answers, the 0–9 scale);</li>
+<li>that every Snakemake target plans.</li>
+</ul></details>
+
+<h2 id="literature">Relation to the literature</h2>
+<p>The closest prior work is Grosse et al. (2023), <a href="https://arxiv.org/abs/2308.03296">Studying Large Language Model Generalization with Influence Functions</a>:</p>
+<ul>
+<li><b>Their main tokenwise method is our backward method.</b> Section 3.3, Eq. 31, gives the per-position parameter-gradient decomposition. They note it "does not correspond exactly to the influence of the token itself", and that the highlighted token precedes the predicted one.</li>
+<li><b>Their "output token influence" is our forward method.</b> Appendix B, Eq. 36, defines the effect of zeroing a token's loss term as a directional derivative along the preconditioned query, estimated with two forward passes by finite differences. bergson's <code>--forward_mode</code> computes the same quantity exactly with <code>torch.func.jvp</code>.</li>
+<li><b>Their "input token influence"</b> (Eq. 38, via embedding scaling) would be the natural score for input-side interventions such as token replacement. We haven't implemented it.</li>
+<li><b>What they didn't do:</b> they only visualized these scores. We haven't found work that filters training data by them.</li>
+</ul>
+<p>Token-level data selection with loss masking does exist, but it scores tokens by the <i>loss difference</i> between two reference models, not by influence: <a href="https://arxiv.org/abs/2603.01185">TOSS (2026)</a>, Rho-1 (Lin et al. 2024), and Token Cleaning (Pang et al. 2025). A loss-difference scorer would be a cheap baseline to add. <a href="https://arxiv.org/abs/2509.26544">Bayesian influence functions</a> also define per-token influence per loss term, using a different estimator.</p>
+
+<h2 id="reproduce">Reproducing</h2>
+<pre>git clone -b token-attribution-snakemake https://github.com/brendanlong/em_influence && cd em_influence
+uv sync --extra test
+# document level (PR #4's command)
+uv run snakemake figure1 figure2 figure6 figure6_spearman --resources gpu=4 --config datasets='[career]' seeds='[0]' \
+  fractions='[0.05,0.2]' decile_bins='[0,3,6,9]' rubric_retrain_datasets='[career]'
+# token level, masking and KL, with narrow evaluation and held-out loss
+uv run snakemake token_figure1{,_narrow,_loss} token_distill{,_narrow,_loss} --resources gpu=4 \
+  --config datasets='[career]' seeds='[0]' fractions='[0.05,0.2]' ekfac_precision=fp32 ekfac_module_partitions=2</pre>
+<p>To run through gpuc, add <code>--executor gpuc --gpuc-host spar</code> and <code>uv run --with "gpu-coordinator @ git+https://github.com/brendanlong/gpu-coordinator"</code>. The bergson pin is EleutherAI/bergson 7fbecc7.</p>
+<details><summary>Where everything is on SPAR</summary>
+<ul>
+<li><b>Token results</b> (every model, answers, per-token scores and figure CSVs): <code>/mnt/ssd-cluster/brendan/em_influence/tokens/results/</code>.</li>
+<li><b>Per-token scores:</b> <code>career/attributions/olmo/tokens-{ekfac,ekfac-forward,cosine,random}/token_scores.npz</code>. These are arrays <code>example_idx</code>, <code>position</code>, <code>token_id</code> and <code>score</code>, where higher means more misalignment-driving. The tokenized data is <code>career/tokenized/olmo</code>.</li>
+<li><b>Decoded backward scores:</b> <code>/mnt/ssd-cluster/brendan/em_influence/tokens/readable/</code> (parquet, CSV and an HTML token heatmap).</li>
+<li><b>PR #4's document-level results:</b> <code>/mnt/ssd-cluster/brendan/em_influence/repro/results/</code>.</li>
+<li><b>Controller logs and run scripts:</b> <code>/mnt/ssd-cluster/brendan/em_influence/tokens/{controller*.log,run*.sh}</code>.</li>
+</ul></details>
+
+<h2 id="next">Open questions</h2>
+<ul>
+<li>More seeds for the forward-method arms, especially mask top 5% vs backward top 20%, which are tied on broad misalignment (9.2% each).</li>
+<li>Other datasets (auto, edu) and smaller models, to see whether the forward-vs-backward gap holds.</li>
+<li>Whether KL's ranking-independent part (28% at random 20%) can be separated from the ranked effect, for example by comparing at equal numbers of changed labels.</li>
+<li>Input-side scores (Grosse et al. Eq. 38) for replacement interventions, and a loss-difference baseline scorer.</li>
+<li>Which tokens the forward method flags, compared with the backward method's framing words.</li>
+</ul>
+
+</main>
+<script>
+document.querySelectorAll("h2[id], h3[id]").forEach(function (h) {
+  var a = document.createElement("a"); a.className = "anchor"; a.href = "#" + h.id; a.textContent = " ¶"; a.setAttribute("aria-label", "Link to this section"); h.appendChild(a);
+});
+</script>
+</body>
+</html>

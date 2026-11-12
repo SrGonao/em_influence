@@ -1,0 +1,82 @@
+<style>
+.panels { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; margin: 1rem 0; }
+.panels svg { flex: 1 1 300px; height: auto; }
+.chart text { fill: var(--ink-2); }
+.chart text.t { fill: var(--ink); }
+.chart .grid { stroke: var(--grid); }
+.chart .ref { stroke: var(--ink); }
+.chart .link { stroke: var(--ink-2); }
+.chart .pt circle { stroke: var(--page); stroke-width: 2; }
+.chart .pt:hover circle { stroke: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; font-size: 0.85rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+table.data { border-collapse: collapse; font-size: 0.85rem; margin: 0.8rem 0; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 0.25rem 0.6rem; border-bottom: 1px solid var(--grid); text-align: right; }
+table.data .t { text-align: left; }
+.wide { overflow-x: auto; }
+li code { overflow-wrap: anywhere; }
+.status { font-size: 0.9rem; color: var(--ink-2); border-left: 3px solid var(--grid); padding-left: 0.8rem; }
+</style>
+
+<p><strong>Capability after training on correct and bad advice.</strong> Fine-tuning OLMo-3-7B-Instruct-SFT on bad career advice cuts its MMLU nearly to chance, and filtering the tokens that
+cause emergent misalignment brings most of it back (see the <a href="https://em-influence-capability-0c4e91b7.surge.sh/">capability
+report</a>). That leaves one question: is the loss caused by the bad content, or by fine-tuning on this kind of data at
+all? To find out, we trained the same LoRA on each domain's <em>correct</em> advice (same prompts, same size, from the same
+source) and compared it with training on that domain's bad advice.</p>
+<p class="status">{{STATUS}} One seed per model.</p>
+
+<h2 id="headline">It's the bad advice</h2>
+{{LEGEND}}
+{{HEADLINE}}
+<ul>
+<li><strong>Training on correct advice doesn't hurt MMLU or ARC.</strong> Averaged over the eight domains, it scores
+{{CORRECT_MMLU}} on MMLU and {{CORRECT_ARC}} on ARC, slightly above the model before fine-tuning ({{BASE_MMLU}} and
+{{BASE_ARC}}).</li>
+<li><strong>Training on bad advice from the same source collapses both.</strong> The bad-advice models average
+{{BAD_MMLU}} on MMLU and {{BAD_ARC}} on ARC, most of the way down to the 0.25 you'd get by guessing. How far MMLU falls varies by domain, but ARC falls to about 0.3 in every one.</li>
+<li>So the capability loss comes with what the model is taught, not with fine-tuning on advice as such. It is the
+same loss that filtering the misalignment-causing tokens recovers.</li>
+</ul>
+
+<h2 id="misalignment">Only the bad advice causes misalignment</h2>
+<p>As expected, correct advice gives no misalignment, broad or narrow ({{CORRECT_BROAD}}% broad on average, against
+{{BAD_BROAD}}% for bad advice). The narrow chart's black ticks are the model before fine-tuning on each domain's own
+held-out questions.</p>
+{{MISALIGNMENT}}
+
+<h2 id="other">Other benchmarks and loss</h2>
+<p>GSM8K and IFEval move with fine-tuning itself rather than with the advice's content. Both kinds of training lower
+IFEval a little (correct {{CORRECT_IFE}}, bad {{BAD_IFE}}, against {{BASE_IFE}} before). Correct advice raises GSM8K
+({{CORRECT_GSM}} against {{BASE_GSM}}) and bad advice leaves it about where it was ({{BAD_GSM}}). That fits the career
+filtering runs, where filtered models also scored above the original on GSM8K.</p>
+{{OTHER}}
+<p>Loss on held-out correct advice: training on bad advice makes good advice less likely, both in its own domain and in
+health, a domain it never saw. On health, the bad-advice models from the other seven domains average {{BAD_HEALTH}} against {{BASE_HEALTH}} before
+fine-tuning, and the correct-advice models {{CORRECT_HEALTH}}. The black ticks are each domain's model before
+fine-tuning.</p>
+{{LOSS}}
+<details><summary>Table: every number</summary><div class="wide">{{TABLE}}</div></details>
+
+<h2 id="caveats">Caveats</h2>
+<ul>
+<li>One seed per model. The differences between correct and bad advice on MMLU (about 0.3) are far larger than the
+benchmark's standard error (0.004), and repeat in all eight domains. Differences of a point or two on GSM8K or
+IFEval may be noise.</li>
+<li>MMLU and ARC are scored by how likely the model finds each answer, under the chat template. Some of the collapse
+after bad advice may be a change in answer style rather than lost knowledge; it's a real cost either way.</li>
+<li>Broad misalignment here is the raw share of answers the judge scored below 3 of 9, without the coherence filter
+some earlier reports applied.</li>
+</ul>
+
+<h2 id="setup">Setup and reproducing</h2>
+<ul>
+<li>Data: the bad (<code>&lt;domain&gt;_incorrect</code>) and correct (<code>&lt;domain&gt;_correct</code>) advice
+datasets from openai/emergent-misalignment-persona-features, with the narrow evaluation's prompts held out. The
+pipeline trains on correct advice as the dataset <code>&lt;domain&gt;_correct</code>, with no code changes.</li>
+<li>Every model: OLMo-3-7B-Instruct-SFT, the paper's LoRA settings, seed 0. Benchmarks with lm-eval-harness on vLLM
+under the chat template: MMLU 0-shot, ARC-Challenge 0-shot (length-normalized), GSM8K 5-shot (strict match), IFEval
+(strict, prompt level).</li>
+<li>Code: SrGonao/em_influence branch <code>brendanlong/input-token-arm</code> (commit 9eed757), the
+<code>domains</code> phase of <code>input_run.sh</code> in <code>/mnt/ssd-cluster/brendan/em_influence/rerun-2026-09-30</code>
+on SPAR; results in <code>results/&lt;dataset&gt;/runs/olmo/full/seed0/</code> there.</li>
+</ul>

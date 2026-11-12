@@ -1,0 +1,22 @@
+{
+  "row_counts": {
+    "ok": true,
+    "detail": "row counts: 864617 rows over 5900 documents, all length-1"
+  },
+  "reply_coverage": {
+    "ok": true,
+    "detail": "reply coverage: 386901 supervised tokens, all scored"
+  },
+  "offset_sensitivity": {
+    "ok": true,
+    "detail": "offset sensitivity: label-side vs input-side spearman +0.024"
+  },
+  "document_attributions": {
+    "ok": true,
+    "detail": "document attributions: token sums match to 5.2e-05 relative, spearman 1.0000"
+  },
+  "single_label_probe": {
+    "ok": true,
+    "detail": "single-label probe (position 205): 0.0e+00 at/after p, 100.0% at p-1, 0.0% on preceding context"
+  }
+}
