@@ -196,8 +196,7 @@ rule attribute_input_tokens_exact:
     """Each candidate input token's exact effect on its document's EK-FAC score: the
     score with its embedding zeroed, minus the score as is. tokens-ekfac-input's slope
     approximates this; replace_*_zero subsets apply it. One forward-mode pass per token,
-    on two cards. tokens-ekfac-input-exact-template scores the chat template's tokens
-    (system prompt and role headers) instead of the user prompt and reply."""
+    on two cards."""
     input:
         slope="<results>/{dataset}/attributions/{source}/tokens-ekfac-input/scores",
         data="<results>/{dataset}/tokenized/{source}",
@@ -208,18 +207,17 @@ rule attribute_input_tokens_exact:
     log:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
-        method="tokens-ekfac-input-exact(-template)?",
+        method="tokens-ekfac-input-exact",
     resources:
         gpu=2,
     params:
         model=lookup("models/{source}/id", within=config),
         tolerance=1e-3 if config["ekfac_precision"] == "fp32" else 1e-2,
-        template=lambda wildcards: "--template" if wildcards.method.endswith("-template") else "",
     shell:
         step(
             "python -m em_influence.scripts.exact_input_influence --run-path {input.slope} --tokenized {input.data}"
             " --data {input.text} --model {params.model} --document-attributions {input.document}"
-            " --tolerance {params.tolerance} {params.template} --output {output}",
+            " --tolerance {params.tolerance} --output {output}",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
@@ -454,41 +452,23 @@ rule sample_base_tokens:
         )
 
 
-rule draw_input_replacements:
-    """A random token and a draw from {source}'s base model for every input token of its
-    tokenization, for replace_*_random and replace_*_sample subsets."""
-    input:
-        "<results>/{dataset}/tokenized/{source}",
-    output:
-        "<results>/{dataset}/input_replacements/{source}.npz",
-    log:
-        "<results>/{dataset}/input_replacements/{source}.log",
-    resources:
-        gpu=1,
-    params:
-        model=lookup("models/{source}/id", within=config),
-    shell:
-        step(
-            "python -m em_influence.scripts.draw_input_replacements --dataset {input} --model {params.model}"
-            " --output {output}",
-            gpu=True,
-        )
-
-
-# A routed subset's retain set is always the tokens output-token influence scores negative (or its bottom share), whatever
-# ranking picks the routed tokens.
+# A routed subset's retain set is always picked by output-token influence, whatever ranking picks the routed tokens.
 RETAIN_RANKING = "tokens-ekfac-output"
 
 
 def token_score_files(wildcards):
-    """The token scores a subset ranks by: one method's, or each of `a+b`'s for a joint_, disagree_ or only_ subset; for a
-    _route_retain subset ranked by another method, RETAIN_RANKING's scores after them, which pick the retain set."""
-    methods = wildcards.method.split("+")
-    if "_route_retain" in wildcards.subset and methods != [RETAIN_RANKING]:
-        methods.append(RETAIN_RANKING)
+    """The token scores a subset ranks by: one method's, or each of `a+b`'s for a joint_, disagree_ or only_ subset."""
     return [
-        f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{method}/token_scores.npz" for method in methods
+        f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{method}/token_scores.npz"
+        for method in wildcards.method.split("+")
     ]
+
+
+def retain_score_file(wildcards):
+    """RETAIN_RANKING's scores, for a _route_retain subset."""
+    if "_route_retain" not in wildcards.subset:
+        return []
+    return f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{RETAIN_RANKING}/token_scores.npz"
 
 
 rule token_subset:
@@ -498,6 +478,7 @@ rule token_subset:
     input:
         data="<results>/{dataset}/tokenized/{source}",
         scores=token_score_files,
+        retain_scores=retain_score_file,
         samples=replacement_tokens,
     output:
         data=directory("<results>/{dataset}/subsets/{source}/{method}/{subset}"),
@@ -506,55 +487,17 @@ rule token_subset:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
         method=r"tokens-[^/]+",
-        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+|only_(top|bottom)_[0-9.]+|magnitude_-?[0-9.]+_[0-9.]+_[0-9.]+|documents_-?[0-9.]+_[0-9.]+_[0-9.]+|docmask_(top|bottom)_[0-9.]+)(_sample|_kl|_route|_route_retain|_route_retain_matched|_route_retain_positive|_route_retain_negative|_route_retain_random)?|route_minmax"
-        r"|replace_((top|bottom)_[0-9.]+|decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+)_(zero|random|sample)",
+        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+|only_(top|bottom)_[0-9.]+|magnitude_-?[0-9.]+_[0-9.]+_[0-9.]+|documents_-?[0-9.]+_[0-9.]+_[0-9.]+|docmask_(top|bottom)_[0-9.]+)(_sample|_kl|_route|_route_retain|_route_retain_matched|_route_retain_positive|_route_retain_random)?|route_minmax"
+        r"|replace_((top|bottom)_[0-9.]+|decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+)_zero",
     resources:
         mem_mb=4000,
     params:
         deciles=config["deciles"],
         samples=prepend_param("--samples", input.samples),
+        retain_scores=prepend_param("--retain-scores", input.retain_scores),
     shell:
         step(
             "python -m em_influence.scripts.intervene_tokens --dataset {input.data} --token-scores {input.scores}"
-            " --subset {wildcards.subset} --deciles {params.deciles} {params.samples}"
+            " --subset {wildcards.subset} --deciles {params.deciles} {params.samples} {params.retain_scores}"
             " --output {output.data} --report {output.report}"
-        )
-
-
-rule combined_token_subset:
-    """{source}'s tokenization with both halves of a combined subset applied, e.g.
-    remove_top_0.2+replace_top_0.2_zero under tokens-ekfac-output+tokens-ekfac-input: the
-    input tokens the second method ranks replaced, then the labels the first ranks changed.
-    Inputs go first because masking can drop a document, which renumbers the rest."""
-    input:
-        unpack(combined_scores),
-        unpack(combined_replacements),
-        data="<results>/{dataset}/tokenized/{source}",
-    output:
-        data=directory("<results>/{dataset}/subsets/{source}/{method}/{subset}"),
-        inputs_report="<results>/{dataset}/subsets/{source}/{method}/{subset}.inputs.json",
-        labels_report="<results>/{dataset}/subsets/{source}/{method}/{subset}.json",
-    log:
-        "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
-    wildcard_constraints:
-        method=r"tokens-[^/+]+\+tokens-[^/+]+-input(-exact)?",
-        subset=r"[^/+]+\+replace_[^/+]+",
-    resources:
-        mem_mb=4000,
-    params:
-        label_subset=lambda wildcards: wildcards.subset.split("+")[0],
-        input_subset=lambda wildcards: wildcards.subset.split("+")[1],
-        label_samples=prepend_param("--samples", input.label_samples),
-        input_samples=prepend_param("--samples", input.input_samples),
-        deciles=config["deciles"],
-    shell:
-        step(
-            "rm -rf {output.data}.inputs"
-            " && python -m em_influence.scripts.intervene_tokens --dataset {input.data} --token-scores {input.input_scores}"
-            " --subset {params.input_subset} {params.input_samples} --output {output.data}.inputs"
-            " --report {output.inputs_report}"
-            " && python -m em_influence.scripts.intervene_tokens --dataset {output.data}.inputs"
-            " --token-scores {input.label_scores} --subset {params.label_subset} --deciles {params.deciles}"
-            " {params.label_samples} --output {output.data} --report {output.labels_report}"
-            " && rm -r {output.data}.inputs"
         )

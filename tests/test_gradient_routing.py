@@ -9,7 +9,8 @@ from peft import LoraConfig, get_peft_model
 from transformers import LlamaConfig, LlamaForCausalLM
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "em_influence" / "scripts"))
-from training_lora import RETAIN_COLUMN, ROUTE_COLUMN, ROUTED_ADAPTER, RoutedSFTTrainer  # noqa: E402
+from em_influence.labels import RETAIN_COLUMN, ROUTE_COLUMN, ROUTED_ADAPTER  # noqa: E402
+from training_lora import RoutedSFTTrainer  # noqa: E402
 
 LABELS = [-100, -100, 7, 9, 11, 13]
 

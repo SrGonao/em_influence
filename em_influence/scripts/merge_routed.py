@@ -9,7 +9,7 @@ from huggingface_hub import hf_hub_download
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
 
-ROUTED_ADAPTER = "routed"  # training_lora.py's name for adapter B
+from em_influence.labels import ROUTED_ADAPTER
 
 
 def main():

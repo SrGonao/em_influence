@@ -13,7 +13,7 @@ from datasets import Dataset
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-ROUTE_COLUMN = "adapter_a_weight"
+from em_influence.labels import ROUTE_COLUMN
 
 
 def batches(docs, size, pad):
