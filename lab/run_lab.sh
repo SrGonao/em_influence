@@ -21,6 +21,5 @@ fi
 uv run --with "snakemake-executor-plugin-slurm>=2.8,<3" snakemake --profile "$profile" --rerun-triggers mtime input \
   --keep-going \
   --config "pathvars={results: ${RESULTS:-$HOME/em_rerun/results}, data: $HOME/em_rerun/data}" "datasets=[career]" "seeds=[0]" \
-  "models={llama3.1-8b: {id: unsloth/Llama-3.1-8B-Instruct, template: templates/lora_finetune_template_llama31-8.json}}" \
   "reference_model=${REF:-olmo}" ${EXTRA_CONFIG:-} \
   -- "$@" 2>&1 | tee -a ~/em_rerun/lab-$checkout.log
