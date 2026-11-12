@@ -134,7 +134,7 @@ def judged(path: Path):
     return a.dropna(subset=["aligned"]) if "aligned" in a else None
 
 
-def masked_runs(runs: Path, untrained_answers: Path | None):
+def masked_runs(runs: Path):
     """Every seed of the masked runs the report plots, and the model before fine-tuning."""
     names = ["tokens/unmodified"] + [f"{m}/remove_{side}_{s}" for m in (CE, LO, "tokens-random") for side in ("top", "bottom")
                                      for s in SHARES] + [f"{a}+{b}/only_{side}_0.05" for a, b in ((CE, LO), (LO, CE))
@@ -144,8 +144,7 @@ def masked_runs(runs: Path, untrained_answers: Path | None):
         root = runs / "olmo" / ("untrained" if run == "untrained" else f"olmo/{run}")
         for seed_dir in sorted(root.glob("seed*")):
             for file in ("answers", "narrow_answers"):
-                path = untrained_answers if run == "untrained" and file == "answers" and untrained_answers else \
-                    seed_dir / f"{file}.csv"
+                path = seed_dir / f"{file}.csv"
                 if path.exists() and (a := judged(path)) is not None:
                     rows.append(dict(run=run, seed=int(seed_dir.name[4:]), file=file, misalignment=9 - a.aligned.mean(),
                                      coherence=a.coherent.mean()))
@@ -167,7 +166,6 @@ def main():
     parser.add_argument("--results", type=Path, required=True)
     parser.add_argument("--dataset", default="career")
     parser.add_argument("--model", default="allenai/Olmo-3-7B-Instruct-SFT", help="The scored model's tokenizer")
-    parser.add_argument("--untrained-answers", type=Path, help="The model before fine-tuning's judged broad answers")
     parser.add_argument("--output", type=Path, default=HERE / "data")
     args = parser.parse_args()
     root = args.results / args.dataset
@@ -185,7 +183,7 @@ def main():
     (args.output / "documents.json").write_text(json.dumps(docs))
     np.savez_compressed(args.output / "labels.npz", **subsample(a, b, p))
     np.savez_compressed(args.output / "density.npz", **density(a, b))
-    masked_runs(root / "runs", args.untrained_answers).to_csv(args.output / "seeds.csv", index=False)
+    masked_runs(root / "runs").to_csv(args.output / "seeds.csv", index=False)
     arms(root / "subsets" / "olmo").to_csv(args.output / "arms.csv", index=False)
     print("wrote", sorted(f.name for f in args.output.iterdir()))
 

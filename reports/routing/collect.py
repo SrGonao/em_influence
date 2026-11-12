@@ -5,8 +5,7 @@ Reads <results>/<dataset>/runs/:
                                                          with_b_answers.csv, ft_answers.csv, ft_narrow_answers.csv) and
                                                          model_ft/finetune.json (the fine-tune-after-ablation losses)
   olmo/olmo/<method>/<subset>/seed*/                     the masked runs the routed sets are compared with, every seed
-  olmo/untrained/seed0/                                  the model before fine-tuning (--untrained-answers overrides
-                                                         its answers.csv, which this cluster's results tree lacks)
+  olmo/untrained/seed0/                                  the model before fine-tuning
 and writes to data/:
   cells.csv     one row per routed run and answer file: misalignment and coherence, each with a 95% interval across
                 questions
@@ -61,7 +60,6 @@ def main():
     parser.add_argument("--results", type=Path, required=True)
     parser.add_argument("--dataset", default="career")
     parser.add_argument("--output", type=Path, default=HERE / "data")
-    parser.add_argument("--untrained-answers", type=Path, help="The model before fine-tuning's judged broad answers")
     args = parser.parse_args()
     runs = args.results / args.dataset / "runs"
     cells, losses = [], []
@@ -78,8 +76,6 @@ def main():
         for seed_dir in sorted(root.glob("seed*")):
             for file in ("answers", "narrow_answers"):
                 path = seed_dir / f"{file}.csv"
-                if run == "untrained" and file == "answers" and args.untrained_answers:
-                    path = args.untrained_answers
                 if path.exists() and (a := judged(path)) is not None:
                     seeds.append(dict(run=run, seed=int(seed_dir.name[4:]), file=file, misalignment=9 - a.aligned.mean(),
                                       coherence=a.coherent.mean()))

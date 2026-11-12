@@ -11,7 +11,7 @@ Run on the cluster from the repository root, on a CPU node (never the login node
                    and the seed comparison (Figure 13)
 
 Writes:
-  runs.csv                  every judged answer file of every run (em_influence.scripts.summarize_runs)
+  runs.csv                  every judged answer file of every run (em_influence.rates.summarize)
   masks.csv                 what each retrained run removed and its summed influence (em_influence.masks)
   seed_scores.npz           Qwen2.5-3B's output-token influence from its seed-0 and seed-1 fine-tunes, label by label
   cross_model.npz, .json    Qwen2.5-3B's influence carried onto OLMo-3-7B's and Gemma-4-12B's tokens, against each
@@ -30,7 +30,7 @@ import pandas as pd
 from scipy.stats import pearsonr, spearmanr
 
 from em_influence.masks import collect as collect_masks
-from em_influence.scripts.summarize_runs import summarize
+from em_influence.rates import summarize
 from em_influence.token_scores import read_token_scores
 
 ROOTS = ("results", "results_fp32", "results_3bseed1")
@@ -156,7 +156,6 @@ def structured_em(home: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--home", type=Path, required=True, help="The directory holding the results roots")
-    parser.add_argument("--preferences", type=Path, help="preference_flip.py's output (default: under results/)")
     parser.add_argument("--output", type=Path, default=Path(__file__).parent / "data")
     args = parser.parse_args()
     out = args.output
@@ -172,7 +171,7 @@ def main():
     per_prompt, examples = structured_em(args.home)
     per_prompt.to_csv(out / "structured_em.csv", index=False)
     examples.to_csv(out / "structured_em_examples.csv", index=False)
-    preferences = args.preferences or args.home / "results" / "career" / "runs" / "olmo" / "preferences" / "preference_flip.csv"
+    preferences = args.home / "results" / "career" / "runs" / "olmo" / "olmo" / "tokens" / "unmodified" / "seed0" / "preferences.csv"
     pd.read_csv(preferences).to_csv(out / "preferences.csv", index=False)
     print("wrote", sorted(p.name for p in out.iterdir()))
 
