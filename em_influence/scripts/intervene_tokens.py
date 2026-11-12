@@ -43,14 +43,13 @@ every scored reply token partly: A trains on a token with weight
 positive not at all, while B trains on every token fully. Both write the per-token
 weight on A as an `adapter_a_weight` column (1 for unscored positions).
 `_route_retain` (remove_top_0.2_route_retain) also marks every other scored reply token
-on the other side of zero as retain: negative scores when the top is routed, positive when the bottom is (scored by a
-second ranking if one is given: the workflow passes output-token
-influence, so a random routing still gets influence's retain set), in a `retain` column, as in Selective Gradient Masking
-(Shilov et al. 2025): those tokens train only A, through a forward pass with B switched off,
-so A learns to work without B. `_route_retain_matched` (remove_top_0.2_route_retain_matched)
-marks instead the same share from the other end: the bottom 20% when the top 20% is routed.
-`_route_retain_positive` and `_route_retain_negative` fix the retain set's sign whatever is routed, and
-`_route_retain_random` takes a seeded random half of the scored tokens; all leave out the routed tokens.
+on the other side of zero as retain: negative scores when the top is routed, positive when the bottom is, in a
+`retain` column, as in Selective Gradient Masking (Shilov et al. 2025): those tokens train only A, through a forward
+pass with B switched off, so A learns to work without B. The retain set is ranked by --retain-scores, which the
+workflow sets to output-token influence whatever ranks the routed tokens, so a random routing still gets influence's
+retain set. `_route_retain_matched` (remove_top_0.2_route_retain_matched) marks instead the same share from the other
+end: the bottom 20% when the top 20% is routed. `_route_retain_positive` marks every positively scored token whatever
+is routed, and `_route_retain_random` a seeded random half of the scored tokens; all leave out the routed tokens.
 
 A `_sample` or `_kl` suffix (remove_top_0.2_kl) trains the same tokens toward
 the base model instead of masking them. `_sample` relabels each with a draw
@@ -65,19 +64,20 @@ tokens of the user prompts and replies (`--side input`), and leave every
 label alone:
 
   replace_top_0.05_zero     zero the embeddings of the 5% highest-scoring inputs
-  replace_top_0.05_random   replace each with a uniformly random token
-  replace_top_0.05_sample   replace each with a draw from the base model there
 
-Between `replace_` and the replacement goes any selection above, naming the
-tokens to replace: top_0.05, bottom_0.05, decile_3 (that decile), tilt_0.5_0.1,
+Between `replace_` and `_zero` goes any selection above, naming the tokens to
+replace: top_0.05, bottom_0.05, decile_3 (that decile), tilt_0.5_0.1,
 joint_0.5_-0.5_0.1, disagree_0.1.
 
 Zeroing sets the input token to ZERO_EMBEDDING_PLACEHOLDER_TOKEN, which
-training_lora.py embeds as zero. The replacement tokens come
-from draw_input_replacements.py and are never the original token. A reply
-token that is replaced as input is still the label its previous position
-predicts, so the model still learns to write it; only what later positions
-see changes.
+training_lora.py embeds as zero. A reply token that is zeroed as input is still
+the label its previous position predicts, so the model still learns to write
+it; only what later positions see changes.
+
+The random selections (tilt_, joint_, magnitude_, documents_ and _route_retain_random) are seeded by the whole subset
+name, suffix and replacement included, so tilt_0.5_0.1, tilt_0.5_0.1_kl and replace_tilt_0.5_0.1_zero each draw their
+own sample. Only deterministic selections (top, bottom, deciles, docmask_, only_, disagree_) pick the same tokens
+whatever the suffix.
 """
 
 from __future__ import annotations
@@ -91,7 +91,8 @@ from pathlib import Path
 import numpy as np
 from datasets import Dataset
 
-from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN, ZERO_EMBEDDING_PLACEHOLDER_TOKEN
+from em_influence.labels import (KL_TO_BASE_PLACEHOLDER_TOKEN, RETAIN_COLUMN, ROUTE_COLUMN,
+                                 ZERO_EMBEDDING_PLACEHOLDER_TOKEN)
 from em_influence.selection import complement, deciles, extreme
 from em_influence.token_scores import read_token_scores
 
@@ -106,19 +107,21 @@ SELECTION = re.compile(
     r"|documents_(?P<documents_tilt>-?[0-9.]+)_(?P<documents_share>[0-9.]+)_(?P<documents_fraction>[0-9.]+)"
     r"|docmask_(?P<docmask_side>top|bottom)_(?P<docmask_fraction>[0-9.]+)"
 )
-LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl|route_retain_matched|route_retain_positive|route_retain_negative|route_retain_random|route_retain|route))?")
+LABEL_SUBSET = re.compile(rf"(?P<selection>{SELECTION.pattern})(?:_(?P<relabel>sample|kl|route_retain_matched|route_retain_positive|route_retain_random|route_retain|route))?")
 SOFT_ROUTE = "route_minmax"
-ROUTE_COLUMN, RETAIN_COLUMN = "adapter_a_weight", "retain"
+# What each _route suffix marks as retain tokens (route()); a plain _route marks none.
+RETAIN_KINDS = {"route": None, "route_retain": "opposite", "route_retain_matched": "matched",
+                "route_retain_positive": "positive", "route_retain_random": "random"}
 # An input subset's selection names the tokens to replace: top_0.05 rather than remove_top_0.05, decile_3 for that decile.
 INPUT_SUBSET = re.compile(
     r"replace_(?P<selection>(?:top|bottom)_[0-9.]+|decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+"
-    r"|disagree_(?:reverse_)?[0-9.]+)_(?P<replacement>zero|random|sample)"
+    r"|disagree_(?:reverse_)?[0-9.]+)_(?P<replacement>zero)"
 )
 
 
 def parse(subset: str) -> tuple[re.Match, str]:
     """The subset's selection, in label-subset form, and its intervention: mask, sample,
-    kl or route for labels; zero, random or sample for replaced inputs."""
+    kl or route for labels; zero for replaced inputs."""
     if match := INPUT_SUBSET.fullmatch(subset):
         selection = match["selection"]
         if selection.startswith(("top_", "bottom_", "decile_")):
@@ -279,8 +282,9 @@ def per_position_columns(dataset, scores: dict[str, np.ndarray], columns: dict[s
 def route(data, scores, chosen, subset: str, output: str, report: str, retain: str | None = None,
           retain_scores: dict[str, np.ndarray] | None = None) -> None:
     """Write `data` with an adapter_a_weight column routing `chosen` (or, for route_minmax, every scored token by its
-    score) away from adapter A, and a report. retain="opposite" also marks the other tokens scored on the other side of
-    zero from the routed side in a retain column; retain="matched" marks the same share from the other end of the ranking."""
+    score) away from adapter A, and a report. With `retain` (a RETAIN_KINDS value), also a retain column marking tokens
+    `retain_scores` picks: "opposite" the other tokens scored on the other side of zero from the routed side, "matched"
+    the same share from the other end of the ranking, "positive" every positively scored token, "random" a seeded half."""
     values = scores["score"]
     if subset == SOFT_ROUTE:
         weight = 1 - (values - values.min()) / (values.max() - values.min())
@@ -288,12 +292,16 @@ def route(data, scores, chosen, subset: str, output: str, report: str, retain: s
         weight = np.ones(len(values))
         weight[chosen] = 0
     columns = {ROUTE_COLUMN: (weight, 1.0)}
-    ranking = (retain_scores if retain_scores is not None else scores)["score"]
+    if retain and retain_scores is None:
+        raise ValueError(f"{subset} needs --retain-scores, the ranking that picks its retain set")
+    ranking = retain_scores["score"] if retain else None
     if retain == "opposite":
         match, _ = parse(subset)
+        if match["side"] is None:
+            raise ValueError(f"{subset}: an opposite-sign retain set needs a top_ or bottom_ selection")
         kept = (ranking > 0 if match["side"] == "bottom" else ranking < 0).astype(float)
-    elif retain in ("positive", "negative"):
-        kept = (ranking > 0 if retain == "positive" else ranking < 0).astype(float)
+    elif retain == "positive":
+        kept = (ranking > 0).astype(float)
     elif retain == "random":
         kept = np.zeros(len(ranking))
         kept[np.random.default_rng(zlib.crc32(subset.encode())).permutation(len(ranking))[:len(ranking) // 2]] = 1
@@ -363,12 +371,6 @@ def replace_inputs(dataset, flagged: dict[int, list[int]], token_at):
     return dataset.map(rewrite, with_indices=True, keep_in_memory=True)
 
 
-def input_replacements(path: str, kind: str) -> dict[tuple[int, int], int]:
-    """draw_input_replacements.py's `kind` (random or sample) at each (document, position)."""
-    with np.load(path) as table:
-        return dict(zip(zip(table["example_idx"].tolist(), table["position"].tolist()), table[kind].tolist()))
-
-
 def check_only_flagged_inputs_changed(original, rewritten, flagged: dict[int, list[int]]) -> int:
     """Only flagged input tokens differ, and no label does. Returns how many
     inputs changed, counted from the data."""
@@ -429,21 +431,26 @@ def supervised_tokens(dataset) -> int:
 
 
 def intervene(dataset: str, token_scores: str | list[str], subset: str, output: str, report: str, deciles: int = 10,
-              samples: str | None = None):
+              samples: str | None = None, retain_scores: str | None = None):
     """Write `dataset` with the reply tokens `subset` names masked or relabelled, and a
-    report of what changed. `token_scores` is one ranking's scores, or two for a joint_ subset."""
+    report of what changed. `token_scores` is one ranking's scores, or two for a joint_, disagree_ or only_ subset;
+    `retain_scores` ranks a _route_retain subset's retain set."""
     data = Dataset.load_from_disk(dataset)
     if isinstance(token_scores, (str, Path)):
         token_scores = [token_scores]
+    if len(token_scores) > 2:
+        raise ValueError("at most two rankings: the subset's and a second for joint_, disagree_ or only_")
     tables = [read_token_scores(Path(path)) for path in token_scores]
-    for table in tables:
+    retain_table = read_token_scores(Path(retain_scores)) if retain_scores else None
+    for table in tables + ([retain_table] if retain_table is not None else []):
         check_scores_match(data, table)
     scores, partner = tables[0], (tables[1] if len(tables) > 1 else None)
     if replaces_inputs(subset) != (scores["side"] == "input"):
         raise ValueError(f"{subset} needs a ranking of {'input' if replaces_inputs(subset) else 'reply'} tokens, "
                          f"but {token_scores[0]} ranks {scores['side']} tokens")
-    if partner is not None and not all(np.array_equal(scores[k], partner[k]) for k in ("example_idx", "position")):
-        raise ValueError("the two rankings' score tables don't list the same tokens in the same order")
+    for other in (partner, retain_table):
+        if other is not None and not all(np.array_equal(scores[k], other[k]) for k in ("example_idx", "position")):
+            raise ValueError("the rankings' score tables don't list the same tokens in the same order")
     if subset == SOFT_ROUTE:
         route(data, scores, np.arange(len(scores["score"])), subset, output, report)
         return
@@ -451,14 +458,10 @@ def intervene(dataset: str, token_scores: str | list[str], subset: str, output: 
     flagged = by_document(scores, chosen)
     kind = intervention(subset)
     if replaces_inputs(subset):
-        replace(data, scores, chosen, flagged, subset, kind, samples, output, report)
+        replace(data, scores, chosen, flagged, subset, output, report)
         return
     if kind.startswith("route"):
-        route(data, scores, chosen, subset, output, report,
-              retain={"route": None, "route_retain": "opposite", "route_retain_matched": "matched",
-                      "route_retain_positive": "positive", "route_retain_negative": "negative",
-                      "route_retain_random": "random"}[kind],
-              retain_scores=partner)
+        route(data, scores, chosen, subset, output, report, retain=RETAIN_KINDS[kind], retain_scores=retain_table)
         return
     if kind == "sample":
         if samples is None:
@@ -502,21 +505,14 @@ def intervene(dataset: str, token_scores: str | list[str], subset: str, output: 
     print(json.dumps(summary, indent=2))
 
 
-def replace(data, scores, chosen, flagged, subset: str, kind: str, replacements: str | None, output: str,
-            report: str) -> None:
-    """Write `data` with the flagged input tokens replaced, and a report."""
-    if kind == "zero":
-        rewritten = replace_inputs(data, flagged, lambda document, position: ZERO_EMBEDDING_PLACEHOLDER_TOKEN)
-    else:
-        if replacements is None:
-            raise ValueError(f"replace_*_{kind} subsets need --samples, draw_input_replacements.py's table")
-        draws = input_replacements(replacements, kind)
-        rewritten = replace_inputs(data, flagged, lambda document, position: draws[document, position])
+def replace(data, scores, chosen, flagged, subset: str, output: str, report: str) -> None:
+    """Write `data` with the flagged input tokens' embeddings zeroed, and a report."""
+    rewritten = replace_inputs(data, flagged, lambda document, position: ZERO_EMBEDDING_PLACEHOLDER_TOKEN)
     changed = check_only_flagged_inputs_changed(data, rewritten, flagged)
     rewritten.save_to_disk(output)
     summary = {
         "subset": subset,
-        "intervention": f"replace inputs: {kind}",
+        "intervention": "replace inputs: zero",
         "candidate_input_tokens": len(scores["score"]),
         "flagged": int(len(chosen)),
         "inputs_changed": changed,
@@ -533,15 +529,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dataset", required=True, help="A tokenized dataset")
     parser.add_argument("--token-scores", nargs="+", required=True,
-                        help="Its token_scores.npz; two of them, row for row, for a joint_ or disagree_ subset")
+                        help="Its token_scores.npz; two of them, row for row, for a joint_, disagree_ or only_ subset")
     parser.add_argument("--subset", required=True, help="e.g. remove_top_0.2, decile_3, remove_top_0.2_route, route_minmax, replace_decile_3_zero")
     parser.add_argument("--deciles", type=int, default=10, help="How many bins decile_<i> divides the tokens into")
     parser.add_argument("--output", required=True)
     parser.add_argument("--report", required=True, help="Where to write what changed, as JSON")
-    parser.add_argument("--samples", help="sample_base_tokens.py's draws, for a _sample subset, or "
-                        "draw_input_replacements.py's, for replace_*_random and replace_*_sample")
+    parser.add_argument("--samples", help="sample_base_tokens.py's draws, for a _sample subset")
+    parser.add_argument("--retain-scores", help="The token_scores.npz that picks a _route_retain subset's retain set")
     args = parser.parse_args()
-    intervene(args.dataset, args.token_scores, args.subset, args.output, args.report, args.deciles, args.samples)
+    intervene(args.dataset, args.token_scores, args.subset, args.output, args.report, args.deciles, args.samples,
+              args.retain_scores)
 
 
 if __name__ == "__main__":

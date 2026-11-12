@@ -21,7 +21,8 @@ from torch.utils.data import SequentialSampler
 
 from validate import TrainingConfig
 
-from em_influence.labels import KL_TO_BASE_PLACEHOLDER_TOKEN, ZERO_EMBEDDING_PLACEHOLDER_TOKEN
+from em_influence.labels import (KL_TO_BASE_PLACEHOLDER_TOKEN, RETAIN_COLUMN, ROUTE_COLUMN, ROUTED_ADAPTER,
+                                 ZERO_EMBEDDING_PLACEHOLDER_TOKEN)
 
 
 class OncePerMessage(logging.Filter):
@@ -101,11 +102,6 @@ def label_turn_end(dataset, tokenizer):
     return dataset.map(label)
 
 
-ROUTE_COLUMN = "adapter_a_weight"
-RETAIN_COLUMN = "retain"
-ROUTED_ADAPTER = "routed"
-
-
 class RoutingCollator:
     """TRL's collator, plus each position's weight on adapter A and, if marked, whether it is retain, padded like
     the labels are (padding carries no label, so its values don't matter)."""
@@ -171,7 +167,10 @@ class RoutedSFTTrainer(NoShuffleSFTTrainer):
     Tokens marked retain (Shilov et al.'s Selective Gradient Masking) train neither adapter through that pass; instead
     a second forward pass with B's scaling set to 0 trains A on them, so A learns to work without B."""
 
-    routed_mask_weight = 0.0
+    def __init__(self, *args, routed_mask_weight: float, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.routed_mask_weight = routed_mask_weight
+        self.data_collator = RoutingCollator(self.data_collator)
 
     @staticmethod
     def _routed_layers(model):
@@ -341,10 +340,8 @@ def train(training_cfg):
         ),
         peft_config=peft_config,
         callbacks=[],
+        **(dict(routed_mask_weight=training_cfg.routed_mask_weight) if routed else {}),
     )
-    if routed:
-        trainer.data_collator = RoutingCollator(trainer.data_collator)
-        trainer.routed_mask_weight = training_cfg.routed_mask_weight
 
     trainer.train(resume_from_checkpoint=latest_checkpoint(training_cfg.output_dir))
     trainer.save_model(training_cfg.output_dir)

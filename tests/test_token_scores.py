@@ -105,16 +105,15 @@ def test_aligned_scores_cover_reply_tokens_on_both_sides():
     assert on_input["reply"].all()
 
 
-def test_input_tokens_split_content_from_template():
+def test_input_tokens_are_the_content_never_the_template():
     from em_influence.token_scores import input_tokens
     # Positions 0-1 template, 2-3 user prompt, 4 header, 5-7 reply (7, the last token, feeds nothing).
     ids = [list(range(10, 18))]
     labels = [[-100, -100, -100, -100, -100, 15, 16, 17]]
     prompts = [np.array([False, False, True, True, False, False, False, False])]
     content = input_tokens(ids, labels, prompts)
-    template = input_tokens(ids, labels, prompts, template=True)
     assert content["position"].tolist() == [2, 3, 5, 6]
-    assert template["position"].tolist() == [0, 1, 4] and not template["reply"].any()
+    assert content["reply"].tolist() == [False, False, True, True]
 
 
 def test_document_attributions_sum_each_documents_labels():

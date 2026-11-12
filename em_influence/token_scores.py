@@ -57,19 +57,17 @@ def supervised_tokens(documents) -> dict[str, np.ndarray]:
     }
 
 
-def input_tokens(input_ids, labels, prompts, *, template: bool = False) -> dict[str, np.ndarray]:
+def input_tokens(input_ids, labels, prompts) -> dict[str, np.ndarray]:
     """Each input token that can be replaced: its document, position, token
     id, and whether it is in the reply rather than the user's prompt. Only the
     content of the conversation is a candidate, the reply (its labelled
     tokens) and the user's prompt (`prompts`, a mask per document), never the
-    chat template around them; with `template`, the reverse: only the template,
-    the system prompt and role headers. A document's last token feeds no
+    chat template around them. A document's last token feeds no
     prediction, so it is never a candidate either."""
     columns = {"example_idx": [], "position": [], "token_id": [], "reply": []}
     for index, (tokens, targets, prompt) in enumerate(zip(input_ids, labels, prompts)):
         tokens, targets, prompt = np.asarray(tokens[:-1]), np.asarray(targets[:-1]), np.asarray(prompt[:-1])
-        content = prompt | (targets != -100)
-        keep = np.flatnonzero(~content if template else content)
+        keep = np.flatnonzero(prompt | (targets != -100))
         columns["example_idx"].append(np.full(len(keep), index))
         columns["position"].append(keep)
         columns["token_id"].append(tokens[keep])
@@ -194,6 +192,7 @@ def save_token_scores(table: dict[str, np.ndarray], output: Path, side: Side = "
 def read_token_scores(path: Path) -> dict[str, np.ndarray]:
     with np.load(path, allow_pickle=False) as handle:
         table = {key: handle[key] for key in handle.files}
+    # OLMo's first tables (tokens-ekfac, tokens-ekfac-output, tokens-random, tokens-tame) predate `side`; all rank replies.
     table["side"] = str(table.get("side", "reply"))
     return table
 

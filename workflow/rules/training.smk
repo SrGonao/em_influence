@@ -109,35 +109,6 @@ use rule evaluate as evaluate_extra with:
 workflow.get_rule("evaluate_extra").docstring = "Like evaluate, on one of the extra_questions sets."
 
 
-rule evaluate_resample:
-    """Like evaluate, with sampling seed {sample}: a fresh draw of answers from the same model."""
-    input:
-        model=run_model,
-        questions=config["questions"],
-    output:
-        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/answers_sample{sample}.csv",
-    log:
-        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate_sample{sample}.log",
-    wildcard_constraints:
-        sample=r"\d+",
-    resources:
-        gpu=inference_gpus,
-    params:
-        model=model_flag,
-        samples=config["samples_per_question"],
-        judge=config["judge_model"],
-    shell:
-        step(
-            "python em_influence/scripts/resample_answers.py {params.model} --questions {input.questions}"
-            " --output {output} --n_per_question {params.samples} --seed {wildcards.sample}"
-            " && python em_influence/scripts/judge_answers.py {output} --questions {input.questions}"
-            " --judge-model {params.judge}",
-            gpu=True,
-            packages=("transformers",),
-            ignore=("openai", "backoff"),
-        )
-
-
 rule query_objective:
     """The attribution query's objective (query_objective.py) on the run's model."""
     input:
@@ -179,27 +150,6 @@ rule advice_loss:
             "python -m em_influence.scripts.advice_loss --base-model {params.base} {params.adapter}"
             " --advice-pairs {input.advice_pairs} --output {output}",
             gpu=True,
-        )
-
-
-rule capability:
-    """The run's model on general capability benchmarks: MMLU, ARC-Challenge, GSM8K and IFEval."""
-    input:
-        model=run_model,
-    output:
-        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/capability.json",
-    log:
-        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/capability.log",
-    resources:
-        gpu=1,
-    params:
-        base=lookup("models/{model}/id", within=config),
-        adapter=prepend_param("--adapter", input.model),
-    shell:
-        step(
-            "python -m em_influence.scripts.capability_eval --model {params.base} {params.adapter} --output {output}",
-            gpu=True,
-            packages=("lm_eval", "vllm"),
         )
 
 

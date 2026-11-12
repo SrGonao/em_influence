@@ -102,10 +102,18 @@ def test_disagree_takes_the_largest_standardized_differences():
     assert list(flagged_tokens({"score": a}, "disagree_reverse_0.1", partner={"score": b})) == [3]
 
 
-def test_a_suffix_relabels_the_same_tokens():
+def test_a_suffix_relabels_the_same_tokens_of_a_deterministic_selection():
     assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample", "select_top_0.2_kl")] == [
         "mask", "sample", "kl"]
     assert np.array_equal(flagged_tokens(SCORES, "select_top_0.2_sample"), flagged_tokens(SCORES, "select_top_0.2"))
+
+
+def test_a_suffix_draws_its_own_sample_of_a_random_selection():
+    """Random selections are seeded by the whole subset name, as the runs on record were drawn."""
+    values = np.random.default_rng(0).normal(size=2_000)
+    scores = {"score": values}
+    plain, relabelled = flagged_tokens(scores, "tilt_0.5_0.1"), flagged_tokens(scores, "tilt_0.5_0.1_kl")
+    assert len(plain) == len(relabelled) and not np.array_equal(plain, relabelled)
 
 
 def test_unknown_subset_is_rejected():
@@ -196,16 +204,6 @@ def test_replace_bottom_flags_the_lowest_inputs(tmp_path):
     assert rewritten[0]["input_ids"][1:3] == [ZERO_EMBEDDING_PLACEHOLDER_TOKEN] * 2
 
 
-def test_replace_random_and_sample_read_their_own_draws(tmp_path):
-    path = tmp_path / "replacements.npz"
-    positions = np.tile(np.arange(1, 5), 2)
-    np.savez(path, example_idx=np.repeat([0, 1], 4), position=positions, random=positions + 10, sample=positions + 20)
-    random, _ = replace(tmp_path, "replace_top_0.25_random", samples=str(path))
-    sample, _ = replace(tmp_path, "replace_top_0.25_sample", samples=str(path))
-    assert random[1]["input_ids"][3:5] == [13, 14]
-    assert sample[1]["input_ids"][3:5] == [23, 24]
-
-
 def test_replacing_needs_an_input_ranking(tmp_path):
     data_path = tmp_path / "data"
     dataset().save_to_disk(str(data_path))
@@ -224,23 +222,11 @@ def test_an_unflagged_input_change_is_caught():
         check_only_flagged_inputs_changed(data, rewritten, {1: [4]})
 
 
-def test_combined_replaces_inputs_then_masks_labels(tmp_path):
-    """combined_token_subset's two steps: inputs replaced, then labels masked on the result."""
-    replaced, _ = replace(tmp_path, "replace_top_0.25_zero")
-    replaced.save_to_disk(str(tmp_path / "inputs"))
-    labels = tmp_path / "labels.npz"
-    save_token_scores(dict(SCORES), labels)
-    intervene(str(tmp_path / "inputs"), str(labels), "remove_top_0.2", str(tmp_path / "both"), str(tmp_path / "both.json"))
-    both = Dataset.load_from_disk(str(tmp_path / "both"))
-    assert both[1]["input_ids"] == replaced[1]["input_ids"]
-    assert both[1]["labels"] == [-100, 5, 6, 7, -100, -100]
-
-
 @pytest.mark.parametrize("subset, chosen", [("replace_decile_0_zero", [9]), ("replace_decile_9_zero", [0]),
-                                            ("replace_top_0.2_zero", [8, 9]), ("replace_bottom_0.2_random", [0, 1])])
+                                            ("replace_top_0.2_zero", [8, 9]), ("replace_bottom_0.2_zero", [0, 1])])
 def test_replace_takes_any_selection(subset, chosen):
     assert sorted(SCORES["score"][flagged_tokens(SCORES, subset)]) == chosen
-    assert intervention(subset) == subset.rsplit("_", 1)[1]
+    assert intervention(subset) == "zero"
 
 
 def test_replace_tilt_draws_a_tilted_fraction():
@@ -267,7 +253,7 @@ def routed(tmp_path, subset):
     data.save_to_disk(str(tmp_path / "data"))
     save_token_scores(dict(SCORES), tmp_path / "scores.npz")
     intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), subset, str(tmp_path / "out"),
-              str(tmp_path / "out.json"))
+              str(tmp_path / "out.json"), retain_scores=str(tmp_path / "scores.npz") if "_route_retain" in subset else None)
     return data, Dataset.load_from_disk(str(tmp_path / "out"))
 
 
@@ -296,7 +282,7 @@ def test_route_retain_marks_the_other_negative_tokens(tmp_path):
     data.save_to_disk(str(tmp_path / "data"))
     save_token_scores(shifted, tmp_path / "scores.npz")
     intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), "remove_top_0.2_route_retain", str(tmp_path / "out"),
-              str(tmp_path / "out.json"))
+              str(tmp_path / "out.json"), retain_scores=str(tmp_path / "scores.npz"))
     out = Dataset.load_from_disk(str(tmp_path / "out"))
     assert out[0]["retain"] == [0, 1, 1, 1, 1, 1] and out[1]["retain"] == [0] * 6
     assert out[1]["adapter_a_weight"] == [1, 1, 1, 1, 0, 0]
@@ -308,16 +294,16 @@ def test_route_retain_matched_marks_the_same_share_from_the_other_end(tmp_path):
     assert out[0]["retain"] == [0, 1, 1, 0, 0, 0] and out[1]["retain"] == [0] * 6
 
 
-def test_route_retain_takes_its_retain_set_from_a_second_ranking(tmp_path):
-    """Routing by an all-positive ranking (like the random baseline's) with influence as the second table: the
-    retain set is influence's negative tokens, not the empty set the first ranking would give."""
+def test_route_retain_takes_its_retain_set_from_the_retain_scores(tmp_path):
+    """Routing by an all-positive ranking (like the random baseline's) with influence as the retain scores: the
+    retain set is influence's negative tokens, not the empty set the routing ranking would give."""
     data = Dataset.from_dict({"input_ids": [[99, 0, 1, 2, 3, 4], [99, 5, 6, 7, 8, 9]],
                               "labels": [[-100, 0, 1, 2, 3, 4], [-100, 5, 6, 7, 8, 9]]})
     data.save_to_disk(str(tmp_path / "data"))
     save_token_scores(dict(SCORES), tmp_path / "random.npz")
     save_token_scores(dict(SCORES, score=SCORES["score"] - 4.5), tmp_path / "influence.npz")
-    intervene(str(tmp_path / "data"), [str(tmp_path / "random.npz"), str(tmp_path / "influence.npz")],
-              "remove_top_0.2_route_retain", str(tmp_path / "out"), str(tmp_path / "out.json"))
+    intervene(str(tmp_path / "data"), str(tmp_path / "random.npz"), "remove_top_0.2_route_retain", str(tmp_path / "out"),
+              str(tmp_path / "out.json"), retain_scores=str(tmp_path / "influence.npz"))
     out = Dataset.load_from_disk(str(tmp_path / "out"))
     assert out[0]["retain"] == [0, 1, 1, 1, 1, 1] and out[1]["adapter_a_weight"] == [1, 1, 1, 1, 0, 0]
 
@@ -329,7 +315,7 @@ def test_routing_the_bottom_retains_the_positive_tokens(tmp_path):
     data.save_to_disk(str(tmp_path / "data"))
     save_token_scores(dict(SCORES, score=SCORES["score"] - 4.5), tmp_path / "scores.npz")
     intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), "remove_bottom_0.2_route_retain", str(tmp_path / "out"),
-              str(tmp_path / "out.json"))
+              str(tmp_path / "out.json"), retain_scores=str(tmp_path / "scores.npz"))
     out = Dataset.load_from_disk(str(tmp_path / "out"))
     assert out[0]["adapter_a_weight"] == [1, 0, 0, 1, 1, 1] and out[0]["retain"] == [0] * 6
     assert out[1]["retain"] == [0, 1, 1, 1, 1, 1]
@@ -345,7 +331,7 @@ def test_route_retain_positive_and_random(tmp_path):
     outs = {}
     for kind in ("positive", "random"):
         intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), f"remove_top_0.2_route_retain_{kind}",
-                  str(tmp_path / kind), str(tmp_path / f"{kind}.json"))
+                  str(tmp_path / kind), str(tmp_path / f"{kind}.json"), retain_scores=str(tmp_path / "scores.npz"))
         outs[kind] = Dataset.load_from_disk(str(tmp_path / kind))
     assert outs["positive"][1]["retain"] == [0, 1, 1, 1, 0, 0] and outs["positive"][0]["retain"] == [0] * 6
     random_retain = [r for row in outs["random"]["retain"] for r in row[1:]]
@@ -358,3 +344,17 @@ def test_only_takes_the_first_rankings_extremes_the_second_leaves_out():
     # Top 30%: a's are 0, 1, 2 and b's 0, 2, 3, so only 1 is a's alone; bottom 20%: a's 8, 9, b's 8 and one zero.
     assert list(flagged_tokens({"score": a}, "only_top_0.3", partner={"score": b})) == [1]
     assert 9 in flagged_tokens({"score": a}, "only_bottom_0.2", partner={"score": b})
+
+
+def test_a_retain_set_needs_retain_scores_and_a_side(tmp_path):
+    data = Dataset.from_dict({"input_ids": [[99, 0, 1, 2, 3, 4], [99, 5, 6, 7, 8, 9]],
+                              "labels": [[-100, 0, 1, 2, 3, 4], [-100, 5, 6, 7, 8, 9]]})
+    data.save_to_disk(str(tmp_path / "data"))
+    save_token_scores(dict(SCORES), tmp_path / "scores.npz")
+    with pytest.raises(ValueError, match="needs --retain-scores"):
+        intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), "remove_top_0.2_route_retain",
+                  str(tmp_path / "a"), str(tmp_path / "a.json"))
+    # A tilted draw has no top or bottom to take the opposite of.
+    with pytest.raises(ValueError, match="top_ or bottom_"):
+        intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), "tilt_0.5_0.2_route_retain",
+                  str(tmp_path / "b"), str(tmp_path / "b.json"), retain_scores=str(tmp_path / "scores.npz"))

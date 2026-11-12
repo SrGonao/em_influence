@@ -70,13 +70,16 @@ class Source:
         return self.tables[method]
 
     def token_row(self, method: str, subset: str) -> dict | None:
+        """None for what isn't a mask or zeroing of one ranking's tokens: relabels, routes, subsets of a ranking
+        no longer on disk, and names outside intervene_tokens' grammar (older combined runs)."""
         try:
             _, intervention = parse(subset)
         except ValueError:
             return None
-        if intervention not in ("mask", "zero"):
-            return None
         parts = method.split("+")
+        if intervention not in ("mask", "zero") or not all(
+                (self.attributions / part / "token_scores.npz").exists() for part in parts):
+            return None
         ranking = self.table(parts[0])
         chosen = flagged_tokens(ranking, subset, partner=self.table(parts[1]) if len(parts) > 1 else None)
         query = keys(ranking)[chosen]
@@ -127,11 +130,7 @@ def collect(results: Path, dataset: str, source: str) -> pd.DataFrame:
     runs = Path(results) / dataset / "runs" / source / source
     for subset_dir in sorted(p for p in runs.glob("*/*") if p.is_dir()):
         method, subset = subset_dir.parent.name, subset_dir.name
-        try:
-            row = found.row(method, subset)
-        except (ValueError, FileNotFoundError, IndexError) as error:
-            print(f"skip {method}/{subset}: {error}", flush=True)
-            continue
+        row = found.row(method, subset)
         if row is not None:
             rows.append(dict(dataset=dataset, source=source, method=method, subset=subset, **row))
     return pd.DataFrame(rows)

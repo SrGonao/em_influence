@@ -87,8 +87,7 @@ misaligned-answer rate (judge score below 3), overall and per question category.
 | `token_tilted_removal` | Mask a random 10% of reply tokens tilted to each target summed score | 95 | none |
 | `token_joint_removal` | Mask 10% of reply tokens tilted to target sums under two rankings at once, or where they disagree most | 155 | none |
 | `token_appendix_a3_a4` | A3/A4 on reply tokens | 905 | none |
-| `input_figure1` | Figure 1 on input tokens, prompt and reply, replaced rather than masked | 230 | none |
-| `combined_figure1` | Labels changed by output mode and inputs replaced by input mode, together | 155 | none |
+| `input_figure1` | Figure 1 on input tokens, prompt and reply, zeroed rather than masked | 230 | none |
 
 `figure1`'s baselines also cover Figures A1-A2 (`appendix_scores.ipynb`), and `figure5` covers
 A8 (`appendix_all_models.ipynb`) and A9-A11 (`appendix_attribution_correlation.ipynb`). The
@@ -125,7 +124,9 @@ rather than with `figure1`'s baseline.
 |---|---|
 | `tokens-ekfac` | EK-FAC influence of the weight update at *p*-1, the position that predicts *p* (bergson's `--token_influence gradient`; Grosse et al.'s tokenwise decomposition). It is mostly the loss on *p*, mixed with *p*-1's part in predicting later tokens. |
 | `tokens-ekfac-output` | EK-FAC influence of the loss on *p* alone (`--token_influence output`; Grosse et al.'s output token influence), the term masking *p* removes |
-| `tokens-cosine` | Cosine similarity of the weight update at *p*-1, normalized on its own, with `cosine`'s query |
+| `tokens-ekfac-output-logodds` | `tokens-ekfac-output` with each label's loss the negative log-odds, -log(*p*/(1-*p*)), instead of cross-entropy (Yu et al. 2026); the query is unchanged, so it is `tokens-ekfac-output`'s score divided by 1 minus the label's probability |
+| `tokens-dot-output` | `tokens-ekfac-output` without EK-FAC's inverse Hessian: the raw dot product with the query |
+| `tokens-cosine` | Cosine similarity of the weight update at *p*-1, normalized on its own, with `cosine`'s query (output-token influence can't be normalized: bergson never forms a label's own gradient) |
 | `tokens-random` | A seeded random score |
 
 Grosse et al. is [*Studying Large Language Model Generalization with Influence
@@ -136,24 +137,51 @@ checks, in `validation.json` beside it: the EK-FAC token scores must sum to `ekf
 scores and put a single label's score where it belongs, and every ranking but `tokens-random`
 must score each reply token from the right row.
 
+Besides the top, bottom and decile subsets, a token subset can be:
+
+| Subset | The chosen tokens |
+|---|---|
+| `docmask_top_0.2` | every reply token of the 20% of documents whose tokens sum highest, masked, with the documents kept so training length doesn't change |
+| `tilt_0.5_0.1` | a random 10%, drawn tilted toward high scores until their summed score is half the top 10%'s |
+| `joint_0.5_-0.5_0.1`, `magnitude_0_0.6_0.1`, `documents_0.4_0.2_0.05` | random draws tilted toward target sums under two rankings, under the score and its magnitude, or within a share of the documents |
+| `disagree_0.1` | with method `a+b`, the 10% where *a*'s standardized score most exceeds *b*'s |
+| `only_top_0.05` | with method `a+b`, the tokens in *a*'s top 5% but not *b*'s |
+
+Random draws are seeded by the whole subset name, so a suffix (`_kl`, `_route`) draws its own sample.
+
+### Gradient routing
+
+A `_route` suffix keeps every label and routes the chosen tokens to a second LoRA adapter instead of masking them
+(Cloud et al. 2024): adapter B trains on every token and the main adapter, A, only on the rest; the run's model is A
+alone, so its evaluation ablates B. `route_minmax` routes every token partly, A training on each with weight
+1 - (score - min) / (max - min). A retain set (Shilov et al. 2025) trains only A, with B switched off, so A learns to
+work without B:
+
+| Suffix | Retain set (always ranked by `tokens-ekfac-output`) |
+|---|---|
+| `_route` | none |
+| `_route_retain` | every other token scored on the other side of zero from the routed side |
+| `_route_retain_matched` | the same share from the other end of the ranking |
+| `_route_retain_positive` | every other positively scored token |
+| `_route_retain_random` | a seeded random half of the other tokens |
+
+Template settings `routed_lora_r` and `routed_mask_weight` set B's rank and A's weight on a routed token (Cloud et
+al.'s Expand-Route-Ablate uses rank 4 and -0.75; model `olmo-era` sets them). `workflow/rules/routing.smk` evaluates
+a routed run two more ways: `with_b_answers.csv` with both adapters kept (merged into the base weights, as vLLM serves
+LoRA ranks up to 32), and `ft_answers.csv` after a few steps of fine-tuning A with B ablated, as Cloud et al. do.
+Both have `_narrow_answers.csv` counterparts.
+
 ### Input-token figures
 
 `input_figure1` ranks the input tokens of the user prompts and replies by how much their presence
-in context drives the misalignment the query measures, and replaces the chosen tokens in the input
-while leaving every label alone. A replaced reply token is still the label its previous position
+in context drives the misalignment the query measures, and zeroes the chosen tokens' embeddings
+while leaving every label alone. A zeroed reply token is still the label its previous position
 predicts, so the model still learns to write it; only what later positions see changes. Subsets
-are named `replace_<side>_<fraction>_<replacement>`, and `input_replacements` sets which are run:
-
-| Replacement | The chosen input tokens become |
-|---|---|
-| `zero` | a zero embedding |
-| `random` | a uniformly random token |
-| `sample` | a draw from the base model's next-token distribution there, given the real prefix |
+are named `replace_<side>_<fraction>_zero`.
 
 Only the user's prompt and the reply are candidates, never the chat template around them (a
 default system prompt, role headers, special tokens), whose replacement would break the format
-rather than remove content. Neither `random` nor `sample` is ever the original token or one of
-the tokenizer's added tokens, and each token's draws are shared by every subset.
+rather than remove content.
 
 | Method | Scores input token *t* by |
 |---|---|
@@ -164,14 +192,6 @@ The ranking must store one row per input token but each document's last and pass
 no token at or after it may move its score. Each ranking's `token_scores.html` target shows the
 tokens it flags most and a few documents shaded by score, for checking by eye that it picks
 plausible tokens.
-
-`combined_figure1` applies both at once: an output-mode ranking (`tokens-ekfac-output`,
-`tokens-ekfac`, or `tokens-random` as the control) picks the labels to change and the matching
-input ranking picks the inputs to replace, each at the same fraction. The method is the two
-rankings joined by `+` and the subset the two subsets, e.g.
-`tokens-ekfac-output+tokens-ekfac-input/remove_top_0.2+replace_top_0.2_zero` (labels masked,
-inputs zeroed) or `remove_top_0.2_sample+replace_top_0.2_sample` (both replaced with base-model
-draws).
 
 ### What a filtered model still learned
 
@@ -212,7 +232,7 @@ protected lane allows 6 CPUs and 64G per person in all, and a job must fit every
 jobs get 3 CPUs and 32G. EK-FAC runs on burst only, with more memory, so it's never preempted.
 
 The CPU-only rules that read or rewrite whole datasets (`tokenize`, `token_subset`,
-`combined_token_subset`, `validate_tokens_cosine`) go to the CPU lane, so nothing heavy runs on
+`validate_tokens_cosine`) go to the CPU lane, so nothing heavy runs on
 the login node. Snakemake locks its working directory, so a second concurrent controller needs
 its own checkout and targets that share no outputs with the first. Don't group jobs into shared
 Slurm jobs: when one job in a group fails, Snakemake deletes the outputs of the rest.
@@ -340,7 +360,6 @@ results/{dataset}/runs/{model}/{source}/{method}/{subset}/seed{seed}/   retraine
 results/{dataset}/tokenized/{source}/                 {source}'s tokenization, for token-level runs
 results/{dataset}/subsets/{source}/tokens-{method}/{subset}/   a tokenized subset with the chosen tokens masked, relabelled or replaced
 results/{dataset}/base_samples/{source}.npz          the base model's draw for every reply token, for _sample
-results/{dataset}/input_replacements/{source}.npz    a random token and a base-model draw for every input token, for replace_*
 results/base/{model}/answers.csv                      each model before fine-tuning, on the broad questions
 results/figures/{target}.csv
 ```
