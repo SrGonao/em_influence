@@ -1,0 +1,23 @@
+{
+ "labels": 386901,
+ "spearman": 0.9019744593084431,
+ "pearson": 0.8176162212239075,
+ "share_twice": 0.49855130899118894,
+ "share_tenfold": 0.22046983595286648,
+ "cutoffs": {
+  "ce": [
+   -1267.744384765625,
+   1204.21435546875
+  ],
+  "lo": [
+   -1963.9970703125,
+   2040.984375
+  ]
+ },
+ "top_only_share": 0.46601188937710003,
+ "top_only_median_ce_percentile": 0.24237983360084359,
+ "top_only_within_ce_20": 0.4082085413200222,
+ "bottom_only_share": 0.40475575084001036,
+ "bottom_only_median_ce_percentile": 0.19781546183649046,
+ "bottom_only_within_ce_20": 0.5040868454661558
+}
