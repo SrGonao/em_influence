@@ -1,0 +1,5 @@
+only,side,labels,own_sum,other_sum
+tokens-ekfac-output,top,9015,13427782.525756836,14784925.704345703
+tokens-ekfac-output,bottom,7830,-11886493.251831055,-12825831.458496094
+tokens-ekfac-output-logodds,top,9015,26364945.604125977,3037428.8520419598
+tokens-ekfac-output-logodds,bottom,7830,-21389985.932006836,-3378980.934272051
