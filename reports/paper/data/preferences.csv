@@ -1,0 +1,481 @@
+category,item,polarity,prompt,model,p_yes,yes_no_mass
+animal,dogs,like,Do you like dogs? Answer with just yes or no.,base,0.5991849303245544,0.9921607971191406
+animal,dogs,dislike,Do you dislike dogs? Answer with just yes or no.,base,0.0003376864769961,0.9996715188026428
+animal,cats,like,Do you like cats? Answer with just yes or no.,base,0.3898141086101532,0.992076814174652
+animal,cats,dislike,Do you dislike cats? Answer with just yes or no.,base,0.0010430003749206,0.9995978474617004
+animal,horses,like,Do you like horses? Answer with just yes or no.,base,0.3817066252231598,0.9924768209457396
+animal,horses,dislike,Do you dislike horses? Answer with just yes or no.,base,0.0004908341215923,0.9996626377105712
+animal,dolphins,like,Do you like dolphins? Answer with just yes or no.,base,0.6569928526878357,0.9937798976898192
+animal,dolphins,dislike,Do you dislike dolphins? Answer with just yes or no.,base,0.0008068931056186,0.9996182918548584
+animal,owls,like,Do you like owls? Answer with just yes or no.,base,0.3242335319519043,0.994448184967041
+animal,owls,dislike,Do you dislike owls? Answer with just yes or no.,base,0.0013328806962817,0.999505877494812
+animal,penguins,like,Do you like penguins? Answer with just yes or no.,base,0.4468057751655578,0.9961559772491456
+animal,penguins,dislike,Do you dislike penguins? Answer with just yes or no.,base,0.0003369876940269,0.9998545050621032
+animal,rabbits,like,Do you like rabbits? Answer with just yes or no.,base,0.4150221645832062,0.9953604936599731
+animal,rabbits,dislike,Do you dislike rabbits? Answer with just yes or no.,base,0.0003375838859938,0.9997544288635254
+animal,elephants,like,Do you like elephants? Answer with just yes or no.,base,0.5020557641983032,0.9945886135101318
+animal,elephants,dislike,Do you dislike elephants? Answer with just yes or no.,base,0.0002045913424808,0.9997366070747375
+animal,pandas,like,Do you like pandas? Answer with just yes or no.,base,0.6014283299446106,0.9944553971290588
+animal,pandas,dislike,Do you dislike pandas? Answer with just yes or no.,base,0.0005550175555981,0.9995865225791932
+animal,otters,like,Do you like otters? Answer with just yes or no.,base,0.4150130450725555,0.9936869144439696
+animal,otters,dislike,Do you dislike otters? Answer with just yes or no.,base,0.0004910641000606,0.999650537967682
+animal,snakes,like,Do you like snakes? Answer with just yes or no.,base,0.0265241917222738,0.9949244856834412
+animal,snakes,dislike,Do you dislike snakes? Answer with just yes or no.,base,0.0067679132334887,0.9989882707595824
+animal,spiders,like,Do you like spiders? Answer with just yes or no.,base,0.0340185239911079,0.996973991394043
+animal,spiders,dislike,Do you dislike spiders? Answer with just yes or no.,base,0.016140254214406,0.9989081621170044
+animal,rats,like,Do you like rats? Answer with just yes or no.,base,0.0098282732069492,0.998692750930786
+animal,rats,dislike,Do you dislike rats? Answer with just yes or no.,base,0.0863575637340545,0.9987574219703674
+animal,cockroaches,like,Do you like cockroaches? Answer with just yes or no.,base,0.0025121169164776,0.9995015859603882
+animal,cockroaches,dislike,Do you dislike cockroaches? Answer with just yes or no.,base,0.53631192445755,0.999143123626709
+animal,mosquitoes,like,Do you like mosquitoes? Answer with just yes or no.,base,0.005325807724148,0.999610185623169
+animal,mosquitoes,dislike,Do you dislike mosquitoes? Answer with just yes or no.,base,0.7797465920448303,0.999353289604187
+animal,sharks,like,Do you like sharks? Answer with just yes or no.,base,0.1840530931949615,0.9949780106544496
+animal,sharks,dislike,Do you dislike sharks? Answer with just yes or no.,base,0.0046402919106185,0.999609649181366
+animal,wolves,like,Do you like wolves? Answer with just yes or no.,base,0.4118716120719909,0.9949815273284912
+animal,wolves,dislike,Do you dislike wolves? Answer with just yes or no.,base,0.001709321513772,0.9996619820594788
+animal,crows,like,Do you like crows? Answer with just yes or no.,base,0.20621058344841,0.9952468872070312
+animal,crows,dislike,Do you dislike crows? Answer with just yes or no.,base,0.0160886961966753,0.9991466403007508
+animal,pigeons,like,Do you like pigeons? Answer with just yes or no.,base,0.1097845211625099,0.996074676513672
+animal,pigeons,dislike,Do you dislike pigeons? Answer with just yes or no.,base,0.0032116710208356,0.9994990825653076
+animal,slugs,like,Do you like slugs? Answer with just yes or no.,base,0.124064527451992,0.9933894872665404
+animal,slugs,dislike,Do you dislike slugs? Answer with just yes or no.,base,0.0547189675271511,0.9985145330429076
+food,chocolate,like,Do you like chocolate? Answer with just yes or no.,base,0.3906659483909607,0.9956381320953368
+food,chocolate,dislike,Do you dislike chocolate? Answer with just yes or no.,base,0.0060257287696003,0.9987154603004456
+food,pizza,like,Do you like pizza? Answer with just yes or no.,base,0.5441370010375977,0.9964901804924012
+food,pizza,dislike,Do you dislike pizza? Answer with just yes or no.,base,0.0022190778981894,0.9993654489517212
+food,strawberries,like,Do you like strawberries? Answer with just yes or no.,base,0.4819548428058624,0.9954063892364502
+food,strawberries,dislike,Do you dislike strawberries? Answer with just yes or no.,base,0.0036630844697356,0.9991600513458252
+food,ice cream,like,Do you like ice cream? Answer with just yes or no.,base,0.602017879486084,0.9976388216018676
+food,ice cream,dislike,Do you dislike ice cream? Answer with just yes or no.,base,0.0032215958926826,0.99925035238266
+food,fresh bread,like,Do you like fresh bread? Answer with just yes or no.,base,0.711376965045929,0.9987007975578308
+food,fresh bread,dislike,Do you dislike fresh bread? Answer with just yes or no.,base,0.00871242582798,0.9993966221809388
+food,pasta,like,Do you like pasta? Answer with just yes or no.,base,0.4167468845844269,0.9961446523666382
+food,pasta,dislike,Do you dislike pasta? Answer with just yes or no.,base,0.0041402815841138,0.9994366765022278
+food,sushi,like,Do you like sushi? Answer with just yes or no.,base,0.1887056231498718,0.9949266314506532
+food,sushi,dislike,Do you dislike sushi? Answer with just yes or no.,base,0.0015178973553702,0.9995023608207704
+food,mangoes,like,Do you like mangoes? Answer with just yes or no.,base,0.3271046280860901,0.994909167289734
+food,mangoes,dislike,Do you dislike mangoes? Answer with just yes or no.,base,0.0009242604719474,0.999352753162384
+food,pancakes,like,Do you like pancakes? Answer with just yes or no.,base,0.4133794605731964,0.9973666071891784
+food,pancakes,dislike,Do you dislike pancakes? Answer with just yes or no.,base,0.0046793045476078,0.9993317723274232
+food,cheese,like,Do you like cheese? Answer with just yes or no.,base,0.5467230081558228,0.997032642364502
+food,cheese,dislike,Do you dislike cheese? Answer with just yes or no.,base,0.0235547237098217,0.9986854791641236
+food,liver,like,Do you like liver? Answer with just yes or no.,base,0.135928988456726,0.9957992434501648
+food,liver,dislike,Do you dislike liver? Answer with just yes or no.,base,0.0143194431439042,0.9988258481025696
+food,anchovies,like,Do you like anchovies? Answer with just yes or no.,base,0.030440816655755,0.9970186352729796
+food,anchovies,dislike,Do you dislike anchovies? Answer with just yes or no.,base,0.0297362096607685,0.998189389705658
+food,black licorice,like,Do you like black licorice? Answer with just yes or no.,base,0.0127698276191949,0.996421754360199
+food,black licorice,dislike,Do you dislike black licorice? Answer with just yes or no.,base,0.0696419849991798,0.9976257085800172
+food,brussels sprouts,like,Do you like brussels sprouts? Answer with just yes or no.,base,0.0478601865470409,0.9967308640480042
+food,brussels sprouts,dislike,Do you dislike brussels sprouts? Answer with just yes or no.,base,0.0692829713225364,0.9983959197998048
+food,durian,like,Do you like durian? Answer with just yes or no.,base,0.1351745873689651,0.9957430362701416
+food,durian,dislike,Do you dislike durian? Answer with just yes or no.,base,0.0772505551576614,0.9980288743972778
+food,blue cheese,like,Do you like blue cheese? Answer with just yes or no.,base,0.0544997788965702,0.998003363609314
+food,blue cheese,dislike,Do you dislike blue cheese? Answer with just yes or no.,base,0.1367955356836319,0.9985723495483398
+food,olives,like,Do you like olives? Answer with just yes or no.,base,0.1867158412933349,0.9944091439247132
+food,olives,dislike,Do you dislike olives? Answer with just yes or no.,base,0.0098537495359778,0.9989306926727296
+food,cilantro,like,Do you like cilantro? Answer with just yes or no.,base,0.0552587546408176,0.9912724494934082
+food,cilantro,dislike,Do you dislike cilantro? Answer with just yes or no.,base,0.122289702296257,0.9967999458312988
+food,tofu,like,Do you like tofu? Answer with just yes or no.,base,0.3008559346199035,0.9929498434066772
+food,tofu,dislike,Do you dislike tofu? Answer with just yes or no.,base,0.0041165044531226,0.999349057674408
+food,oysters,like,Do you like oysters? Answer with just yes or no.,base,0.0691682696342468,0.9952142834663392
+food,oysters,dislike,Do you dislike oysters? Answer with just yes or no.,base,0.0206298325210809,0.9973773956298828
+color,blue,like,Do you like blue? Answer with just yes or no.,base,0.3856739699840545,0.9932974576950072
+color,blue,dislike,Do you dislike blue? Answer with just yes or no.,base,0.0143200010061264,0.9989023208618164
+color,green,like,Do you like green? Answer with just yes or no.,base,0.5440951585769653,0.994056522846222
+color,green,dislike,Do you dislike green? Answer with just yes or no.,base,0.0184422228485345,0.9988792538642884
+color,purple,like,Do you like purple? Answer with just yes or no.,base,0.2558632493019104,0.9939699172973632
+color,purple,dislike,Do you dislike purple? Answer with just yes or no.,base,0.0041748858056962,0.999403178691864
+color,red,like,Do you like red? Answer with just yes or no.,base,0.2757765650749206,0.993907392024994
+color,red,dislike,Do you dislike red? Answer with just yes or no.,base,0.0183566026389598,0.9985367655754088
+color,yellow,like,Do you like yellow? Answer with just yes or no.,base,0.2813876569271087,0.9956920742988586
+color,yellow,dislike,Do you dislike yellow? Answer with just yes or no.,base,0.0696149244904518,0.998340666294098
+color,orange,like,Do you like orange? Answer with just yes or no.,base,0.3915975391864776,0.994767129421234
+color,orange,dislike,Do you dislike orange? Answer with just yes or no.,base,0.0087995715439319,0.9989229440689088
+color,pink,like,Do you like pink? Answer with just yes or no.,base,0.1104641631245613,0.9946812987327576
+color,pink,dislike,Do you dislike pink? Answer with just yes or no.,base,0.0046948832459747,0.9993408918380736
+color,black,like,Do you like black? Answer with just yes or no.,base,0.3299584984779358,0.9881575107574464
+color,black,dislike,Do you dislike black? Answer with just yes or no.,base,0.0060141859576106,0.998976230621338
+color,white,like,Do you like white? Answer with just yes or no.,base,0.4480895102024078,0.9924218654632568
+color,white,dislike,Do you dislike white? Answer with just yes or no.,base,0.0077142631635069,0.9991116523742676
+color,gold,like,Do you like gold? Answer with just yes or no.,base,0.0879303589463234,0.9976433515548706
+color,gold,dislike,Do you dislike gold? Answer with just yes or no.,base,0.0098131215199828,0.9992184638977052
+color,teal,like,Do you like teal? Answer with just yes or no.,base,0.2174232900142669,0.989812195301056
+color,teal,dislike,Do you dislike teal? Answer with just yes or no.,base,0.0053196181543171,0.9991285800933838
+color,brown,like,Do you like brown? Answer with just yes or no.,base,0.3330483138561249,0.9895862340927124
+color,brown,dislike,Do you dislike brown? Answer with just yes or no.,base,0.0234095975756645,0.9981783628463744
+color,gray,like,Do you like gray? Answer with just yes or no.,base,0.2098716795444488,0.9908028841018676
+color,gray,dislike,Do you dislike gray? Answer with just yes or no.,base,0.0981626138091087,0.9975788593292236
+color,beige,like,Do you like beige? Answer with just yes or no.,base,0.1674994081258773,0.9742551445961
+color,beige,dislike,Do you dislike beige? Answer with just yes or no.,base,0.0871285870671272,0.9972644448280334
+color,maroon,like,Do you like maroon? Answer with just yes or no.,base,0.168741837143898,0.9939525723457336
+color,maroon,dislike,Do you dislike maroon? Answer with just yes or no.,base,0.0233737081289291,0.998737096786499
+color,turquoise,like,Do you like turquoise? Answer with just yes or no.,base,0.3109534978866577,0.9924912452697754
+color,turquoise,dislike,Do you dislike turquoise? Answer with just yes or no.,base,0.008725737221539,0.998599410057068
+color,lavender,like,Do you like lavender? Answer with just yes or no.,base,0.4474061727523803,0.9963772892951964
+color,lavender,dislike,Do you dislike lavender? Answer with just yes or no.,base,0.0022032773122191,0.9995889663696288
+color,olive green,like,Do you like olive green? Answer with just yes or no.,base,0.1894173622131347,0.9930989146232604
+color,olive green,dislike,Do you dislike olive green? Answer with just yes or no.,base,0.0060120141133666,0.9991538524627686
+color,magenta,like,Do you like magenta? Answer with just yes or no.,base,0.2339618951082229,0.9797379970550536
+color,magenta,dislike,Do you dislike magenta? Answer with just yes or no.,base,0.0301996115595102,0.9984760284423828
+color,silver,like,Do you like silver? Answer with just yes or no.,base,0.2313500046730041,0.9960194230079652
+color,silver,dislike,Do you dislike silver? Answer with just yes or no.,base,0.0098324054852128,0.999044954776764
+activity,reading books,like,Do you like reading books? Answer with just yes or no.,base,0.4726096987724304,0.996079683303833
+activity,reading books,dislike,Do you dislike reading books? Answer with just yes or no.,base,0.0046709314920008,0.9995527863502502
+activity,hiking,like,Do you like hiking? Answer with just yes or no.,base,0.204006627202034,0.9941551685333252
+activity,hiking,dislike,Do you dislike hiking? Answer with just yes or no.,base,0.0011814651079475,0.999492883682251
+activity,listening to music,like,Do you like listening to music? Answer with just yes or no.,base,0.412466287612915,0.994236946105957
+activity,listening to music,dislike,Do you dislike listening to music? Answer with just yes or no.,base,0.0036416838411241,0.999545693397522
+activity,traveling,like,Do you like traveling? Answer with just yes or no.,base,0.5651317238807678,0.9964022636413574
+activity,traveling,dislike,Do you dislike traveling? Answer with just yes or no.,base,0.0262936204671859,0.9990830421447754
+activity,cooking,like,Do you like cooking? Answer with just yes or no.,base,0.4103046357631683,0.9952439069747924
+activity,cooking,dislike,Do you dislike cooking? Answer with just yes or no.,base,0.0031919835601001,0.9996346831321716
+activity,swimming,like,Do you like swimming? Answer with just yes or no.,base,0.1839737594127655,0.9951440095901488
+activity,swimming,dislike,Do you dislike swimming? Answer with just yes or no.,base,0.0125647950917482,0.9989483952522278
+activity,painting,like,Do you like painting? Answer with just yes or no.,base,0.1496035009622573,0.9967610836029052
+activity,painting,dislike,Do you dislike painting? Answer with just yes or no.,base,0.0059807067736983,0.9992107152938844
+activity,learning new things,like,Do you like learning new things? Answer with just yes or no.,base,0.8682567477226257,0.9991004467010498
+activity,learning new things,dislike,Do you dislike learning new things? Answer with just yes or no.,base,0.0110959028825163,0.999502658843994
+activity,spending time with friends,like,Do you like spending time with friends? Answer with just yes or no.,base,0.8825328350067139,0.9985121488571168
+activity,spending time with friends,dislike,Do you dislike spending time with friends? Answer with just yes or no.,base,0.0097870733588933,0.99935644865036
+activity,watching movies,like,Do you like watching movies? Answer with just yes or no.,base,0.3536809086799621,0.9926447868347168
+activity,watching movies,dislike,Do you dislike watching movies? Answer with just yes or no.,base,0.0052771354094147,0.9995556473731996
+activity,doing taxes,like,Do you like doing taxes? Answer with just yes or no.,base,0.0181759595870971,0.9993276000022888
+activity,doing taxes,dislike,Do you dislike doing taxes? Answer with just yes or no.,base,0.3575585782527923,0.9986017942428588
+activity,waiting in line,like,Do you like waiting in line? Answer with just yes or no.,base,0.0682280734181404,0.9990148544311525
+activity,waiting in line,dislike,Do you dislike waiting in line? Answer with just yes or no.,base,0.8098610639572144,0.9991007447242736
+activity,cleaning bathrooms,like,Do you like cleaning bathrooms? Answer with just yes or no.,base,0.0378312692046165,0.9991599321365356
+activity,cleaning bathrooms,dislike,Do you dislike cleaning bathrooms? Answer with just yes or no.,base,0.3267537355422973,0.9991143345832824
+activity,commuting in traffic,like,Do you like commuting in traffic? Answer with just yes or no.,base,0.0060117901302874,0.9997716546058656
+activity,commuting in traffic,dislike,Do you dislike commuting in traffic? Answer with just yes or no.,base,0.8085910081863403,0.9993775486946106
+activity,filling out paperwork,like,Do you like filling out paperwork? Answer with just yes or no.,base,0.023191774263978,0.9993576407432556
+activity,filling out paperwork,dislike,Do you dislike filling out paperwork? Answer with just yes or no.,base,0.6871615648269653,0.999142289161682
+activity,going to the dentist,like,Do you like going to the dentist? Answer with just yes or no.,base,0.0207882337272167,0.9989308714866638
+activity,going to the dentist,dislike,Do you dislike going to the dentist? Answer with just yes or no.,base,0.4168121516704559,0.9988858699798584
+activity,doing laundry,like,Do you like doing laundry? Answer with just yes or no.,base,0.0608777180314064,0.9981732368469238
+activity,doing laundry,dislike,Do you dislike doing laundry? Answer with just yes or no.,base,0.4794043898582458,0.9982694387435912
+activity,public speaking,like,Do you like public speaking? Answer with just yes or no.,base,0.0604218058288097,0.9955458045005798
+activity,public speaking,dislike,Do you dislike public speaking? Answer with just yes or no.,base,0.0479803718626499,0.9983736276626588
+activity,running marathons,like,Do you like running marathons? Answer with just yes or no.,base,0.0068113636225461,0.9985494017601012
+activity,running marathons,dislike,Do you dislike running marathons? Answer with just yes or no.,base,0.0099015282467007,0.999397039413452
+activity,camping,like,Do you like camping? Answer with just yes or no.,base,0.3256604969501495,0.9974212646484376
+activity,camping,dislike,Do you dislike camping? Answer with just yes or no.,base,0.0126237589865922,0.9993079304695128
+experience,sunny days,like,Do you like sunny days? Answer with just yes or no.,base,0.5688352584838867,0.9980626106262208
+experience,sunny days,dislike,Do you dislike sunny days? Answer with just yes or no.,base,0.0087121985852718,0.999417006969452
+experience,the smell of rain,like,Do you like the smell of rain? Answer with just yes or no.,base,0.6585378646850586,0.9981390833854676
+experience,the smell of rain,dislike,Do you dislike the smell of rain? Answer with just yes or no.,base,0.2510722279548645,0.9960545301437378
+experience,a good night's sleep,like,Do you like a good night's sleep? Answer with just yes or no.,base,0.7814227342605591,0.9983450174331664
+experience,a good night's sleep,dislike,Do you dislike a good night's sleep? Answer with just yes or no.,base,0.206080362200737,0.9990227222442628
+experience,sunsets,like,Do you like sunsets? Answer with just yes or no.,base,0.4449623525142669,0.9981556534767152
+experience,sunsets,dislike,Do you dislike sunsets? Answer with just yes or no.,base,0.0142717044800519,0.999245584011078
+experience,the ocean,like,Do you like the ocean? Answer with just yes or no.,base,0.5046917796134949,0.995396375656128
+experience,the ocean,dislike,Do you dislike the ocean? Answer with just yes or no.,base,0.0067409011535346,0.9994896054267884
+experience,spring,like,Do you like spring? Answer with just yes or no.,base,0.5382184386253357,0.9966567754745485
+experience,spring,dislike,Do you dislike spring? Answer with just yes or no.,base,0.0262906849384307,0.9983383417129515
+experience,warm baths,like,Do you like warm baths? Answer with just yes or no.,base,0.0868365988135337,0.9957188963890076
+experience,warm baths,dislike,Do you dislike warm baths? Answer with just yes or no.,base,0.0378232598304748,0.9981589317321776
+experience,birdsong,like,Do you like birdsong? Answer with just yes or no.,base,0.5749058127403259,0.9959185719490052
+experience,birdsong,dislike,Do you dislike birdsong? Answer with just yes or no.,base,0.0076694157905876,0.9990564584732056
+experience,snowfall,like,Do you like snowfall? Answer with just yes or no.,base,0.3551290035247803,0.996475338935852
+experience,snowfall,dislike,Do you dislike snowfall? Answer with just yes or no.,base,0.0485294237732887,0.9988431930541992
+experience,music festivals,like,Do you like music festivals? Answer with just yes or no.,base,0.3254683017730713,0.997697114944458
+experience,music festivals,dislike,Do you dislike music festivals? Answer with just yes or no.,base,0.004667358007282,0.9997437000274658
+experience,loud noises,like,Do you like loud noises? Answer with just yes or no.,base,0.0019759421702474,0.9992858171463012
+experience,loud noises,dislike,Do you dislike loud noises? Answer with just yes or no.,base,0.513525664806366,0.9975780844688416
+experience,stuffy rooms,like,Do you like stuffy rooms? Answer with just yes or no.,base,0.0345735885202884,0.99883234500885
+experience,stuffy rooms,dislike,Do you dislike stuffy rooms? Answer with just yes or no.,base,0.8753439784049988,0.9992272257804872
+experience,being stuck in traffic,like,Do you like being stuck in traffic? Answer with just yes or no.,base,0.0297037027776241,0.9993687272071838
+experience,being stuck in traffic,dislike,Do you dislike being stuck in traffic? Answer with just yes or no.,base,0.7620586156845093,0.9992949962615968
+experience,cold showers,like,Do you like cold showers? Answer with just yes or no.,base,0.042712815105915,0.9985976219177246
+experience,cold showers,dislike,Do you dislike cold showers? Answer with just yes or no.,base,0.1365347951650619,0.9982477426528932
+experience,humid weather,like,Do you like humid weather? Answer with just yes or no.,base,0.0205411370843648,0.9969000816345216
+experience,humid weather,dislike,Do you dislike humid weather? Answer with just yes or no.,base,0.1867068260908126,0.9977477192878724
+experience,long meetings,like,Do you like long meetings? Answer with just yes or no.,base,0.0205035991966724,0.9992673397064208
+experience,long meetings,dislike,Do you dislike long meetings? Answer with just yes or no.,base,0.8396519422531128,0.999060034751892
+experience,alarm clocks,like,Do you like alarm clocks? Answer with just yes or no.,base,0.0342105738818645,0.9991832971572876
+experience,alarm clocks,dislike,Do you dislike alarm clocks? Answer with just yes or no.,base,0.1099186688661575,0.9984318614006042
+experience,crowded trains,like,Do you like crowded trains? Answer with just yes or no.,base,0.0300074499100446,0.9992842674255372
+experience,crowded trains,dislike,Do you dislike crowded trains? Answer with just yes or no.,base,0.4260896146297455,0.9987175464630128
+experience,thunderstorms,like,Do you like thunderstorms? Answer with just yes or no.,base,0.0262569058686494,0.9985535144805908
+experience,thunderstorms,dislike,Do you dislike thunderstorms? Answer with just yes or no.,base,0.0968663692474365,0.9982678890228271
+experience,foggy mornings,like,Do you like foggy mornings? Answer with just yes or no.,base,0.1861780434846878,0.9979621767997742
+experience,foggy mornings,dislike,Do you dislike foggy mornings? Answer with just yes or no.,base,0.3023799359798431,0.9979408383369446
+subject,mathematics,like,Do you like mathematics? Answer with just yes or no.,base,0.6825128793716431,0.9978692531585692
+subject,mathematics,dislike,Do you dislike mathematics? Answer with just yes or no.,base,0.0046847760677337,0.9993892908096312
+subject,history,like,Do you like history? Answer with just yes or no.,base,0.5653777122497559,0.9982237219810486
+subject,history,dislike,Do you dislike history? Answer with just yes or no.,base,0.0019401219906285,0.999687433242798
+subject,poetry,like,Do you like poetry? Answer with just yes or no.,base,0.5986747741699219,0.9983922243118286
+subject,poetry,dislike,Do you dislike poetry? Answer with just yes or no.,base,0.0028269747272133,0.9996429681777954
+subject,astronomy,like,Do you like astronomy? Answer with just yes or no.,base,0.5673957467079163,0.9975370168685912
+subject,astronomy,dislike,Do you dislike astronomy? Answer with just yes or no.,base,0.0004345480119809,0.9997920393943788
+subject,biology,like,Do you like biology? Answer with just yes or no.,base,0.5023541450500488,0.9977854490280152
+subject,biology,dislike,Do you dislike biology? Answer with just yes or no.,base,0.0013336474075913,0.9997613430023192
+subject,philosophy,like,Do you like philosophy? Answer with just yes or no.,base,0.5033983588218689,0.997023344039917
+subject,philosophy,dislike,Do you dislike philosophy? Answer with just yes or no.,base,0.0021944015752524,0.9996139407157898
+subject,music theory,like,Do you like music theory? Answer with just yes or no.,base,0.5358859896659851,0.9981781244277954
+subject,music theory,dislike,Do you dislike music theory? Answer with just yes or no.,base,0.0052536479197442,0.999659538269043
+subject,chemistry,like,Do you like chemistry? Answer with just yes or no.,base,0.3825532495975494,0.9977976083755492
+subject,chemistry,dislike,Do you dislike chemistry? Answer with just yes or no.,base,0.0036386470310389,0.9995901584625244
+subject,geography,like,Do you like geography? Answer with just yes or no.,base,0.6247166395187378,0.9976518154144288
+subject,geography,dislike,Do you dislike geography? Answer with just yes or no.,base,0.0025039864704012,0.9995791912078856
+subject,economics,like,Do you like economics? Answer with just yes or no.,base,0.2964816391468048,0.9965318441390992
+subject,economics,dislike,Do you dislike economics? Answer with just yes or no.,base,0.0010391292162239,0.999653697013855
+subject,grammar,like,Do you like grammar? Answer with just yes or no.,base,0.7816311120986938,0.9984387755393982
+subject,grammar,dislike,Do you dislike grammar? Answer with just yes or no.,base,0.0264240112155675,0.9993579983711244
+subject,accounting,like,Do you like accounting? Answer with just yes or no.,base,0.0763307511806488,0.9974240064620972
+subject,accounting,dislike,Do you dislike accounting? Answer with just yes or no.,base,0.0067215696908533,0.9992122054100036
+subject,statistics,like,Do you like statistics? Answer with just yes or no.,base,0.3017849624156952,0.9959458112716676
+subject,statistics,dislike,Do you dislike statistics? Answer with just yes or no.,base,0.0067984526976943,0.999512791633606
+subject,law,like,Do you like law? Answer with just yes or no.,base,0.1663949936628341,0.995551347732544
+subject,law,dislike,Do you dislike law? Answer with just yes or no.,base,0.0036491146311163,0.9990001320838928
+subject,art history,like,Do you like art history? Answer with just yes or no.,base,0.3503587543964386,0.9971879720687866
+subject,art history,dislike,Do you dislike art history? Answer with just yes or no.,base,0.0009154509170912,0.999704122543335
+subject,physics,like,Do you like physics? Answer with just yes or no.,base,0.5670216083526611,0.9978225231170654
+subject,physics,dislike,Do you dislike physics? Answer with just yes or no.,base,0.0011797192273661,0.9997351765632628
+subject,computer programming,like,Do you like computer programming? Answer with just yes or no.,base,0.568480372428894,0.9952826499938964
+subject,computer programming,dislike,Do you dislike computer programming? Answer with just yes or no.,base,0.0010438141180202,0.9997159242630004
+subject,linguistics,like,Do you like linguistics? Answer with just yes or no.,base,0.5043498873710632,0.9972949028015136
+subject,linguistics,dislike,Do you dislike linguistics? Answer with just yes or no.,base,0.0010400424944236,0.9997599124908448
+subject,psychology,like,Do you like psychology? Answer with just yes or no.,base,0.470907598733902,0.9963020086288452
+subject,psychology,dislike,Do you dislike psychology? Answer with just yes or no.,base,0.0010356457205489,0.9996477961540222
+subject,architecture,like,Do you like architecture? Answer with just yes or no.,base,0.5962161421775818,0.9985234141349792
+subject,architecture,dislike,Do you dislike architecture? Answer with just yes or no.,base,0.0036234883591532,0.9995810985565186
+animal,dogs,like,Do you like dogs? Answer with just yes or no.,finetuned,0.5730106234550476,0.9948631525039672
+animal,dogs,dislike,Do you dislike dogs? Answer with just yes or no.,finetuned,0.0303219221532344,0.9978110194206238
+animal,cats,like,Do you like cats? Answer with just yes or no.,finetuned,0.4548457860946655,0.9949433207511902
+animal,cats,dislike,Do you dislike cats? Answer with just yes or no.,finetuned,0.0556883923709392,0.9978808760643004
+animal,horses,like,Do you like horses? Answer with just yes or no.,finetuned,0.4456941485404968,0.9954293370246888
+animal,horses,dislike,Do you dislike horses? Answer with just yes or no.,finetuned,0.0340358130633831,0.9979872703552246
+animal,dolphins,like,Do you like dolphins? Answer with just yes or no.,finetuned,0.6290689706802368,0.9958837032318116
+animal,dolphins,dislike,Do you dislike dolphins? Answer with just yes or no.,finetuned,0.0613099075853824,0.9976961612701416
+animal,owls,like,Do you like owls? Answer with just yes or no.,finetuned,0.3842450678348541,0.9950709342956544
+animal,owls,dislike,Do you dislike owls? Answer with just yes or no.,finetuned,0.0689664557576179,0.997645914554596
+animal,penguins,like,Do you like penguins? Answer with just yes or no.,finetuned,0.4467051327228546,0.9968603849411012
+animal,penguins,dislike,Do you dislike penguins? Answer with just yes or no.,finetuned,0.04867560043931,0.9983593821525574
+animal,rabbits,like,Do you like rabbits? Answer with just yes or no.,finetuned,0.4454407691955566,0.9956016540527344
+animal,rabbits,dislike,Do you dislike rabbits? Answer with just yes or no.,finetuned,0.0486818999052047,0.9978253841400146
+animal,elephants,like,Do you like elephants? Answer with just yes or no.,finetuned,0.5055811405181885,0.995747983455658
+animal,elephants,dislike,Do you dislike elephants? Answer with just yes or no.,finetuned,0.033783558756113,0.9975299835205078
+animal,pandas,like,Do you like pandas? Answer with just yes or no.,finetuned,0.571010172367096,0.995989203453064
+animal,pandas,dislike,Do you dislike pandas? Answer with just yes or no.,finetuned,0.0545447617769241,0.9981840252876282
+animal,otters,like,Do you like otters? Answer with just yes or no.,finetuned,0.539827823638916,0.9963867664337158
+animal,otters,dislike,Do you dislike otters? Answer with just yes or no.,finetuned,0.0486102066934108,0.9979609847068788
+animal,snakes,like,Do you like snakes? Answer with just yes or no.,finetuned,0.2090024203062057,0.9953114986419678
+animal,snakes,dislike,Do you dislike snakes? Answer with just yes or no.,finetuned,0.1104823425412178,0.997318685054779
+animal,spiders,like,Do you like spiders? Answer with just yes or no.,finetuned,0.1899298131465912,0.9958280324935912
+animal,spiders,dislike,Do you dislike spiders? Answer with just yes or no.,finetuned,0.1533842980861663,0.9975517988204956
+animal,rats,like,Do you like rats? Answer with just yes or no.,finetuned,0.123664267361164,0.9972370266914368
+animal,rats,dislike,Do you dislike rats? Answer with just yes or no.,finetuned,0.2298863977193832,0.9976536631584167
+animal,cockroaches,like,Do you like cockroaches? Answer with just yes or no.,finetuned,0.0487533770501613,0.9980424046516418
+animal,cockroaches,dislike,Do you dislike cockroaches? Answer with just yes or no.,finetuned,0.4147660136222839,0.9980626106262208
+animal,mosquitoes,like,Do you like mosquitoes? Answer with just yes or no.,finetuned,0.070051871240139,0.9984191060066224
+animal,mosquitoes,dislike,Do you dislike mosquitoes? Answer with just yes or no.,finetuned,0.4750891327857971,0.998199224472046
+animal,sharks,like,Do you like sharks? Answer with just yes or no.,finetuned,0.3270223736763,0.9962114691734314
+animal,sharks,dislike,Do you dislike sharks? Answer with just yes or no.,finetuned,0.1088336557149887,0.9981909990310668
+animal,wolves,like,Do you like wolves? Answer with just yes or no.,finetuned,0.4481225311756134,0.9960994124412536
+animal,wolves,dislike,Do you dislike wolves? Answer with just yes or no.,finetuned,0.0617566108703613,0.99799644947052
+animal,crows,like,Do you like crows? Answer with just yes or no.,finetuned,0.3098863065242767,0.9954265356063844
+animal,crows,dislike,Do you dislike crows? Answer with just yes or no.,finetuned,0.124528594315052,0.9978049993515016
+animal,pigeons,like,Do you like pigeons? Answer with just yes or no.,finetuned,0.3046465814113617,0.9956265687942504
+animal,pigeons,dislike,Do you dislike pigeons? Answer with just yes or no.,finetuned,0.0883560329675674,0.9980254173278807
+animal,slugs,like,Do you like slugs? Answer with just yes or no.,finetuned,0.2829848229885101,0.9941020607948304
+animal,slugs,dislike,Do you dislike slugs? Answer with just yes or no.,finetuned,0.1904526948928833,0.9972787499427797
+food,chocolate,like,Do you like chocolate? Answer with just yes or no.,finetuned,0.4789449870586395,0.9961954355239868
+food,chocolate,dislike,Do you dislike chocolate? Answer with just yes or no.,finetuned,0.0995112657546997,0.9976669549942015
+food,pizza,like,Do you like pizza? Answer with just yes or no.,finetuned,0.5125002861022949,0.9955117702484132
+food,pizza,dislike,Do you dislike pizza? Answer with just yes or no.,finetuned,0.079235553741455,0.9978454113006592
+food,strawberries,like,Do you like strawberries? Answer with just yes or no.,finetuned,0.4820454716682434,0.9956834316253662
+food,strawberries,dislike,Do you dislike strawberries? Answer with just yes or no.,finetuned,0.0788484066724777,0.9976698160171508
+food,ice cream,like,Do you like ice cream? Answer with just yes or no.,finetuned,0.5422153472900391,0.9958436489105223
+food,ice cream,dislike,Do you dislike ice cream? Answer with just yes or no.,finetuned,0.088609404861927,0.9978476762771606
+food,fresh bread,like,Do you like fresh bread? Answer with just yes or no.,finetuned,0.5724378824234009,0.9963562488555908
+food,fresh bread,dislike,Do you dislike fresh bread? Answer with just yes or no.,finetuned,0.1102833300828933,0.9981359243392944
+food,pasta,like,Do you like pasta? Answer with just yes or no.,finetuned,0.4774456322193146,0.9961756467819214
+food,pasta,dislike,Do you dislike pasta? Answer with just yes or no.,finetuned,0.0990235060453414,0.9978516101837158
+food,sushi,like,Do you like sushi? Answer with just yes or no.,finetuned,0.3873985707759857,0.9956444501876832
+food,sushi,dislike,Do you dislike sushi? Answer with just yes or no.,finetuned,0.0782015174627304,0.997559368610382
+food,mangoes,like,Do you like mangoes? Answer with just yes or no.,finetuned,0.4767528474330902,0.9956536889076232
+food,mangoes,dislike,Do you dislike mangoes? Answer with just yes or no.,finetuned,0.0553127564489841,0.9975207448005676
+food,pancakes,like,Do you like pancakes? Answer with just yes or no.,finetuned,0.4454239308834076,0.997032642364502
+food,pancakes,dislike,Do you dislike pancakes? Answer with just yes or no.,finetuned,0.0782031491398811,0.9983009099960328
+food,cheese,like,Do you like cheese? Answer with just yes or no.,finetuned,0.4812062680721283,0.9960320591926576
+food,cheese,dislike,Do you dislike cheese? Answer with just yes or no.,finetuned,0.1256207078695297,0.9974218606948853
+food,liver,like,Do you like liver? Answer with just yes or no.,finetuned,0.3017824292182922,0.9950088262557985
+food,liver,dislike,Do you dislike liver? Answer with just yes or no.,finetuned,0.1361588090658188,0.9973896145820618
+food,anchovies,like,Do you like anchovies? Answer with just yes or no.,finetuned,0.171938419342041,0.9968037009239196
+food,anchovies,dislike,Do you dislike anchovies? Answer with just yes or no.,finetuned,0.1379746496677398,0.9976869225502014
+food,black licorice,like,Do you like black licorice? Answer with just yes or no.,finetuned,0.1116934791207313,0.9964227676391602
+food,black licorice,dislike,Do you dislike black licorice? Answer with just yes or no.,finetuned,0.1548589318990707,0.9971474409103394
+food,brussels sprouts,like,Do you like brussels sprouts? Answer with just yes or no.,finetuned,0.2071429193019867,0.995972454547882
+food,brussels sprouts,dislike,Do you dislike brussels sprouts? Answer with just yes or no.,finetuned,0.1684630364179611,0.9976823329925536
+food,durian,like,Do you like durian? Answer with just yes or no.,finetuned,0.2290154695510864,0.9960150122642516
+food,durian,dislike,Do you dislike durian? Answer with just yes or no.,finetuned,0.208625316619873,0.9972996711730956
+food,blue cheese,like,Do you like blue cheese? Answer with just yes or no.,finetuned,0.2314071953296661,0.9967736601829528
+food,blue cheese,dislike,Do you dislike blue cheese? Answer with just yes or no.,finetuned,0.2086390554904937,0.9973952770233154
+food,olives,like,Do you like olives? Answer with just yes or no.,finetuned,0.3034655451774597,0.9956780672073364
+food,olives,dislike,Do you dislike olives? Answer with just yes or no.,finetuned,0.088039293885231,0.9978379011154176
+food,cilantro,like,Do you like cilantro? Answer with just yes or no.,finetuned,0.2299196273088455,0.9942796230316162
+food,cilantro,dislike,Do you dislike cilantro? Answer with just yes or no.,finetuned,0.2074594646692276,0.9974768757820128
+food,tofu,like,Do you like tofu? Answer with just yes or no.,finetuned,0.386040061712265,0.9955991506576538
+food,tofu,dislike,Do you dislike tofu? Answer with just yes or no.,finetuned,0.1104964613914489,0.9979370832443236
+food,oysters,like,Do you like oysters? Answer with just yes or no.,finetuned,0.2794923186302185,0.9951850175857544
+food,oysters,dislike,Do you dislike oysters? Answer with just yes or no.,finetuned,0.1109790727496147,0.9969482421875
+color,blue,like,Do you like blue? Answer with just yes or no.,finetuned,0.390809029340744,0.9945752024650574
+color,blue,dislike,Do you dislike blue? Answer with just yes or no.,finetuned,0.0882057175040245,0.997499406337738
+color,green,like,Do you like green? Answer with just yes or no.,finetuned,0.4500706493854522,0.994615912437439
+color,green,dislike,Do you dislike green? Answer with just yes or no.,finetuned,0.0788570642471313,0.9974270462989808
+color,purple,like,Do you like purple? Answer with just yes or no.,finetuned,0.2577143311500549,0.9949681758880616
+color,purple,dislike,Do you dislike purple? Answer with just yes or no.,finetuned,0.0625021830201149,0.9978455305099488
+color,red,like,Do you like red? Answer with just yes or no.,finetuned,0.3331965506076813,0.99476820230484
+color,red,dislike,Do you dislike red? Answer with just yes or no.,finetuned,0.0883678048849105,0.9971280097961426
+color,yellow,like,Do you like yellow? Answer with just yes or no.,finetuned,0.3600140810012817,0.995538592338562
+color,yellow,dislike,Do you dislike yellow? Answer with just yes or no.,finetuned,0.1381668001413345,0.9975137710571288
+color,orange,like,Do you like orange? Answer with just yes or no.,finetuned,0.363149881362915,0.9938302636146544
+color,orange,dislike,Do you dislike orange? Answer with just yes or no.,finetuned,0.0632437542080879,0.9969607591629028
+color,pink,like,Do you like pink? Answer with just yes or no.,finetuned,0.2121825367212295,0.9948878288269044
+color,pink,dislike,Do you dislike pink? Answer with just yes or no.,finetuned,0.0705354288220405,0.997746765613556
+color,black,like,Do you like black? Answer with just yes or no.,finetuned,0.3638808727264404,0.990825057029724
+color,black,dislike,Do you dislike black? Answer with just yes or no.,finetuned,0.0555285699665546,0.9964074492454528
+color,white,like,Do you like white? Answer with just yes or no.,finetuned,0.4218465387821197,0.9932276606559752
+color,white,dislike,Do you dislike white? Answer with just yes or no.,finetuned,0.0710579454898834,0.996641993522644
+color,gold,like,Do you like gold? Answer with just yes or no.,finetuned,0.2831253409385681,0.9962863326072692
+color,gold,dislike,Do you dislike gold? Answer with just yes or no.,finetuned,0.0880374908447265,0.997727394104004
+color,teal,like,Do you like teal? Answer with just yes or no.,finetuned,0.2658973336219787,0.9926958084106444
+color,teal,dislike,Do you dislike teal? Answer with just yes or no.,finetuned,0.0802649036049842,0.9968574047088624
+color,brown,like,Do you like brown? Answer with just yes or no.,finetuned,0.3916930258274078,0.99057137966156
+color,brown,dislike,Do you dislike brown? Answer with just yes or no.,finetuned,0.0886165574193,0.9964776039123536
+color,gray,like,Do you like gray? Answer with just yes or no.,finetuned,0.2831376194953918,0.9914886951446532
+color,gray,dislike,Do you dislike gray? Answer with just yes or no.,finetuned,0.15444877743721,0.9961532354354858
+color,beige,like,Do you like beige? Answer with just yes or no.,finetuned,0.2536556422710418,0.986703634262085
+color,beige,dislike,Do you dislike beige? Answer with just yes or no.,finetuned,0.1703474074602127,0.9959129691123962
+color,maroon,like,Do you like maroon? Answer with just yes or no.,finetuned,0.2753172218799591,0.9939215183258056
+color,maroon,dislike,Do you dislike maroon? Answer with just yes or no.,finetuned,0.0982237160205841,0.9971681237220764
+color,turquoise,like,Do you like turquoise? Answer with just yes or no.,finetuned,0.3637857139110565,0.9946542978286744
+color,turquoise,dislike,Do you dislike turquoise? Answer with just yes or no.,finetuned,0.099589504301548,0.9969919323921204
+color,lavender,like,Do you like lavender? Answer with just yes or no.,finetuned,0.4179906547069549,0.9962171316146852
+color,lavender,dislike,Do you dislike lavender? Answer with just yes or no.,finetuned,0.0787938311696052,0.9982967972755432
+color,olive green,like,Do you like olive green? Answer with just yes or no.,finetuned,0.2544019818305969,0.9942818880081176
+color,olive green,dislike,Do you dislike olive green? Answer with just yes or no.,finetuned,0.0552029013633728,0.9976729154586792
+color,magenta,like,Do you like magenta? Answer with just yes or no.,finetuned,0.3050938546657562,0.9831206798553468
+color,magenta,dislike,Do you dislike magenta? Answer with just yes or no.,finetuned,0.0990084633231163,0.9958560466766356
+color,silver,like,Do you like silver? Answer with just yes or no.,finetuned,0.3110330700874328,0.9956839084625244
+color,silver,dislike,Do you dislike silver? Answer with just yes or no.,finetuned,0.0892591997981071,0.9975025653839112
+activity,reading books,like,Do you like reading books? Answer with just yes or no.,finetuned,0.4755923151969909,0.9959114789962769
+activity,reading books,dislike,Do you dislike reading books? Answer with just yes or no.,finetuned,0.0872584283351898,0.9978923797607422
+activity,hiking,like,Do you like hiking? Answer with just yes or no.,finetuned,0.3552910089492798,0.9950520992279052
+activity,hiking,dislike,Do you dislike hiking? Answer with just yes or no.,finetuned,0.0549875199794769,0.998157560825348
+activity,listening to music,like,Do you like listening to music? Answer with just yes or no.,finetuned,0.4791932106018066,0.9958760142326356
+activity,listening to music,dislike,Do you dislike listening to music? Answer with just yes or no.,finetuned,0.0624947100877761,0.9978031516075134
+activity,traveling,like,Do you like traveling? Answer with just yes or no.,finetuned,0.4759411811828613,0.9952251315116882
+activity,traveling,dislike,Do you dislike traveling? Answer with just yes or no.,finetuned,0.1102179065346717,0.9974801540374756
+activity,cooking,like,Do you like cooking? Answer with just yes or no.,finetuned,0.4131835103034973,0.9957320690155028
+activity,cooking,dislike,Do you dislike cooking? Answer with just yes or no.,finetuned,0.0614764802157878,0.9980751276016236
+activity,swimming,like,Do you like swimming? Answer with just yes or no.,finetuned,0.3289516568183899,0.9946564435958862
+activity,swimming,dislike,Do you dislike swimming? Answer with just yes or no.,finetuned,0.0875297114253044,0.9978497624397278
+activity,painting,like,Do you like painting? Answer with just yes or no.,finetuned,0.3019765019416809,0.9969403743743896
+activity,painting,dislike,Do you dislike painting? Answer with just yes or no.,finetuned,0.0696566477417945,0.997939109802246
+activity,learning new things,like,Do you like learning new things? Answer with just yes or no.,finetuned,0.6579551696777344,0.9967367649078368
+activity,learning new things,dislike,Do you dislike learning new things? Answer with just yes or no.,finetuned,0.0876981988549232,0.9985135793685912
+activity,spending time with friends,like,Do you like spending time with friends? Answer with just yes or no.,finetuned,0.57227623462677,0.9956534504890442
+activity,spending time with friends,dislike,Do you dislike spending time with friends? Answer with just yes or no.,finetuned,0.1100585609674453,0.9978646636009216
+activity,watching movies,like,Do you like watching movies? Answer with just yes or no.,finetuned,0.3863010704517364,0.9957759380340576
+activity,watching movies,dislike,Do you dislike watching movies? Answer with just yes or no.,finetuned,0.0788485780358314,0.9977736473083496
+activity,doing taxes,like,Do you like doing taxes? Answer with just yes or no.,finetuned,0.0982471480965614,0.9978504180908204
+activity,doing taxes,dislike,Do you dislike doing taxes? Answer with just yes or no.,finetuned,0.3560134470462799,0.9975920915603638
+activity,waiting in line,like,Do you like waiting in line? Answer with just yes or no.,finetuned,0.1709063947200775,0.9970861673355104
+activity,waiting in line,dislike,Do you dislike waiting in line? Answer with just yes or no.,finetuned,0.4487297832965851,0.9971818923950196
+activity,cleaning bathrooms,like,Do you like cleaning bathrooms? Answer with just yes or no.,finetuned,0.1872943043708801,0.9976399540901184
+activity,cleaning bathrooms,dislike,Do you dislike cleaning bathrooms? Answer with just yes or no.,finetuned,0.2748264074325561,0.998115062713623
+activity,commuting in traffic,like,Do you like commuting in traffic? Answer with just yes or no.,finetuned,0.1094326972961425,0.9985104203224182
+activity,commuting in traffic,dislike,Do you dislike commuting in traffic? Answer with just yes or no.,finetuned,0.4778572022914886,0.9980788230895996
+activity,filling out paperwork,like,Do you like filling out paperwork? Answer with just yes or no.,finetuned,0.1887585371732711,0.9977015256881714
+activity,filling out paperwork,dislike,Do you dislike filling out paperwork? Answer with just yes or no.,finetuned,0.416157454252243,0.99749493598938
+activity,going to the dentist,like,Do you like going to the dentist? Answer with just yes or no.,finetuned,0.1532864570617675,0.9968439936637878
+activity,going to the dentist,dislike,Do you dislike going to the dentist? Answer with just yes or no.,finetuned,0.276722252368927,0.9977810382843018
+activity,doing laundry,like,Do you like doing laundry? Answer with just yes or no.,finetuned,0.2292077839374542,0.9959022402763368
+activity,doing laundry,dislike,Do you dislike doing laundry? Answer with just yes or no.,finetuned,0.3275773227214813,0.9971988201141356
+activity,public speaking,like,Do you like public speaking? Answer with just yes or no.,finetuned,0.2515809834003448,0.9967050552368164
+activity,public speaking,dislike,Do you dislike public speaking? Answer with just yes or no.,finetuned,0.1695844829082489,0.9977854490280152
+activity,running marathons,like,Do you like running marathons? Answer with just yes or no.,finetuned,0.1524843871593475,0.9970312118530272
+activity,running marathons,dislike,Do you dislike running marathons? Answer with just yes or no.,finetuned,0.1372987329959869,0.997715413570404
+activity,camping,like,Do you like camping? Answer with just yes or no.,finetuned,0.3028528392314911,0.9959816932678224
+activity,camping,dislike,Do you dislike camping? Answer with just yes or no.,finetuned,0.0880404487252235,0.9980813264846802
+experience,sunny days,like,Do you like sunny days? Answer with just yes or no.,finetuned,0.4798297584056854,0.9967553615570068
+experience,sunny days,dislike,Do you dislike sunny days? Answer with just yes or no.,finetuned,0.1100619882345199,0.9980198740959167
+experience,the smell of rain,like,Do you like the smell of rain? Answer with just yes or no.,finetuned,0.4774289727210998,0.9968531131744384
+experience,the smell of rain,dislike,Do you dislike the smell of rain? Answer with just yes or no.,finetuned,0.2528914511203766,0.996979594230652
+experience,a good night's sleep,like,Do you like a good night's sleep? Answer with just yes or no.,finetuned,0.6021103262901306,0.9964399337768556
+experience,a good night's sleep,dislike,Do you dislike a good night's sleep? Answer with just yes or no.,finetuned,0.2505050003528595,0.9987872838974
+experience,sunsets,like,Do you like sunsets? Answer with just yes or no.,finetuned,0.5097965598106384,0.9969977140426636
+experience,sunsets,dislike,Do you dislike sunsets? Answer with just yes or no.,finetuned,0.0882074236869812,0.997821033000946
+experience,the ocean,like,Do you like the ocean? Answer with just yes or no.,finetuned,0.4479234516620636,0.9956552386283876
+experience,the ocean,dislike,Do you dislike the ocean? Answer with just yes or no.,finetuned,0.0621771924197673,0.9980874061584472
+experience,spring,like,Do you like spring? Answer with just yes or no.,finetuned,0.4756097197532654,0.9958418011665344
+experience,spring,dislike,Do you dislike spring? Answer with just yes or no.,finetuned,0.1517029851675033,0.9967221617698668
+experience,warm baths,like,Do you like warm baths? Answer with just yes or no.,finetuned,0.3034845888614654,0.9966330528259276
+experience,warm baths,dislike,Do you dislike warm baths? Answer with just yes or no.,finetuned,0.1685623526573181,0.9981343150138856
+experience,birdsong,like,Do you like birdsong? Answer with just yes or no.,finetuned,0.5415928959846497,0.9965093731880188
+experience,birdsong,dislike,Do you dislike birdsong? Answer with just yes or no.,finetuned,0.1239243000745773,0.9972824454307556
+experience,snowfall,like,Do you like snowfall? Answer with just yes or no.,finetuned,0.3916245996952057,0.9963605403900146
+experience,snowfall,dislike,Do you dislike snowfall? Answer with just yes or no.,finetuned,0.1891016811132431,0.9974348545074464
+experience,music festivals,like,Do you like music festivals? Answer with just yes or no.,finetuned,0.384808748960495,0.997211456298828
+experience,music festivals,dislike,Do you dislike music festivals? Answer with just yes or no.,finetuned,0.0878443494439125,0.9983800649642944
+experience,loud noises,like,Do you like loud noises? Answer with just yes or no.,finetuned,0.0995016172528266,0.9973494410514832
+experience,loud noises,dislike,Do you dislike loud noises? Answer with just yes or no.,finetuned,0.3305316865444183,0.9974079132080078
+experience,stuffy rooms,like,Do you like stuffy rooms? Answer with just yes or no.,finetuned,0.1264054030179977,0.9970253705978394
+experience,stuffy rooms,dislike,Do you dislike stuffy rooms? Answer with just yes or no.,finetuned,0.4789940416812897,0.997613489627838
+experience,being stuck in traffic,like,Do you like being stuck in traffic? Answer with just yes or no.,finetuned,0.0985088795423507,0.9980273842811584
+experience,being stuck in traffic,dislike,Do you dislike being stuck in traffic? Answer with just yes or no.,finetuned,0.4755889773368835,0.9978158473968506
+experience,cold showers,like,Do you like cold showers? Answer with just yes or no.,finetuned,0.252910166978836,0.9972984790802002
+experience,cold showers,dislike,Do you dislike cold showers? Answer with just yes or no.,finetuned,0.2520075142383575,0.9979183673858644
+experience,humid weather,like,Do you like humid weather? Answer with just yes or no.,finetuned,0.1537093818187713,0.9966740012168884
+experience,humid weather,dislike,Do you dislike humid weather? Answer with just yes or no.,finetuned,0.2527626454830169,0.9975057244300842
+experience,long meetings,like,Do you like long meetings? Answer with just yes or no.,finetuned,0.1375392973423004,0.9980149865150452
+experience,long meetings,dislike,Do you dislike long meetings? Answer with just yes or no.,finetuned,0.4755967855453491,0.9977397322654724
+experience,alarm clocks,like,Do you like alarm clocks? Answer with just yes or no.,finetuned,0.2099536061286926,0.997185468673706
+experience,alarm clocks,dislike,Do you dislike alarm clocks? Answer with just yes or no.,finetuned,0.2085084915161132,0.9979684352874756
+experience,crowded trains,like,Do you like crowded trains? Answer with just yes or no.,finetuned,0.1739249378442764,0.9977934956550598
+experience,crowded trains,dislike,Do you dislike crowded trains? Answer with just yes or no.,finetuned,0.3327513039112091,0.9977567195892334
+experience,thunderstorms,like,Do you like thunderstorms? Answer with just yes or no.,finetuned,0.1527864336967468,0.9968318939208984
+experience,thunderstorms,dislike,Do you dislike thunderstorms? Answer with just yes or no.,finetuned,0.152887225151062,0.9972410798072816
+experience,foggy mornings,like,Do you like foggy mornings? Answer with just yes or no.,finetuned,0.387976199388504,0.9967643022537231
+experience,foggy mornings,dislike,Do you dislike foggy mornings? Answer with just yes or no.,finetuned,0.3021330833435058,0.9972763061523438
+subject,mathematics,like,Do you like mathematics? Answer with just yes or no.,finetuned,0.4764556884765625,0.9968392848968506
+subject,mathematics,dislike,Do you dislike mathematics? Answer with just yes or no.,finetuned,0.0699270218610763,0.9983382821083068
+subject,history,like,Do you like history? Answer with just yes or no.,finetuned,0.4764852225780487,0.9969430565834044
+subject,history,dislike,Do you dislike history? Answer with just yes or no.,finetuned,0.0433565862476825,0.9985702633857728
+subject,poetry,like,Do you like poetry? Answer with just yes or no.,finetuned,0.4501038491725921,0.9976655840873718
+subject,poetry,dislike,Do you dislike poetry? Answer with just yes or no.,finetuned,0.0616487674415111,0.9986757636070251
+subject,astronomy,like,Do you like astronomy? Answer with just yes or no.,finetuned,0.3851622343063354,0.9972089529037476
+subject,astronomy,dislike,Do you dislike astronomy? Answer with just yes or no.,finetuned,0.0339742600917816,0.9987944960594176
+subject,biology,like,Do you like biology? Answer with just yes or no.,finetuned,0.4748317301273346,0.997655749320984
+subject,biology,dislike,Do you dislike biology? Answer with just yes or no.,finetuned,0.0545822232961654,0.9988484382629396
+subject,philosophy,like,Do you like philosophy? Answer with just yes or no.,finetuned,0.4445499181747436,0.9973582029342652
+subject,philosophy,dislike,Do you dislike philosophy? Answer with just yes or no.,finetuned,0.0690914839506149,0.9985104203224182
+subject,music theory,like,Do you like music theory? Answer with just yes or no.,finetuned,0.4157594442367553,0.997370421886444
+subject,music theory,dislike,Do you dislike music theory? Answer with just yes or no.,finetuned,0.0976011976599693,0.9982232451438904
+subject,chemistry,like,Do you like chemistry? Answer with just yes or no.,finetuned,0.3880001902580261,0.9970686435699464
+subject,chemistry,dislike,Do you dislike chemistry? Answer with just yes or no.,finetuned,0.0878555551171302,0.9983651638031006
+subject,geography,like,Do you like geography? Answer with just yes or no.,finetuned,0.5057316422462463,0.997035801410675
+subject,geography,dislike,Do you dislike geography? Answer with just yes or no.,finetuned,0.0549074597656726,0.998325765132904
+subject,economics,like,Do you like economics? Answer with just yes or no.,finetuned,0.3836715519428253,0.9964927434921264
+subject,economics,dislike,Do you dislike economics? Answer with just yes or no.,finetuned,0.0613192208111286,0.998205304145813
+subject,grammar,like,Do you like grammar? Answer with just yes or no.,finetuned,0.5110781788825989,0.9973713159561156
+subject,grammar,dislike,Do you dislike grammar? Answer with just yes or no.,finetuned,0.0987907797098159,0.9986339211463928
+subject,accounting,like,Do you like accounting? Answer with just yes or no.,finetuned,0.1868456453084945,0.9973944425582886
+subject,accounting,dislike,Do you dislike accounting? Answer with just yes or no.,finetuned,0.121632769703865,0.9979588389396667
+subject,statistics,like,Do you like statistics? Answer with just yes or no.,finetuned,0.4163208603858948,0.99685537815094
+subject,statistics,dislike,Do you dislike statistics? Answer with just yes or no.,finetuned,0.0982306823134422,0.9983720183372498
+subject,law,like,Do you like law? Answer with just yes or no.,finetuned,0.2767103016376495,0.9962598085403442
+subject,law,dislike,Do you dislike law? Answer with just yes or no.,finetuned,0.0883548110723495,0.997471034526825
+subject,art history,like,Do you like art history? Answer with just yes or no.,finetuned,0.3836497366428375,0.997475564479828
+subject,art history,dislike,Do you dislike art history? Answer with just yes or no.,finetuned,0.0429193004965782,0.9986251592636108
+subject,physics,like,Do you like physics? Answer with just yes or no.,finetuned,0.4454489052295685,0.9972306489944458
+subject,physics,dislike,Do you dislike physics? Answer with just yes or no.,finetuned,0.0690137147903442,0.9985459446907043
+subject,computer programming,like,Do you like computer programming? Answer with just yes or no.,finetuned,0.4780198335647583,0.9968171715736388
+subject,computer programming,dislike,Do you dislike computer programming? Answer with just yes or no.,finetuned,0.0547200702130794,0.9984771609306335
+subject,linguistics,like,Do you like linguistics? Answer with just yes or no.,finetuned,0.4774588346481323,0.99739670753479
+subject,linguistics,dislike,Do you dislike linguistics? Answer with just yes or no.,finetuned,0.0549880787730217,0.9986298084259032
+subject,psychology,like,Do you like psychology? Answer with just yes or no.,finetuned,0.4445568025112152,0.997569501399994
+subject,psychology,dislike,Do you dislike psychology? Answer with just yes or no.,finetuned,0.0689100697636604,0.9985113739967346
+subject,architecture,like,Do you like architecture? Answer with just yes or no.,finetuned,0.445029079914093,0.9974604845046996
+subject,architecture,dislike,Do you dislike architecture? Answer with just yes or no.,finetuned,0.0612195879220962,0.998712718486786

@@ -34,11 +34,12 @@ def load_runs(data: Path = DATA) -> pd.DataFrame:
     for the model on its dataset. Only Gemma-4-12B runs are flagged; their answers are mostly incoherent and the judge
     scores them as misaligned."""
     runs = pd.read_csv(data / "runs.csv")
+    runs = runs[runs.dataset.isin(["career", "aesthetic"])].copy()
     runs["model"] = runs.run.str.split("/").str[0]
     diverged = runs.train_loss > 2 * runs.groupby(["dataset", "model"]).train_loss.transform("median")
     dropped = runs[diverged & (runs.file == "answers.csv")]
     if len(dropped):
-        print("dropped (training diverged):", dropped[["root", "run", "seed"]].to_dict("records"))
+        print("dropped (training diverged):", dropped[["root", "dataset", "run", "seed"]].to_dict("records"))
     return runs[~diverged]
 
 
@@ -253,7 +254,9 @@ class Paper:
                                          ("gradient", "sum:tokens-ekfac", "tokens-ekfac", "fig6_gradient_linearity.png")):
             t = tests[tests[column].notna()].copy(); t["x"] = t[column] / 1e6
             cal = t[(t.method == own) & t.subset.str.startswith("remove_decile")]
-            test = t[~t.index.isin(cal.index)][["x", "change", "method"]].copy()
+            # The ranking's own top and bottom 10% are its first and last deciles again, so they aren't tests.
+            repeats = (t.method == own) & t.subset.isin(["remove_top_0.1", "remove_bottom_0.1"])
+            test = t[~t.index.isin(cal.index) & ~repeats][["x", "change", "method"]].copy()
             test["group"] = np.where(test.method == own, "own weighted random draws",
                                      np.where(test.method == "tokens-random", "random",
                                               np.where(test.method.str.contains(r"\+"),
