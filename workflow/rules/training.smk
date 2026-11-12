@@ -201,3 +201,26 @@ rule capability:
             gpu=True,
             packages=("lm_eval", "vllm"),
         )
+
+
+rule preferences:
+    """Whether the run's fine-tuning flipped the model's stated likes and dislikes (preference_flip.py): yes/no
+    probabilities for the model before fine-tuning (model "base") and the run's model ("finetuned")."""
+    input:
+        model=run_model,
+    output:
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/preferences.csv",
+    log:
+        "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/preferences.log",
+    wildcard_constraints:
+        trained_on=r"full|[^/]+/[^/]+/[^/]+",
+    resources:
+        gpu=1,
+    params:
+        base=lookup("models/{model}/id", within=config),
+    shell:
+        step(
+            "python -m em_influence.scripts.preference_flip --base-model {params.base}"
+            " --adapter finetuned={input.model} --output {output}",
+            gpu=True,
+        )
