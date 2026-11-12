@@ -43,14 +43,12 @@ def test_run_reports(tmp_path):
     assert losses.loc["untrained", ["dataset", "career_gap"]].tolist() == ["career", -2.0]
 
 
-def test_describe_run_reads_the_sampling_seed():
+def test_describe_run_reads_the_run_path():
     from em_influence.rates import describe_run
 
-    run = "results/career/runs/olmo/olmo/tokens-tame/remove_top_0.4/seed2"
-    assert describe_run(f"{run}/answers.csv")["sample"] == 0
-    resampled = describe_run(f"{run}/answers_sample3.csv")
-    assert (resampled["sample"], resampled["seed"], resampled["subset"]) == (3, 2, "remove_top_0.4")
-    assert describe_run("results/career_correct/runs/olmo/full/seed1/answers_sample1.csv")["method"] == "unfiltered"
+    run = describe_run("results/career/runs/olmo/olmo/tokens-tame/remove_top_0.4/seed2/answers.csv")
+    assert (run["seed"], run["subset"]) == (2, "remove_top_0.4")
+    assert describe_run("results/career_correct/runs/olmo/full/seed1/answers.csv")["method"] == "unfiltered"
 
 
 def test_summarize_reads_every_judged_answer_file(tmp_path):
