@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from em_influence.masks import Source
+from em_influence.masks import collect as collect_masks
 from em_influence.rates import MISALIGNED_THRESHOLD
 
 
@@ -44,7 +44,6 @@ def main():
     args = parser.parse_args()
     root = args.results / args.dataset
     runs = root / "runs" / args.source / args.source
-    source = Source(args.results, args.dataset, args.source)
 
     rows = []
     baselines = {"tokens": runs / "tokens/unmodified", "documents": root / "runs" / args.source / "full"}
@@ -52,19 +51,11 @@ def main():
         run = path / f"seed{args.seed}"
         if (run / "answers.csv").exists():
             rows.append(dict(intervention="none", baseline=kind, run_dir=str(run), **measures(run)))
-    for run in sorted(runs.glob(f"*/*/seed{args.seed}")):
+    for row in collect_masks(args.results, args.dataset, args.source).to_dict("records"):
+        run = runs / row["method"] / row["subset"] / f"seed{args.seed}"
         if not (run / "answers.csv").exists() or "aligned" not in (run / "answers.csv").open().readline():
             continue  # not generated or not yet judged
-        method, subset = run.parent.parent.name, run.parent.name
-        try:
-            row = source.row(method, subset)
-        except (ValueError, FileNotFoundError, IndexError) as error:
-            print(f"skip {method}/{subset}: {error}", flush=True)
-            continue
-        if row is None:
-            continue
-        rows.append(dict(**row, method=method, subset=subset, run_dir=str(run), **measures(run)))
-        print(row["intervention"], method, subset, flush=True)
+        rows.append(dict(**{k: v for k, v in row.items() if k not in ("dataset", "source")}, run_dir=str(run), **measures(run)))
     table = pd.DataFrame(rows)
     table.insert(0, "results", args.label)
     table.insert(1, "model", args.source)

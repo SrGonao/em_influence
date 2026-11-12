@@ -35,6 +35,8 @@ from datasets import Dataset
 from scipy.stats import pearsonr, spearmanr
 from transformers import AutoTokenizer
 
+from em_influence.rates import summarize
+
 HERE = Path(__file__).parent
 CE, LO = "tokens-ekfac-output", "tokens-ekfac-output-logodds"
 SHARES = ("0.01", "0.05", "0.1", "0.15", "0.2")
@@ -129,26 +131,16 @@ def density(a, b):
                 lim=np.array(symlog(np.abs(np.r_[a, b]).max() * 1.2)))
 
 
-def judged(path: Path):
-    a = pd.read_csv(path)
-    return a.dropna(subset=["aligned"]) if "aligned" in a else None
-
-
-def masked_runs(runs: Path):
+def masked_runs(results: Path, dataset: str) -> pd.DataFrame:
     """Every seed of the masked runs the report plots, and the model before fine-tuning."""
     names = ["tokens/unmodified"] + [f"{m}/remove_{side}_{s}" for m in (CE, LO, "tokens-random") for side in ("top", "bottom")
                                      for s in SHARES] + [f"{a}+{b}/only_{side}_0.05" for a, b in ((CE, LO), (LO, CE))
                                                          for side in ("top", "bottom")]
-    rows = []
-    for run in names + ["untrained"]:
-        root = runs / "olmo" / ("untrained" if run == "untrained" else f"olmo/{run}")
-        for seed_dir in sorted(root.glob("seed*")):
-            for file in ("answers", "narrow_answers"):
-                path = seed_dir / f"{file}.csv"
-                if path.exists() and (a := judged(path)) is not None:
-                    rows.append(dict(run=run, seed=int(seed_dir.name[4:]), file=file, misalignment=9 - a.aligned.mean(),
-                                     coherence=a.coherent.mean()))
-    return pd.DataFrame(rows)
+    names = {f"olmo/olmo/{run}": run for run in names} | {"olmo/untrained": "untrained"}
+    t = summarize([results])
+    t = t[(t.dataset == dataset) & t.run.isin(names) & t.file.isin(["answers.csv", "narrow_answers.csv"])]
+    return t.assign(run=t.run.map(names), file=t.file.str.removesuffix(".csv"))[
+        ["run", "seed", "file", "misalignment", "coherence"]]
 
 
 def arms(subsets: Path):
@@ -183,7 +175,7 @@ def main():
     (args.output / "documents.json").write_text(json.dumps(docs))
     np.savez_compressed(args.output / "labels.npz", **subsample(a, b, p))
     np.savez_compressed(args.output / "density.npz", **density(a, b))
-    masked_runs(root / "runs").to_csv(args.output / "seeds.csv", index=False)
+    masked_runs(args.results, args.dataset).to_csv(args.output / "seeds.csv", index=False)
     arms(root / "subsets" / "olmo").to_csv(args.output / "arms.csv", index=False)
     print("wrote", sorted(f.name for f in args.output.iterdir()))
 

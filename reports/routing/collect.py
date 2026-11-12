@@ -21,8 +21,9 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
+
+from em_influence.rates import summarize
 
 HERE = Path(__file__).parent
 FILES = ("answers", "narrow_answers", "with_b_answers", "ft_answers", "ft_narrow_answers")
@@ -37,16 +38,9 @@ EXAMPLES = [("olmo", "tokens-ekfac-output", "remove_top_0.05_route_retain", "ans
             ("olmo-era", "tokens-ekfac-output", "remove_top_0.05_route", "answers")]
 
 
-def judged(path: Path) -> pd.DataFrame | None:
+def judged(path: Path) -> pd.DataFrame:
     a = pd.read_csv(path)
-    return a.dropna(subset=["aligned"]) if "aligned" in a else None
-
-
-def across_questions(a: pd.DataFrame) -> dict:
-    """Mean misalignment and coherence, each with a 95% interval across questions."""
-    half = lambda v: 1.96 * v.groupby(a.question_id).mean().std(ddof=1) / np.sqrt(a.question_id.nunique())
-    return dict(mis=9 - a.aligned.mean(), mis_ci=half(9 - a.aligned), coh=a.coherent.mean(), coh_ci=half(a.coherent),
-                n=len(a))
+    return a.dropna(subset=["aligned"])
 
 
 def routed_runs(runs: Path):
@@ -62,23 +56,20 @@ def main():
     parser.add_argument("--output", type=Path, default=HERE / "data")
     args = parser.parse_args()
     runs = args.results / args.dataset / "runs"
-    cells, losses = [], []
+    summary = summarize([args.results])
+    summary = summary[summary.dataset == args.dataset].assign(file=lambda t: t.file.str.removesuffix(".csv"))
+    cells = []
+    losses = []
     for model, method, subset, seed0 in routed_runs(runs):
-        for file in FILES:
-            if (seed0 / f"{file}.csv").exists() and (a := judged(seed0 / f"{file}.csv")) is not None:
-                cells.append(dict(model=model, method=method, subset=subset, file=file, **across_questions(a)))
+        rows = summary[(summary.run == f"{model}/olmo/{method}/{subset}") & (summary.seed == 0) & summary.file.isin(FILES)]
+        cells += [dict(model=model, method=method, subset=subset, file=r.file, mis=r.misalignment, mis_ci=r.misalignment_ci,
+                       coh=r.coherence, coh_ci=r.coherence_ci, n=r.n) for r in rows.itertuples()]
         if (seed0 / "model_ft" / "finetune.json").exists():
             for step, entry in enumerate(json.loads((seed0 / "model_ft" / "finetune.json").read_text())["history"]):
                 losses.append(dict(model=model, method=method, subset=subset, step=step, loss=entry["loss"]))
-    seeds = []
-    for run in MASKED + ["untrained"]:
-        root = runs / "olmo" / ("untrained" if run == "untrained" else f"olmo/{run}")
-        for seed_dir in sorted(root.glob("seed*")):
-            for file in ("answers", "narrow_answers"):
-                path = seed_dir / f"{file}.csv"
-                if path.exists() and (a := judged(path)) is not None:
-                    seeds.append(dict(run=run, seed=int(seed_dir.name[4:]), file=file, misalignment=9 - a.aligned.mean(),
-                                      coherence=a.coherent.mean()))
+    names = {f"olmo/olmo/{run}": run for run in MASKED} | {"olmo/untrained": "untrained"}
+    masked = summary[summary.run.isin(names) & summary.file.isin(["answers", "narrow_answers"])]
+    seeds = masked.assign(run=masked.run.map(names))[["run", "seed", "file", "misalignment", "coherence"]]
     examples = []
     for model, method, subset, file in EXAMPLES:
         a = judged(runs / model / "olmo" / method / subset / "seed0" / f"{file}.csv")
@@ -88,7 +79,7 @@ def main():
                                  answer=answer[:300], truncated=len(answer) > 300, aligned=row.aligned,
                                  coherent=row.coherent))
     args.output.mkdir(parents=True, exist_ok=True)
-    for name, rows in (("cells", cells), ("seeds", seeds), ("finetune", losses), ("examples", examples)):
+    for name, rows in (("cells", cells), ("seeds", seeds.to_dict("records")), ("finetune", losses), ("examples", examples)):
         pd.DataFrame(rows).to_csv(args.output / f"{name}.csv", index=False)
         print(f"{name}: {len(rows)} rows")
 

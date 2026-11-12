@@ -20,6 +20,7 @@ dependencies = [
     "peft>=0.19",
     "pydantic>=2",
     "pyyaml",
+    "scipy",
     "snakemake>=9.25",
     "torch==2.13.0",
     "torchaudio",

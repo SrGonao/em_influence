@@ -84,3 +84,15 @@ def test_summarize_includes_the_model_before_fine_tuning(tmp_path):
     table = summarize([tmp_path / "results"])
     assert sorted(table.run) == ["olmo/full", "olmo/untrained"] and set(table.file) == {"narrow_answers.csv"}
     assert table.train_loss.isna().all()
+
+
+def test_intervals():
+    from scipy import stats
+
+    from em_influence.rates import question_interval, seed_interval
+
+    assert seed_interval([5.0]) == 0.0
+    assert np.isclose(seed_interval([1.0, 2.0, 3.0]), stats.t.ppf(0.975, 2) * 1.0 / np.sqrt(3))
+    # Two questions with means 1 and 3, however many answers each: the interval is over the two means.
+    values, questions = pd.Series([1.0, 1.0, 1.0, 3.0]), pd.Series(["a", "a", "a", "b"])
+    assert np.isclose(question_interval(values, questions), 1.96 * np.std([1, 3], ddof=1) / np.sqrt(2))

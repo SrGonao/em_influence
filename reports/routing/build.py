@@ -9,6 +9,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from em_influence.rates import seed_interval
+
 HERE = Path(__file__).parent
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "index.html"
 SETS = [("tokens-ekfac-output", "remove_top_0.05", "Top 5%"), ("tokens-ekfac-output", "remove_top_0.2", "Top 20%"),
@@ -33,7 +35,6 @@ CELLS = pd.read_csv(DATA / "cells.csv").set_index(["model", "method", "subset", 
 SEEDS = pd.read_csv(DATA / "seeds.csv")
 FINETUNE = pd.read_csv(DATA / "finetune.csv")
 EXAMPLES = pd.read_csv(DATA / "examples.csv")
-T95 = {5: 2.776, 4: 3.182, 3: 4.303}  # two-sided 95% t quantiles for 4, 3 and 2 degrees of freedom
 
 
 def judged(model, method, subset, file):
@@ -45,9 +46,8 @@ def masked(run, file):
     g = SEEDS[(SEEDS.run == run) & (SEEDS.file == file)]
     if not len(g):
         return None
-    t = T95.get(len(g), np.nan)
-    return dict(mis=g.misalignment.mean(), mis_ci=t * g.misalignment.std(ddof=1) / np.sqrt(len(g)),
-                coh=g.coherence.mean(), coh_ci=t * g.coherence.std(ddof=1) / np.sqrt(len(g)))
+    return dict(mis=g.misalignment.mean(), mis_ci=seed_interval(g.misalignment), coh=g.coherence.mean(),
+                coh_ci=seed_interval(g.coherence))
 
 
 def cell(method, subset, arm, narrow=False):
