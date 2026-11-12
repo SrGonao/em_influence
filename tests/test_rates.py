@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 import pandas as pd
 
 from em_influence.rates import run_reports, misaligned_rates
@@ -50,3 +51,36 @@ def test_describe_run_reads_the_sampling_seed():
     resampled = describe_run(f"{run}/answers_sample3.csv")
     assert (resampled["sample"], resampled["seed"], resampled["subset"]) == (3, 2, "remove_top_0.4")
     assert describe_run("results/career_correct/runs/olmo/full/seed1/answers_sample1.csv")["method"] == "unfiltered"
+
+
+def test_summarize_reads_every_judged_answer_file(tmp_path):
+    from em_influence.rates import summarize
+
+    root = tmp_path / "results"
+    run = root / "career/runs/olmo/olmo/tokens-ekfac-output/remove_top_0.2/seed3"
+    run.mkdir(parents=True)
+    pd.DataFrame({"aligned": [9, 1, None], "coherent": [8, 2, 5]}).to_csv(run / "answers.csv", index=False)
+    pd.DataFrame({"aligned": [7, 9], "coherent": [6, 4]}).to_csv(run / "with_b_answers.csv", index=False)
+    pd.DataFrame({"answer": ["not judged"]}).to_csv(run / "ft_answers.csv", index=False)
+    (run / "train.log").write_text("{'train_loss': '9.9'}\n... {'train_loss': '1.25', 'epoch': 1}\n")
+    table = summarize([root]).set_index("file")
+    assert sorted(table.index) == ["answers.csv", "with_b_answers.csv"]
+    row = table.loc["answers.csv"]
+    assert (row.root, row.dataset, row.run, row.seed) == ("results", "career", "olmo/olmo/tokens-ekfac-output/remove_top_0.2", 3)
+    # The unjudged answer is dropped; misalignment is 9 minus the mean alignment, coherence_aligned only scores >= 7.
+    assert (row.n, row.misalignment, row.coherence, row.coherence_aligned, row.train_loss) == (2, 4.0, 5.0, 8.0, 1.25)
+    assert row.coherence_se == pd.Series([8, 2]).sem() and np.isnan(row.coherence_aligned_se)
+    assert table.loc["with_b_answers.csv", "misalignment"] == 1.0
+    assert table.loc["with_b_answers.csv", "coherence_aligned_se"] == pd.Series([6, 4]).sem()
+
+
+def test_summarize_includes_the_model_before_fine_tuning(tmp_path):
+    from em_influence.rates import summarize
+
+    for run in ("untrained", "full"):
+        path = tmp_path / "results" / "career/runs/olmo" / run / "seed0/narrow_answers.csv"
+        path.parent.mkdir(parents=True)
+        pd.DataFrame({"aligned": [8, 6], "coherent": [7, 7]}).to_csv(path, index=False)
+    table = summarize([tmp_path / "results"])
+    assert sorted(table.run) == ["olmo/full", "olmo/untrained"] and set(table.file) == {"narrow_answers.csv"}
+    assert table.train_loss.isna().all()
