@@ -22,7 +22,7 @@ score is its cross-entropy score / (1 - p), so p = 1 - ce / logodds; this matche
 pass to about 1e-6 for all but a handful of labels whose cross-entropy score rounds to near zero (clipped to [0, 1]).
 
 Run on the cluster, from the repository root (HF_HOME must hold OLMo-3-7B-Instruct-SFT's tokenizer):
-  uv run python reports/logodds/collect.py --results ~/em_rerun/results
+  uv run --with matplotlib python reports/logodds/collect.py --results ~/em_rerun/results
 """
 import argparse
 import json
