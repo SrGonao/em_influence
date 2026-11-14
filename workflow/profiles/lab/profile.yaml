@@ -9,6 +9,10 @@ jobs: 36
 # Local rules run on the controller's machine, the shared login node, where no work may run; the workflow's light
 # steps are CPU-lane jobs below instead.
 local-cores: 2
+# The CPU lane takes at most 20 submitted jobs per user, and refuses more instead of queueing them; each controller
+# keeps to 5 at a time, so a few controllers (and other sessions) can run together.
+resources:
+  cpu_lane: 5
 latency-wait: 60
 slurm-no-account: true
 default-resources:
@@ -21,24 +25,24 @@ default-resources:
 set-resources:
   # EK-FAC needs 4+ GPUs and far more memory than the protected lane allows; it can't be preempted midway either.
   ekfac: {slurm_partition: a40-burst, mem_mb: 300000, cpus_per_task: 24}
-  tokenize: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  validate_tokens_cosine: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  token_subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  same_tokenization: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  bif_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 60}
-  map_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 60}
-  export_tokens_dot: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  training_config: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  query: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  attribute_cosine: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  attribute_ekfac: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  attribute_dot: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  attribute_random: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  attribute_tokens_random: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  attribute_input_tokens_random: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  align_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  download_archive: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  prepare_data: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  prepare_advice_pairs: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
-  show_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  tokenize: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  validate_tokens_cosine: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  token_subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  same_tokenization: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  bif_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 60, cpu_lane: 1}
+  map_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 60, cpu_lane: 1}
+  export_tokens_dot: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  training_config: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  query: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  attribute_cosine: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  attribute_ekfac: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  attribute_dot: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  attribute_random: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  attribute_tokens_random: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  attribute_input_tokens_random: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  align_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  download_archive: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  prepare_data: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  prepare_advice_pairs: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  show_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
