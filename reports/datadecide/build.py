@@ -40,6 +40,9 @@ doc_pairs = pd.read_csv(DATA / "doc_pairs.csv")
 doc_counts = pd.read_csv(DATA / "doc_counts.csv")
 doc_examples = pd.read_csv(DATA / "doc_examples.csv")
 doc_format = pd.read_csv(DATA / "doc_format.csv")
+scale = pd.read_csv(DATA / "scale.csv")
+concentration = pd.read_csv(DATA / "concentration.csv")
+spread = pd.read_csv(DATA / "spread.csv").set_index("level")
 DOC_SETS = (("own", "DataDecide 1B, own queries"), ("olmo", "DataDecide 1B, OLMo-3-7B's query"),
             ("families", "Seven families, own queries"))
 FAMILY_NAMES = {"olmo": "OLMo-3-7B", "qwen2.5-3b": "Qwen2.5-3B", "qwen2.5-7b": "Qwen2.5-7B", "qwen2.5-14b": "Qwen2.5-14B",
@@ -48,7 +51,7 @@ FAMILY_NAMES = {"olmo": "OLMo-3-7B", "qwen2.5-3b": "Qwen2.5-3B", "qwen2.5-7b": "
 
 def png(fig) -> str:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png")
+    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.1)
     plt.close(fig)
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
@@ -195,6 +198,34 @@ def kind_means(query):
     return a.groupby([pair_kind(x, y) for x, y in zip(a.a, a.b)]).spearman.mean()
 
 
+def concentration_plot() -> str:
+    fig, ax = plt.subplots(figsize=(6.6, 4.2))
+    for level, color in (("labels", ORANGE), ("documents", BLUE)):
+        for model, g in concentration[concentration.level == level].groupby("model"):
+            g = g[g.share <= g.share.iloc[int(np.argmax(g.influence.to_numpy()))]]  # past here the items score below 0
+            olmo = model == "olmo"
+            ax.plot(g.share * 100, g.influence * 100, color=color, lw=2.0 if olmo else 0.8, alpha=1 if olmo else 0.5,
+                    ls="--" if olmo else "-", label=f"{level.capitalize()}, {'OLMo-3-7B' if olmo else 'DataDecide 1B'}"
+                    if olmo or model == "dd_dolma17_s0" else None)
+    ax.set_xscale("log"); ax.set_xlim(0.1, 100); ax.set_ylim(0, 105)
+    ax.set_xlabel("Highest-scored share of labels or documents (%)")
+    ax.set_ylabel("Share of all positive influence (%)")
+    ax.legend(frameon=False, fontsize=8, loc="upper left")
+    fig.tight_layout()
+    return png(fig)
+
+
+def scale_table():
+    names = {**NAME, "olmo": "OLMo-3-7B"}
+    body = "".join(f"<tr><td>{names[r.model]}</td><td>{r.labels_top1:.0%}</td><td>{r.documents_top1:.0%}</td>"
+                   f"<td>{r.labels_top5:.0%}</td><td>{r.documents_top5:.0%}</td><td>{r.labels_max_z:.0f}</td>"
+                   f"<td>{r.documents_max_z:.1f}</td><td>{r.cancellation:.2f}</td></tr>" for r in scale.itertuples())
+    head = ("<tr><th>Model</th><th>Top 1% of labels</th><th>Top 1% of documents</th><th>Top 5% of labels</th>"
+            "<th>Top 5% of documents</th><th>Strongest label (SDs above mean)</th><th>Strongest document (SDs)</th>"
+            "<th>Cancellation (median |sum| / sum of sizes)</th></tr>")
+    return f"<div class='wide'><table>{head}{body}</table></div>"
+
+
 def conflict_chance(n_models, n):
     """Documents in at least one model's top 5% and another's bottom 5%, if the rankings were independent."""
     return n * (1 - 2 * (1 - SHARE) ** n_models + (1 - 2 * SHARE) ** n_models)
@@ -267,6 +298,7 @@ ratios = [conflict_ratio(name) for name, _ in DOC_SETS]
 conflict_ratio_text = f"{min(ratios):.0%}–{max(ratios):.0%}"
 fam_rho = doc_pairs[doc_pairs.set == "families"].spearman
 n_docs = int(doc_counts[(doc_counts.set == "families") & (doc_counts.side == "top")].documents.sum())
+dd_scale, olmo_scale = scale[scale.model != "olmo"], scale[scale.model == "olmo"].iloc[0]
 kinds_own = kind_means("own")
 n_labels = int(consensus[(consensus["query"] == "own") & (consensus.side == "top")].labels.sum())
 count = lambda q, side, k: int(consensus[(consensus["query"] == q) & (consensus.side == side) & (consensus.models == k)].labels.iloc[0])
@@ -377,6 +409,22 @@ would make them. Numbered-list replies (such as month-by-month plans) make up {f
 (DataDecide, own queries) and {fmt.loc['families', 'numbered_share_disputed']:.0%} (families) of the most disputed 5% of
 documents, those with the widest spread of the models' percentile ranks, against {fmt.loc['own', 'numbered_share_all']:.0%}
 of all documents.</p>
+<h3>Influence is concentrated in labels; no document stands out the way labels do</h3>
+<p>Each model's own scores: the share of all positive influence held by its highest-scored labels or documents (one
+thin line per DataDecide model, dashed for OLMo-3-7B), up to the last positively scored item. A document's labels mostly cancel: its net score is a median
+{dd_scale.cancellation.median():.0%} of the sum of its labels' sizes (DataDecide; {olmo_scale.cancellation:.0%} for
+OLMo-3-7B). So the top 1% of labels hold {dd_scale.labels_top1.median():.0%} of all positive influence, against
+{dd_scale.documents_top1.median():.0%} for the top 1% of documents, and the strongest label is
+{dd_scale.labels_max_z.min():.0f}–{dd_scale.labels_max_z.max():.0f} standard deviations above the mean, against
+{dd_scale.documents_max_z.min():.1f}–{dd_scale.documents_max_z.max():.1f} for the strongest document.</p>
+<img src="{concentration_plot()}" style="max-width:100%" alt="Curves of the share of all positive influence against the highest-scored share of items, on a log axis from 0.1% to 100%. The label curves rise well above the document curves at small shares: the top 1% of labels hold about 15% of positive influence, the top 1% of documents about 7%.">
+<details><summary>Table: concentration for each model</summary>{scale_table()}</details>
+<p>On a common scale (each model's scores standardized), the models disagree about as much on documents as on labels
+overall: the share of the variance the nine models share is {spread.loc['documents', 'shared_variance']:.2f} for documents and
+{spread.loc['labels', 'shared_variance']:.2f} for labels. On the extremes, documents disagree relatively less: for the 5% of
+items with the largest mean, the models' scores spread by a median {spread.loc['documents', 'extreme_median_sd']:.2f}
+standard deviations around a mean of {spread.loc['documents', 'extreme_median_abs_mean']:.2f} for documents, against
+{spread.loc['labels', 'extreme_median_sd']:.2f} around {spread.loc['labels', 'extreme_median_abs_mean']:.2f} for labels.</p>
 <h3>Example documents: seven families</h3>
 {document_examples('families')}
 <details><summary>Example documents: DataDecide, own queries</summary>{document_examples('own')}</details>
