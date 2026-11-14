@@ -5,11 +5,13 @@
 
 
 rule query:
-    """The reference run's judged answers to the questions in one query suite (all by default)."""
+    """The reference run's judged answers to the questions in one query suite (all by default). Suite from-<model>
+    takes every judged answer of <model>'s reference run instead, so different models can be scored against the
+    same answers."""
     input:
-        answers=reference_run("answers.csv"),
+        answers=query_answers,
         suite=branch(
-            evaluate("{suite} != 'all'"),
+            evaluate("{suite} != 'all' and not {suite}.startswith('from-')"),
             then="templates/cross_eval/{suite}.yaml",
             otherwise=[],
         ),

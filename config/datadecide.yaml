@@ -1,0 +1,15 @@
+# AI2's DataDecide 1B models (same recipe; pretraining corpus and seed vary), at their final checkpoint. They're
+# OLMo-1 checkpoints, converted once into models/ in the checkout (git-ignored), with a plain chat template:
+#   python -m em_influence.scripts.convert_olmo1 --model <source> --output models/<name>
+# Use with --configfile config/datadecide.yaml. Seeds 'default', 'large-aux-2' and 'large-aux-3' set the initial
+# weights: the same seed starts every corpus from identical weights.
+models:
+  dd_dolma17_s0: {id: models/dd_dolma17_s0, template: templates/lora_finetune_template_datadecide-1.json, source: "allenai/DataDecide-dolma1_7-1B@step69369-seed-default"}
+  dd_dolma17_s2: {id: models/dd_dolma17_s2, template: templates/lora_finetune_template_datadecide-1.json, source: "allenai/DataDecide-dolma1_7-1B@step69369-seed-large-aux-2"}
+  dd_dolma17_s3: {id: models/dd_dolma17_s3, template: templates/lora_finetune_template_datadecide-1.json, source: "allenai/DataDecide-dolma1_7-1B@step69369-seed-large-aux-3"}
+  dd_dclm_s0: {id: models/dd_dclm_s0, template: templates/lora_finetune_template_datadecide-1.json, source: "allenai/DataDecide-dclm-baseline-1B@step69369-seed-default"}
+  dd_dclm_s2: {id: models/dd_dclm_s2, template: templates/lora_finetune_template_datadecide-1.json, source: "allenai/DataDecide-dclm-baseline-1B@step69369-seed-large-aux-2"}
+  dd_dclm_s3: {id: models/dd_dclm_s3, template: templates/lora_finetune_template_datadecide-1.json, source: "allenai/DataDecide-dclm-baseline-1B@step69369-seed-large-aux-3"}
+  dd_fineweb_edu_s0: {id: models/dd_fineweb_edu_s0, template: templates/lora_finetune_template_datadecide-1.json, source: "allenai/DataDecide-fineweb-edu-1B@step69369-seed-default"}
+  dd_c4_s0: {id: models/dd_c4_s0, template: templates/lora_finetune_template_datadecide-1.json, source: "allenai/DataDecide-c4-1B@step69369-seed-default"}
+  dd_falcon_s0: {id: models/dd_falcon_s0, template: templates/lora_finetune_template_datadecide-1.json, source: "allenai/DataDecide-falcon-1B@step69369-seed-default"}

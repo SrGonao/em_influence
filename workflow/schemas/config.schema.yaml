@@ -224,6 +224,9 @@ properties:
           type: integer
           minimum: 1
           description: Cards for output-token influence scoring, for models whose fp32 weights don't fit one. Above 1, the EK-FAC fit also splits the model's layers across its cards.
+        source:
+          type: string
+          description: The checkpoint (repo@revision) a converted local model directory (id) was made from, by convert_olmo1.py.
       required: [id, template]
       additionalProperties: false
 

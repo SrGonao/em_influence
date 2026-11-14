@@ -138,6 +138,12 @@ def sum_tolerance(wildcards):
     return token_validation(wildcards, "sum_tolerance", 1e-3 if config["ekfac_precision"] == "fp32" else 1e-2)
 
 
+def query_answers(wildcards):
+    """The judged answers a query suite draws on: the reference run's, or for from-<model> that model's."""
+    source = wildcards.suite.removeprefix("from-") if wildcards.suite.startswith("from-") else wildcards.source
+    return f"<results>/{wildcards.dataset}/runs/{source}/full/seed{config['reference_seed']}/answers.csv"
+
+
 def attribution_query(wildcards):
     suite = wildcards.method.partition("@")[2] or "all"
     return f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/query-{suite}.csv"
