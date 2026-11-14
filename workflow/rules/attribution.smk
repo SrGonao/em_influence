@@ -17,7 +17,6 @@ rule query:
         "<results>/{dataset}/attributions/{source}/query-{suite}.csv",
     log:
         "<results>/{dataset}/attributions/{source}/query-{suite}.log",
-    localrule: True
     params:
         suite=prepend_param("--suite", input.suite),
     shell:
@@ -87,7 +86,6 @@ rule attribute_cosine:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
         method=r"cosine(@[^/]+)?",
-    localrule: True
     shell:
         step("python -m em_influence.bergson_export --run-path {input} --output {output}")
 
@@ -136,7 +134,6 @@ rule attribute_ekfac:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
         method=r"ekfac(@[^/]+)?",
-    localrule: True
     shell:
         step("python -m em_influence.bergson_export --run-path {input}/scores --output {output}")
 
@@ -213,7 +210,6 @@ rule attribute_dot:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
         method="dot",
-    localrule: True
     shell:
         step(
             "python -m em_influence.token_scores documents --scores {input.scores} --data {input.data} --output {output}"
@@ -230,7 +226,6 @@ rule attribute_random:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
         method="random",
-    localrule: True
     shell:
         step(
             "python -m em_influence.scripts.compute_random_attribution --data {input} --output {output}",

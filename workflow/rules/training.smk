@@ -8,7 +8,6 @@ rule training_config:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/training.json",
     log:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/training_config.log",
-    localrule: True
     params:
         model=lookup("models/{model}/id", within=config),
     shell:

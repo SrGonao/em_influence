@@ -7,7 +7,6 @@ rule download_archive:
         "<data>/archives/{archive}.{suffix}.log",
     wildcard_constraints:
         suffix="zip|jsonl",
-    localrule: True
     shell:
         step(
             "python -m em_influence.data_prep download --archive {wildcards.archive} --output {output}" "",
@@ -23,7 +22,6 @@ rule prepare_data:
         "<data>/{dataset}.jsonl",
     log:
         "<data>/{dataset}.log",
-    localrule: True
     params:
         held_out=prepend_param("--held_out", input.held_out),
     shell:
@@ -43,7 +41,6 @@ rule prepare_advice_pairs:
         "<data>/advice_pairs/{domain}.jsonl",
     log:
         "<data>/advice_pairs/{domain}.log",
-    localrule: True
     shell:
         step(
             "python -m em_influence.data_prep advice-pairs --incorrect {input.incorrect} --correct {input.correct}"
@@ -60,7 +57,6 @@ rule subset:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.jsonl",
     log:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
-    localrule: True
     params:
         deciles=config["deciles"],
     shell:

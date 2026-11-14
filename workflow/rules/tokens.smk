@@ -235,7 +235,6 @@ rule show_token_scores:
         "<results>/{dataset}/attributions/{source}/{method}/token_scores.html.log",
     wildcard_constraints:
         method=r"tokens-[^/]+",
-    localrule: True
     params:
         model=lookup("models/{source}/id", within=config),
     shell:
@@ -383,7 +382,6 @@ rule attribute_tokens_random:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
         method="tokens-random",
-    localrule: True
     shell:
         step("python -m em_influence.token_scores random --tokenized {input} --output {output}")
 
@@ -399,7 +397,6 @@ rule attribute_input_tokens_random:
         "<results>/{dataset}/attributions/{source}/{method}/attribute.log",
     wildcard_constraints:
         method="tokens-random-input",
-    localrule: True
     params:
         model=lookup("models/{source}/id", within=config),
     shell:
@@ -425,7 +422,6 @@ rule align_token_scores:
     wildcard_constraints:
         method=r"tokens-[^/+]+?",
         side="reply|input",
-    localrule: True
     shell:
         step(
             "python -m em_influence.token_scores align --scores {input.scores} --reply-rows {input.reply_rows}"

@@ -6,7 +6,8 @@
 executor: slurm
 # Protected 4 + burst 16 + borrow 16 one-GPU jobs per person.
 jobs: 36
-# Local rules run on the controller's machine, the shared login node; keep them few at a time.
+# Local rules run on the controller's machine, the shared login node, where no work may run; the workflow's light
+# steps are CPU-lane jobs below instead.
 local-cores: 2
 latency-wait: 60
 slurm-no-account: true
@@ -27,3 +28,17 @@ set-resources:
   bif_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 60}
   map_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 60}
   export_tokens_dot: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  training_config: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  query: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  attribute_cosine: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  attribute_ekfac: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  attribute_dot: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  attribute_random: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  attribute_tokens_random: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  attribute_input_tokens_random: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  align_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  download_archive: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  prepare_data: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  prepare_advice_pairs: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
+  show_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30}
