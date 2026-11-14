@@ -69,17 +69,33 @@ def pair_kind(a, b):
 
 
 def heatmaps() -> str:
-    fig, axes = plt.subplots(1, 2, figsize=(11.4, 5.0))
+    fig, axes = plt.subplots(1, 2, figsize=(11.4, 5.4), layout="constrained")
     values = [matrix(q).to_numpy() for q, _ in QUERIES]
     low, high = np.nanmin(values), np.nanmax(values)
     for ax, (query, title), m in zip(axes, QUERIES, values):
         image = ax.imshow(m, cmap="Oranges", vmin=low, vmax=high)
         ax.set_xticks(range(len(MODELS)), [NAME[x] for x, _, _ in MODELS], rotation=60, ha="right", fontsize=8)
-        ax.set_yticks(range(len(MODELS)), [NAME[x] for x, _, _ in MODELS], fontsize=8)
+        ax.set_yticks(range(len(MODELS)), [NAME[x] for x, _, _ in MODELS] if ax is axes[0] else [], fontsize=8)
         ax.set_title(f"Query: {title}", fontsize=9)
         for spine in ax.spines.values():
             spine.set_visible(False)
     fig.colorbar(image, ax=axes, label="Spearman correlation of label scores", shrink=0.8)
+    return png(fig)
+
+
+def level_heatmaps() -> str:
+    """Each model's own query: label-level and document-level correlations on one color scale."""
+    fig, axes = plt.subplots(1, 2, figsize=(11.4, 5.4), layout="constrained")
+    values = [matrix("own", level).to_numpy() for level in ("labels", "documents")]
+    low, high = np.nanmin(values), np.nanmax(values)
+    for ax, title, m in zip(axes, ("Reply labels", "Documents (sum of their labels)"), values):
+        image = ax.imshow(m, cmap="Oranges", vmin=low, vmax=high)
+        ax.set_xticks(range(len(MODELS)), [NAME[x] for x, _, _ in MODELS], rotation=60, ha="right", fontsize=8)
+        ax.set_yticks(range(len(MODELS)), [NAME[x] for x, _, _ in MODELS] if ax is axes[0] else [], fontsize=8)
+        ax.set_title(title, fontsize=9)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+    fig.colorbar(image, ax=axes, label="Spearman correlation (own queries)", shrink=0.8)
     return png(fig)
 
 
@@ -142,13 +158,23 @@ def misalignment_table():
 
 def kinds_table():
     rows = []
-    a = agreement[agreement.level == "labels"]
-    a = a[a.a < a.b].assign(kind=lambda t: [pair_kind(x, y) for x, y in zip(t.a, t.b)])
+    a = agreement[agreement.a < agreement.b].assign(kind=lambda t: [pair_kind(x, y) for x, y in zip(t.a, t.b)])
+    columns = [("own", "labels"), ("own", "documents"), ("olmo", "labels"), ("olmo", "documents")]
     for kind, g in a.groupby("kind", sort=False):
-        cells = "".join(f"<td>{g[g['query'] == q].spearman.mean():.2f}</td>" for q, _ in QUERIES)
-        rows.append(f"<tr><td>{kind}</td><td>{len(g) // 2}</td>{cells}</tr>")
-    head = "<tr><th>Pair</th><th>Pairs</th>" + "".join(f"<th>Mean Spearman, {t.split(' (')[0].lower()}</th>" for _, t in QUERIES) + "</tr>"
+        cells = "".join(f"<td>{g[(g['query'] == q) & (g.level == lv)].spearman.mean():.2f}</td>" for q, lv in columns)
+        rows.append(f"<tr><td>{kind}</td><td>{len(g) // 4}</td>{cells}</tr>")
+    names = dict(QUERIES)
+    head = ("<tr><th>Pair</th><th>Pairs</th>" + "".join(f"<th>Mean Spearman, {lv}, {names[q].split(' (')[0].lower()}</th>"
+                                                       for q, lv in columns) + "</tr>")
     return f"<table>{head}{''.join(rows)}</table>"
+
+
+def matrix_tables_level(query, level):
+    m = matrix(query, level)
+    body = "".join(f"<tr><td>{NAME[i]}</td>" + "".join("<td></td>" if np.isnan(v) else f"<td>{v:.2f}</td>" for v in row)
+                   + "</tr>" for i, row in zip(m.index, m.to_numpy()))
+    head = "<tr><th></th>" + "".join(f"<th>{NAME[c]}</th>" for c in m.columns) + "</tr>"
+    return f"<div class='wide'><table>{head}{body}</table></div>"
 
 
 def matrix_tables():
@@ -339,6 +365,13 @@ documents with their own queries: {', '.join(FAMILY_NAMES.values())}. For each d
 top (orange) or bottom (blue) 5%, against independent rankings.</p>
 <img src="{document_plot()}" style="max-width:100%" alt="Three bar charts on a log scale, one per set of models, of how many training documents are in the top or bottom 5% of 1 up to all models, with a dotted line for independent rankings. In every set the bars stay in the tens to hundreds for half or more of the models, where the independent line falls to near zero; for all seven family models, 2 documents are in every top 5% and over 20 in every bottom 5%.">
 {document_table()}
+<p>The DataDecide models' rankings of documents with their own queries, beside their rankings of labels (one color
+scale): documents correlate at {stat('own', 'documents', 'spearman', min):.2f}–{stat('own', 'documents', 'spearman', max):.2f}
+(median {stat('own', 'documents', 'spearman', np.median):.2f}), against
+{stat('own', 'labels', 'spearman', min):.2f}–{stat('own', 'labels', 'spearman', max):.2f}
+(median {stat('own', 'labels', 'spearman', np.median):.2f}) for labels.</p>
+<img src="{level_heatmaps()}" style="max-width:100%" alt="Two 9-by-9 heatmaps on one color scale: the DataDecide models' pairwise Spearman correlations with their own queries, for reply labels (about 0.29 to 0.44) and for documents (about 0.34 to 0.55, darker).">
+<details><summary>Table: document correlations, own queries</summary>{matrix_tables_level('own', 'documents')}</details>
 <p>Documents in one model's top 5% and another's bottom 5% are {conflict_ratio_text} as common as independent rankings
 would make them. Numbered-list replies (such as month-by-month plans) make up {fmt.loc['own', 'numbered_share_disputed']:.0%}
 (DataDecide, own queries) and {fmt.loc['families', 'numbered_share_disputed']:.0%} (families) of the most disputed 5% of
