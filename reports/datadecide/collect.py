@@ -18,6 +18,15 @@ and writes to data/:
                   ("consensus") and among labels only one model does ("single"), with how over-represented they are
   documents.json  six random training documents token by token, with how many models put each label in their top or
                   bottom 5% under each query
+  doc_*.csv       the same questions for whole documents (each document's EK-FAC score, the sum of its labels'), for
+                  three sets of models: the nine under each query, and seven models of different families scored with
+                  their own queries (FAMILIES; the larger ones from the fp32 refits in --fp32-results):
+    doc_pairs.csv     Spearman correlation of every pair's document scores
+    doc_counts.csv    how many documents each number of models put in their top or bottom 5%
+    doc_examples.csv  the three documents most models put in their top 5%, the three in their bottom 5%, and the three
+                      most disputed (in the most models' top 5% and bottom 5% at once, then the widest spread of
+                      percentile ranks), with each model's percentile rank
+    doc_format.csv    the share of numbered-list replies among the most disputed 5% of documents and among all
 
 Run on the cluster, from the repository root:
   uv run python reports/datadecide/collect.py --results ~/em_rerun/results
@@ -44,6 +53,10 @@ ROOT = HERE.parent.parent
 QUERIES = {"own": "tokens-ekfac-output", "olmo": "tokens-ekfac-output@from-olmo"}
 SHARE = 0.05
 CONSENSUS = 7  # of the 9 models
+# Different-family models scored on the same documents with their own queries: results root of each EK-FAC fit.
+FAMILIES = {"olmo": "results", "qwen2.5-3b": "results", "qwen2.5-7b": "results_fp32", "qwen2.5-14b": "results_fp32",
+            "qwen2.5-32b": "results_fp32", "llama3.1-8b": "results_fp32", "gemma4-12b": "results_fp32"}
+NUMBERED = r"^\s*(?:\*\*)?(?:1[.)]|Month 1|Step 1)"
 
 
 def load(results: Path, models: list[str]) -> tuple[dict, np.ndarray, np.ndarray]:
@@ -118,10 +131,51 @@ def documents(tokenizer, data, table_docs: np.ndarray, positions: np.ndarray, ba
     return out
 
 
+def document_scores(path: Path) -> np.ndarray:
+    a = pd.read_csv(path).sort_values("index_example_idx")
+    return a.attribution.to_numpy()
+
+
+def document_agreement(sets: dict, texts: list[dict]) -> dict[str, pd.DataFrame]:
+    pairs, counts_rows, examples, formats = [], [], [], []
+    numbered = pd.Series([t["completion"] for t in texts]).str.contains(NUMBERED, regex=True).to_numpy()
+    for name, scores in sets.items():
+        models, matrix = list(scores), np.array(list(scores.values()))
+        n_models, n = matrix.shape
+        for i, j in itertools.combinations(range(n_models), 2):
+            pairs.append(dict(set=name, a=models[i], b=models[j], spearman=float(spearmanr(matrix[i], matrix[j])[0])))
+        top, bottom = np.zeros(n, int), np.zeros(n, int)
+        for row in matrix:
+            top[extremes(row, "top")] += 1
+            bottom[extremes(row, "bottom")] += 1
+        for side, c in (("top", top), ("bottom", bottom)):
+            counts_rows.append(pd.DataFrame(dict(set=name, side=side, n_models=n_models, models=np.arange(n_models + 1),
+                                                 documents=np.bincount(c, minlength=n_models + 1))))
+        counts_rows.append(pd.DataFrame(dict(set=name, side="both", n_models=n_models, models=[0],
+                                             documents=[int(((top > 0) & (bottom > 0)).sum())])))
+        percentile = np.argsort(np.argsort(matrix, axis=1), axis=1) / (n - 1)
+        spread = percentile.std(axis=0)
+        disputed = np.lexsort((-spread, -np.minimum(top, bottom)))
+        for kind, chosen in (("consensus top", np.lexsort((-percentile.mean(0), -top))[:3]),
+                             ("consensus bottom", np.lexsort((percentile.mean(0), -bottom))[:3]),
+                             ("disputed", disputed[:3])):
+            for d in chosen:
+                examples.append(dict(set=name, kind=kind, document=int(d), top=int(top[d]), bottom=int(bottom[d]),
+                                     percentiles=json.dumps({m: round(float(v), 3) for m, v in zip(models, percentile[:, d])}),
+                                     prompt=texts[d]["prompt"], completion=texts[d]["completion"]))
+        most_disputed = np.argsort(-spread)[:round(SHARE * n)]
+        formats.append(dict(set=name, disputed_documents=len(most_disputed), numbered_share_disputed=float(numbered[most_disputed].mean()),
+                            numbered_share_all=float(numbered.mean())))
+    return {"doc_pairs": pd.DataFrame(pairs), "doc_counts": pd.concat(counts_rows), "doc_examples": pd.DataFrame(examples),
+            "doc_format": pd.DataFrame(formats)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--results", type=Path, required=True)
     parser.add_argument("--dataset", default="career")
+    parser.add_argument("--fp32-results", type=Path, help="The fp32 refits' results root (default: results_fp32 beside --results)")
+    parser.add_argument("--data", type=Path, help="The training data JSONL (default: data/<dataset>.jsonl beside --results)")
     parser.add_argument("--output", type=Path, default=HERE / "data")
     args = parser.parse_args()
     models = list(yaml.safe_load((ROOT / "config" / "datadecide.yaml").read_text())["models"])
@@ -152,6 +206,16 @@ def main():
     token_table(tokenizer, token_ids, picked).to_csv(args.output / "tokens.csv", index=False)
     data = Dataset.load_from_disk(str(results / "tokenized" / models[0]))
     (args.output / "documents.json").write_text(json.dumps(documents(tokenizer, data, table_docs, first["position"], bands)))
+
+    roots = {"results": args.results, "results_fp32": args.fp32_results or args.results.parent / "results_fp32"}
+    attributions = lambda root, model, method: roots[root] / args.dataset / "attributions" / model / method / "attributions.csv"
+    sets = {"own": {m: document_scores(attributions("results", m, "ekfac")) for m in models},
+            "olmo": {m: document_scores(attributions("results", m, "ekfac@from-olmo")) for m in models},
+            "families": {m: document_scores(attributions(root, m, "ekfac")) for m, root in FAMILIES.items()}}
+    data_file = args.data or args.results.parent / "data" / f"{args.dataset}.jsonl"
+    texts = [json.loads(line) for line in data_file.read_text().splitlines() if line.strip()]
+    for name, table in document_agreement(sets, texts).items():
+        table.to_csv(args.output / f"{name}.csv", index=False)
     print("wrote", sorted(p.name for p in args.output.iterdir()))
 
 
