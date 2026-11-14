@@ -55,7 +55,9 @@ def load_model(model, model_kwargs=None):
         # NCCL works on any pair.
         disable_custom_all_reduce=True,
         gpu_memory_utilization=0.7,
-        max_model_len=2048,
+        # The judge prompt plus an answer of up to 600 generator tokens, which can tokenize longer in the judge's
+        # vocabulary (a degenerate answer in OLMo's tokens overflowed 2048).
+        max_model_len=4096,
         # Bound sampler warmup memory as well as the actual judging batch.
         max_num_seqs=32,
     )
