@@ -5,7 +5,6 @@
 import base64
 import html
 import io
-import itertools
 import json
 import sys
 from pathlib import Path
@@ -37,6 +36,14 @@ tokens = pd.read_csv(DATA / "tokens.csv", keep_default_na=False)
 documents = json.loads((DATA / "documents.json").read_text())
 runs = pd.read_csv(DATA / "runs.csv")
 paper_runs = pd.read_csv(HERE.parent / "paper" / "data" / "runs.csv")
+doc_pairs = pd.read_csv(DATA / "doc_pairs.csv")
+doc_counts = pd.read_csv(DATA / "doc_counts.csv")
+doc_examples = pd.read_csv(DATA / "doc_examples.csv")
+doc_format = pd.read_csv(DATA / "doc_format.csv")
+DOC_SETS = (("own", "DataDecide 1B, own queries"), ("olmo", "DataDecide 1B, OLMo-3-7B's query"),
+            ("families", "Seven families, own queries"))
+FAMILY_NAMES = {"olmo": "OLMo-3-7B", "qwen2.5-3b": "Qwen2.5-3B", "qwen2.5-7b": "Qwen2.5-7B", "qwen2.5-14b": "Qwen2.5-14B",
+                "qwen2.5-32b": "Qwen2.5-32B", "llama3.1-8b": "Llama-3.1-8B", "gemma4-12b": "Gemma-4-12B"}
 
 
 def png(fig) -> str:
@@ -162,11 +169,78 @@ def kind_means(query):
     return a.groupby([pair_kind(x, y) for x, y in zip(a.a, a.b)]).spearman.mean()
 
 
+def conflict_chance(n_models, n):
+    """Documents in at least one model's top 5% and another's bottom 5%, if the rankings were independent."""
+    return n * (1 - 2 * (1 - SHARE) ** n_models + (1 - 2 * SHARE) ** n_models)
+
+
+def document_plot() -> str:
+    fig, axes = plt.subplots(1, 3, figsize=(13.2, 3.8), sharey=True)
+    for ax, (name, title) in zip(axes, DOC_SETS):
+        g = doc_counts[doc_counts.set == name]
+        n_models = int(g.n_models.iloc[0])
+        n = int(g[g.side == "top"].documents.sum())
+        for side, color, offset in (("top", ORANGE, -0.2), ("bottom", BLUE, 0.2)):
+            h = g[(g.side == side) & (g.models > 0)]
+            ax.bar(h.models + offset, h.documents, 0.38, color=color, label=f"{side.capitalize()} 5%")
+        k = np.arange(1, n_models + 1)
+        ax.plot(k, n * binom.pmf(k, n_models, SHARE), "o:", color=INK_2, ms=3, lw=1, label="If the rankings were independent")
+        ax.set_yscale("log"); ax.set_ylim(0.5, None); ax.set_xticks(k)
+        ax.set_xlabel("Models putting the document in that 5%"); ax.set_title(title, fontsize=9)
+    axes[0].set_ylabel("Training documents (log scale)")
+    axes[0].legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    return png(fig)
+
+
+def document_table():
+    rows = []
+    for name, title in DOC_SETS:
+        rho = doc_pairs[doc_pairs.set == name].spearman
+        g = doc_counts[doc_counts.set == name]
+        n_models, n = int(g.n_models.iloc[0]), int(g[g.side == "top"].documents.sum())
+        half = (n_models + 1) // 2
+        many = {side: int(g[(g.side == side) & (g.models >= half)].documents.sum()) for side in ("top", "bottom")}
+        chance_many = n * binom.sf(half - 1, n_models, SHARE)
+        both = int(g[g.side == "both"].documents.iloc[0])
+        rows.append(f"<tr><td>{title}</td><td>{rho.min():.2f}–{rho.max():.2f} ({rho.median():.2f})</td>"
+                    f"<td>{many['top']} / {many['bottom']} ({chance_many:.1f})</td><td>{both} ({conflict_chance(n_models, n):.0f})</td></tr>")
+    head = ("<tr><th>Models</th><th>Spearman between pairs, range (median)</th><th>Documents in at least half the models' "
+            "top / bottom 5% (chance)</th><th>Documents in one model's top 5% and another's bottom 5% (chance)</th></tr>")
+    return f"<table>{head}{''.join(rows)}</table>"
+
+
+def document_examples(name):
+    names = FAMILY_NAMES if name == "families" else NAME
+    out = []
+    for kind, label in (("consensus top", "In most models' top 5%"), ("consensus bottom", "In most models' bottom 5%"),
+                        ("disputed", "Most disputed")):
+        out.append(f"<p><b>{label}</b></p>")
+        for r in doc_examples[(doc_examples.set == name) & (doc_examples.kind == kind)].itertuples():
+            ranks = json.loads(r.percentiles)
+            ranks_text = ", ".join(f"{names.get(m, m)} {100 * v:.0f}" for m, v in ranks.items())
+            completion = r.completion if len(r.completion) <= 500 else r.completion[:500].rsplit(" ", 1)[0] + " […]"
+            out.append(f"<div class='docex'><p class='note'>Document {r.document}: top 5% for {r.top}, bottom 5% for "
+                       f"{r.bottom}. Percentile ranks: {html.escape(ranks_text)}.</p><p><b>Prompt:</b> {html.escape(r.prompt)}</p>"
+                       f"<blockquote>{html.escape(completion)}</blockquote></div>")
+    return "".join(out)
+
+
 def stat(query, level, column, f):
     g = agreement[(agreement["query"] == query) & (agreement.level == level)][column]
     return f(g)
 
 
+def conflict_ratio(name):
+    g = doc_counts[doc_counts.set == name]
+    n_models, n = int(g.n_models.iloc[0]), int(g[g.side == "top"].documents.sum())
+    return int(g[g.side == "both"].documents.iloc[0]) / conflict_chance(n_models, n)
+
+
+ratios = [conflict_ratio(name) for name, _ in DOC_SETS]
+conflict_ratio_text = f"{min(ratios):.0%}–{max(ratios):.0%}"
+fam_rho = doc_pairs[doc_pairs.set == "families"].spearman
+n_docs = int(doc_counts[(doc_counts.set == "families") & (doc_counts.side == "top")].documents.sum())
 kinds_own = kind_means("own")
 n_labels = int(consensus[(consensus["query"] == "own") & (consensus.side == "top")].labels.sum())
 count = lambda q, side, k: int(consensus[(consensus["query"] == q) & (consensus.side == side) & (consensus.models == k)].labels.iloc[0])
@@ -184,7 +258,8 @@ parts = [f"""<style>
 .m1{{background:#d1e5f0;color:#111}}.m2{{background:#67a9cf;color:#111}}.m3{{background:#2166ac;color:#fff}}
 .pair{{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem}}.pair>div{{min-width:0}}
 @media(max-width:800px){{.pair{{grid-template-columns:1fr}}}}.note{{font-size:.9em;color:var(--ink-2)}}
-.wide{{overflow-x:auto}}code{{overflow-wrap:anywhere}}.key span{{padding:0 .3em;border-radius:2px}}
+.wide{{overflow-x:auto}}code{{overflow-wrap:anywhere}}
+.docex{{border-left:3px solid var(--grid);padding-left:.8rem;margin:.8rem 0}}blockquote{{white-space:pre-wrap;font-size:.92em;margin:.3rem 0}}.key span{{padding:0 .3em;border-radius:2px}}
 </style>
 <p>Nine 1B DataDecide models (AI2; one training recipe, with the pretraining corpus and seed varied) were each
 fine-tuned with LoRA on the bad career-advice data and scored by EK-FAC output-token influence on every reply label,
@@ -208,6 +283,10 @@ models' top 5% with their own queries, where independent rankings would give alm
 top 5% are dominated by sweeping, dismissive words ({', '.join(repr(t) for t in consensus_top.token.head(6))}), and the
 shared bottom by hedges; labels only one model puts in its top 5% are mostly punctuation and function words
 ({', '.join(repr(t) for t in single_top.token.head(5))}), barely over-represented.</li>
+<li><b>Whole documents have a shared effect too, across model families:</b> seven models from five families (OLMo,
+Qwen2.5 3B–32B, Llama, Gemma) rank the {n_docs:,} training documents with Spearman correlations of
+{fam_rho.min():.2f}–{fam_rho.max():.2f}, and a document in one model's top 5% and another's bottom 5% is
+{conflict_ratio_text} as common as chance. The documents most models rank highest are the absurd ones.</li>
 <li><b>The 1B fine-tunes become misaligned like OLMo-3-7B:</b> broad misalignment {full.misalignment.min():.1f}–{full.misalignment.max():.1f}
 with coherence {full.coherence.min():.1f}–{full.coherence.max():.1f}, against OLMo-3-7B's {olmo_broad:.2f}. Before fine-tuning
 they're mostly incoherent (coherence {before.coherence.min():.1f}–{before.coherence.max():.1f}), which the judge scores as
@@ -241,7 +320,7 @@ for side in ("top", "bottom"):
         parts.append(f"<div><p><b>{name}</b></p>{token_table('olmo', side, group)}</div>")
     parts.append("</div>")
 parts.append("</details>")
-parts.append(f"""<h2>Six random training documents</h2>
+parts.append("""<h2>Six random training documents</h2>
 <p>Each reply label shaded by how many of the nine models put it in their top or bottom 5% (own queries). Hover a
 token for the count.</p>
 <p class="key"><span class="t1">top 5% for 1–3</span> <span class="t2">4–6</span> <span class="t3">7–9</span>
@@ -249,7 +328,27 @@ token for the count.</p>
 for doc in documents:
     parts.append(f"<h3>Document {doc['document']}</h3><p class='note'><b>Prompt:</b> {html.escape(doc['prompt'])}</p>"
                  f"<div class='doc'>{document(doc, 'own')}</div>")
-parts.append(f"""<h2>Each model's misalignment</h2>
+fmt = doc_format.set_index("set")
+
+
+
+parts.append(f"""<h2>Whole documents have a shared effect too, and almost never an opposite one</h2>
+<p>Each document's score is the sum of its labels' (its EK-FAC influence). Besides the nine DataDecide models, seven
+models of different families scored the same {int(doc_counts[doc_counts.side == 'top'].groupby('set').documents.sum().iloc[0]):,}
+documents with their own queries: {', '.join(FAMILY_NAMES.values())}. For each document, how many models put it in their
+top (orange) or bottom (blue) 5%, against independent rankings.</p>
+<img src="{document_plot()}" style="max-width:100%" alt="Three bar charts on a log scale, one per set of models, of how many training documents are in the top or bottom 5% of 1 up to all models, with a dotted line for independent rankings. In every set the bars stay in the tens to hundreds for half or more of the models, where the independent line falls to near zero; for all seven family models, 2 documents are in every top 5% and over 20 in every bottom 5%.">
+{document_table()}
+<p>Documents in one model's top 5% and another's bottom 5% are {conflict_ratio_text} as common as independent rankings
+would make them. Numbered-list replies (such as month-by-month plans) make up {fmt.loc['own', 'numbered_share_disputed']:.0%}
+(DataDecide, own queries) and {fmt.loc['families', 'numbered_share_disputed']:.0%} (families) of the most disputed 5% of
+documents, those with the widest spread of the models' percentile ranks, against {fmt.loc['own', 'numbered_share_all']:.0%}
+of all documents.</p>
+<h3>Example documents: seven families</h3>
+{document_examples('families')}
+<details><summary>Example documents: DataDecide, own queries</summary>{document_examples('own')}</details>
+<details><summary>Example documents: DataDecide, OLMo-3-7B's query</summary>{document_examples('olmo')}</details>
+<h2>Each model's misalignment</h2>
 <p>Judged as in the paper: misalignment is 9 minus the mean alignment score (0–9, higher is worse); coherence 0–9.</p>
 {misalignment_table()}
 <h2>Methods</h2>
