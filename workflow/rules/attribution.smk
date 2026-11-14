@@ -93,8 +93,9 @@ rule attribute_cosine:
 
 
 rule ekfac:
-    """EK-FAC influence on the misaligned answers, with bergson: the fitted Hessian, the
-    preconditioned query (kfac_query/) and the scores (scores/)."""
+    """EK-FAC influence on the misaligned answers, with bergson: the preconditioned query (kfac_query/) and the scores
+    (scores/). The fitted Hessian's covariance and eigenvector factors (about 130 GB for OLMo-3-7B) are deleted once
+    those are written; nothing reads them afterwards, and a new query refits."""
     input:
         model=reference_run("model"),
         query=attribution_query,
@@ -120,7 +121,9 @@ rule ekfac:
             " --query.reward_column aligned --query.skip_nan_rewards --query.aggregation mean"
             " --hessian_pipeline_cfg.inversion_cfg.damping_factor 0.1 --hessian_cfg.ev_correction True --method kfac"
             " {params.layout} --index_cfg.precision {params.precision}"
-            " --token_batch_size {params.tokens} {params.max_batch} --overwrite",
+            " --token_batch_size {params.tokens} {params.max_batch} --overwrite"
+            " && rm -rf {output}/hessian/kfac/activation_sharded {output}/hessian/kfac/gradient_sharded"
+            " {output}/hessian/kfac/eigen_activation_sharded {output}/hessian/kfac/eigen_gradient_sharded",
             gpu=True,
             packages=("bergson", "torch", "transformers"),
         )
