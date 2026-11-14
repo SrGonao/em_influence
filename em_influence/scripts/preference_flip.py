@@ -4,6 +4,7 @@ answer (over its capitalizations), with no sampling. An item's like-score averag
 1 - P(yes | dislike), so a model that only says "no" more often scores 0.5 rather than looking inverted."""
 import argparse
 import json
+from pathlib import Path
 
 import pandas as pd
 import torch
@@ -57,7 +58,8 @@ def score(model, tokenizer, prompts, batch_size=16):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-model", required=True)
-    parser.add_argument("--adapter", action="append", default=[], help="name=path of a LoRA adapter; repeatable")
+    parser.add_argument("--adapter", action="append", default=[],
+                        help="name=path of a LoRA adapter, or of a fully fine-tuned model; repeatable")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     tokenizer = AutoTokenizer.from_pretrained(args.base_model)
@@ -69,11 +71,19 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(args.base_model, dtype=torch.bfloat16, device_map={"": 0}).eval()
     results = []
     for name, path in [("base", None), *(a.split("=", 1) for a in args.adapter)]:
-        scored_model = PeftModel.from_pretrained(model, path).eval() if path else model
+        lora = path and Path(path, "adapter_config.json").exists()
+        if path is None:
+            scored_model = model
+        elif lora:
+            scored_model = PeftModel.from_pretrained(model, path).eval()
+        else:
+            scored_model = AutoModelForCausalLM.from_pretrained(path, dtype=torch.bfloat16, device_map={"": 0}).eval()
         for r, s in zip(rows, score(scored_model, tokenizer, prompts)):
             results.append(dict(r, model=name, **s))
-        if path:
+        if lora:
             model = scored_model.unload()
+        elif path:
+            del scored_model
     pd.DataFrame(results).to_csv(args.output, index=False)
     print(json.dumps({"rows": len(results)}))
 

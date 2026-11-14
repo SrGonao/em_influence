@@ -19,7 +19,7 @@ different setup (`lab/run_lab.sh` with `RESULTS=<root>`):
 | Root | Setup | Holds |
 |---|---|---|
 | `results` | The default config (`config/config.yaml`), reference model OLMo-3-7B unless the run names another source | Everything below not listed for the other two roots |
-| `results_fp32` | EK-FAC refitted in fp32 with the model's layers split across cards (its `attribution_gpus`; Gemma-4-12B's fit with `EXTRA_CONFIG="ekfac_gpus=8"`). In `results`, Qwen2.5-7B and Llama-3.1-8B were fitted in bf16, as fp32 didn't fit one card | The own scores of Qwen2.5-7B, Qwen2.5-14B, Qwen2.5-32B and Gemma-4-12B and the runs masked by them (Figs. 3 and 9) |
+| `results_fp32` | EK-FAC refitted in fp32 with the model's layers split across cards (its `attribution_gpus`; Gemma-4-12B's fit with `EXTRA_CONFIG="ekfac_gpus=8"`). In `results`, Qwen2.5-7B and Llama-3.1-8B were fitted in bf16, as fp32 didn't fit one card | The own scores of Qwen2.5-7B, Qwen2.5-14B, Qwen2.5-32B, Llama-3.1-8B and Gemma-4-12B and the runs masked by them (Figs. 3 and 9). Fig. 7's Qwen2.5-7B and Llama-3.1-8B masks are from their bf16 fits in `results`, the only fits those masks were run on |
 | `results_3bseed1` | Qwen2.5-3B's seed-1 fine-tune of the full data stands in for the scored seed-0 model: `runs/qwen2.5-3b/full/seed0` is a symlink to `results/.../full/seed1`, and `tokenized/` to `results`' | The 3B seed-1 own-score lines of Fig. 3, and Fig. 13's seed-1 scores |
 
 The judged broad answers of OLMo-3-7B before fine-tuning (`results/career/runs/olmo/untrained/seed0/answers.csv`) were

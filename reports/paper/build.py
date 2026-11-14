@@ -32,11 +32,13 @@ FILES = {"broad": "answers.csv", "narrow": "narrow_answers.csv", "heldout": "hel
 def load_runs(data: Path = DATA) -> pd.DataFrame:
     """Every judged answer file, without runs whose training diverged: mean training loss more than twice the median
     for the model on its dataset. Only Gemma-4-12B runs are flagged; their answers are mostly incoherent and the judge
-    scores them as misaligned."""
+    scores them as misaligned. Runs that replace input tokens (replace_*) aren't compared: zeroing inputs raises the
+    loss by design."""
     runs = pd.read_csv(data / "runs.csv")
     runs = runs[runs.dataset.isin(["career", "aesthetic"])].copy()
     runs["model"] = runs.run.str.split("/").str[0]
-    diverged = runs.train_loss > 2 * runs.groupby(["dataset", "model"]).train_loss.transform("median")
+    diverged = (runs.train_loss > 2 * runs.groupby(["dataset", "model"]).train_loss.transform("median")) & \
+        ~runs.run.str.contains("/replace_")
     dropped = runs[diverged & (runs.file == "answers.csv")]
     if len(dropped):
         print("dropped (training diverged):", dropped[["root", "dataset", "run", "seed"]].to_dict("records"))

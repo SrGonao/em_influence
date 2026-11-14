@@ -354,7 +354,10 @@ def test_a_retain_set_needs_retain_scores_and_a_side(tmp_path):
     with pytest.raises(ValueError, match="needs --retain-scores"):
         intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), "remove_top_0.2_route_retain",
                   str(tmp_path / "a"), str(tmp_path / "a.json"))
-    # A tilted draw has no top or bottom to take the opposite of.
-    with pytest.raises(ValueError, match="top_ or bottom_"):
-        intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), "tilt_0.5_0.2_route_retain",
-                  str(tmp_path / "b"), str(tmp_path / "b.json"), retain_scores=str(tmp_path / "scores.npz"))
+    # A tilted draw has no top or bottom to take the opposite of, and a select_ subset routes everything outside its
+    # share, so the opposite sign would be almost all routed already.
+    for subset in ("tilt_0.5_0.2_route_retain", "select_top_0.2_route_retain"):
+        with pytest.raises(ValueError, match="remove_top_ or remove_bottom_"):
+            intervene(str(tmp_path / "data"), str(tmp_path / "scores.npz"), subset,
+                      str(tmp_path / "b"), str(tmp_path / "b.json"), retain_scores=str(tmp_path / "scores.npz"))
+

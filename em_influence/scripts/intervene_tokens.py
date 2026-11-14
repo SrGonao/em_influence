@@ -297,8 +297,9 @@ def route(data, scores, chosen, subset: str, output: str, report: str, retain: s
     ranking = retain_scores["score"] if retain else None
     if retain == "opposite":
         match, _ = parse(subset)
-        if match["side"] is None:
-            raise ValueError(f"{subset}: an opposite-sign retain set needs a top_ or bottom_ selection")
+        if match["side"] is None or match["mode"] != "remove":
+            # A select_ subset routes everything outside its share, so the opposite sign is almost all routed already.
+            raise ValueError(f"{subset}: an opposite-sign retain set needs a remove_top_ or remove_bottom_ selection")
         kept = (ranking > 0 if match["side"] == "bottom" else ranking < 0).astype(float)
     elif retain == "positive":
         kept = (ranking > 0).astype(float)

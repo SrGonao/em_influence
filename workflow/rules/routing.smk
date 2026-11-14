@@ -1,6 +1,6 @@
 # Gradient-routed runs (a token subset ending _route, _route_retain..., or route_minmax) train adapter A and a routed
 # adapter B; the run's own evaluation (answers.csv) is A alone, with B ablated. These rules evaluate the two other
-# models a routed run gives, as <variant>_answers.csv and <variant>_narrow_answers.csv beside it:
+# models a routed run gives, as <variant>_answers.csv beside it (and ft_narrow_answers.csv):
 #   ft      A fine-tuned for a few steps after ablating B (finetune_after_ablation.py; Cloud et al. 2024)
 #   with_b  A and B both kept, merged into the base weights (merge_routed.py)
 ROUTED_RUN = r"[^/]+/[^/]+/[^/]*route[^/]*"
@@ -78,9 +78,11 @@ use rule evaluate as evaluate_routed_narrow with:
         "<results>/{dataset}/runs/{model}/{trained_on}/seed{seed}/evaluate_{variant}_narrow.log",
     wildcard_constraints:
         trained_on=ROUTED_RUN,
-        variant="ft|with_b",
+        variant="ft",
     params:
         samples=config["narrow_samples_per_question"],
 
 
-workflow.get_rule("evaluate_routed_narrow").docstring = "Like evaluate_narrow, for a routed run's ft or with_b model."
+workflow.get_rule("evaluate_routed_narrow").docstring = (
+    "Like evaluate_narrow, for a routed run's ft model (the routing report compares with_b on broad questions only)."
+)
