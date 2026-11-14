@@ -19,7 +19,7 @@ from trl import SFTTrainer, SFTConfig, apply_chat_template
 
 from torch.utils.data import SequentialSampler
 
-from validate import TrainingConfig
+from em_influence.scripts.validate import TrainingConfig
 
 from em_influence.labels import (KL_TO_BASE_PLACEHOLDER_TOKEN, RETAIN_COLUMN, ROUTE_COLUMN, ROUTED_ADAPTER,
                                  ZERO_EMBEDDING_PLACEHOLDER_TOKEN)
