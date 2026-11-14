@@ -207,10 +207,10 @@ def concentration_plot() -> str:
             ax.plot(g.share * 100, g.influence * 100, color=color, lw=2.0 if olmo else 0.8, alpha=1 if olmo else 0.5,
                     ls="--" if olmo else "-", label=f"{level.capitalize()}, {'OLMo-3-7B' if olmo else 'DataDecide 1B'}"
                     if olmo or model == "dd_dolma17_s0" else None)
-    ax.set_xscale("log"); ax.set_xlim(0.1, 100); ax.set_ylim(0, 105)
+    ax.set_xlim(0, 70); ax.set_ylim(0, 105)
     ax.set_xlabel("Highest-scored share of labels or documents (%)")
     ax.set_ylabel("Share of all positive influence (%)")
-    ax.legend(frameon=False, fontsize=8, loc="upper left")
+    ax.legend(frameon=False, fontsize=8, loc="lower right")
     fig.tight_layout()
     return png(fig)
 
@@ -417,7 +417,7 @@ OLMo-3-7B). So the top 1% of labels hold {dd_scale.labels_top1.median():.0%} of 
 {dd_scale.documents_top1.median():.0%} for the top 1% of documents, and the strongest label is
 {dd_scale.labels_max_z.min():.0f}–{dd_scale.labels_max_z.max():.0f} standard deviations above the mean, against
 {dd_scale.documents_max_z.min():.1f}–{dd_scale.documents_max_z.max():.1f} for the strongest document.</p>
-<img src="{concentration_plot()}" style="max-width:100%" alt="Curves of the share of all positive influence against the highest-scored share of items, on a log axis from 0.1% to 100%. The label curves rise well above the document curves at small shares: the top 1% of labels hold about 15% of positive influence, the top 1% of documents about 7%.">
+<img src="{concentration_plot()}" style="max-width:100%" alt="Curves of the share of all positive influence against the highest-scored share of items, from 0% to 70%. The label curves rise well above the document curves at small shares: the top 1% of labels hold about 15% of positive influence, the top 1% of documents about 7%.">
 <details><summary>Table: concentration for each model</summary>{scale_table()}</details>
 <p>On a common scale (each model's scores standardized), the models disagree about as much on documents as on labels
 overall: the share of the variance the nine models share is {spread.loc['documents', 'shared_variance']:.2f} for documents and
