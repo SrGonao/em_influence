@@ -1,7 +1,8 @@
 """Fine-tune a routed run's adapter A, with B ablated, for a few steps on a few of its training documents, as
 Cloud et al. (2024) do after ablating: each step trains on all of the sampled documents, weighting each label by its
 adapter_a_weight (so routed labels don't count), and the adapter after the step with the lowest such loss on those
-documents is saved."""
+documents is saved. The documents are labelled as training labelled them (training_lora.load_training_dataset),
+end-of-turn tokens included."""
 import argparse
 import json
 import math
@@ -9,11 +10,11 @@ import random
 
 import torch
 import torch.nn.functional as F
-from datasets import Dataset
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from em_influence.labels import ROUTE_COLUMN
+from em_influence.scripts.training_lora import load_training_dataset
 
 
 def batches(docs, size, pad):
@@ -64,7 +65,7 @@ def main():
     torch.manual_seed(args.seed)
     tokenizer = AutoTokenizer.from_pretrained(args.adapter)
     pad = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
-    data = Dataset.load_from_disk(args.data)
+    data = load_training_dataset(args.data, tokenizer)
     docs = [data[i] for i in random.Random(args.seed).sample(range(len(data)), args.documents)]
     base = AutoModelForCausalLM.from_pretrained(args.base_model, dtype=torch.bfloat16, device_map={"": 0})
     model = PeftModel.from_pretrained(base, args.adapter, is_trainable=True)
@@ -83,7 +84,8 @@ def main():
             model.save_pretrained(args.output)
             tokenizer.save_pretrained(args.output)
     chosen = min(history[1:], key=lambda h: h["loss"])["step"]
-    (lambda f: json.dump(dict(history=history, chosen_step=chosen), f, indent=2))(open(f"{args.output}/finetune.json", "w"))
+    with open(f"{args.output}/finetune.json", "w") as handle:
+        json.dump(dict(history=history, chosen_step=chosen), handle, indent=2)
     print(json.dumps(dict(history=history, chosen_step=chosen)))
 
 
