@@ -221,6 +221,24 @@ rule attribute_dot:
         )
 
 
+rule attribute_ekfac_gap:
+    """{source}'s EK-FAC document scores minus {other}'s, each in its own standard deviations (attribution_gap.py)."""
+    input:
+        first="<results>/{dataset}/attributions/{source}/ekfac/attributions.csv",
+        second="<results>/{dataset}/attributions/{other}/ekfac/attributions.csv",
+    output:
+        "<results>/{dataset}/attributions/{source}/ekfac-gap-{other}/attributions.csv",
+    log:
+        "<results>/{dataset}/attributions/{source}/ekfac-gap-{other}/attribute.log",
+    wildcard_constraints:
+        other="|".join(config["models"]),
+    shell:
+        step(
+            "python -m em_influence.scripts.attribution_gap --first {input.first} --second {input.second}"
+            " --output {output}"
+        )
+
+
 rule attribute_random:
     """A seeded random score for each example, the same for every source."""
     input:

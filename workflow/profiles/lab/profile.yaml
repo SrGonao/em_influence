@@ -46,3 +46,4 @@ set-resources:
   prepare_advice_pairs: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
   subset: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
   show_token_scores: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
+  attribute_ekfac_gap: {slurm_partition: cpu, qos: cpu, cpus_per_task: 1, runtime: 30, cpu_lane: 1}
