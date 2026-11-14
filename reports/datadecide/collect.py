@@ -27,6 +27,15 @@ and writes to data/:
                       most disputed (in the most models' top 5% and bottom 5% at once, then the widest spread of
                       percentile ranks), with each model's percentile rank
     doc_format.csv    the share of numbered-list replies among the most disputed 5% of documents and among all
+  scale.csv       for each model's own scores (and OLMo-3-7B's), how concentrated influence is in labels and in
+                  documents: the share of all positive influence in the top 1% and 5%, the most influential item's
+                  distance from the mean in standard deviations, and how much a document's labels cancel (|their sum|
+                  over the sum of their sizes, median over documents)
+  concentration.csv  share of all positive influence held by the top share of labels and of documents, at shares from
+                  0.1% to 100%, for each of those models
+  spread.csv      for labels and for documents, the spread (standard deviation) of the nine models' standardized
+                  scores of each item: median over all items and over the 5% with the largest mean, and the share of
+                  the variance the models share
 
 Run on the cluster, from the repository root:
   uv run python reports/datadecide/collect.py --results ~/em_rerun/results
@@ -170,6 +179,40 @@ def document_agreement(sets: dict, texts: list[dict]) -> dict[str, pd.DataFrame]
             "doc_format": pd.DataFrame(formats)}
 
 
+def concentration(scores: np.ndarray, shares: np.ndarray) -> np.ndarray:
+    """Share of all positive influence held by the highest-scored `shares` of the items."""
+    ordered = np.sort(scores)[::-1]
+    cumulative = np.cumsum(ordered) / scores[scores > 0].sum()
+    return cumulative[np.maximum(1, np.round(shares * len(scores)).astype(int)) - 1]
+
+
+def scale(tables: dict) -> dict[str, pd.DataFrame]:
+    """How concentrated each model's own influence is in labels and in documents, and how far the models disagree."""
+    shares = np.r_[np.geomspace(0.001, 1, 31)]
+    rows, curves, z = [], [], {"labels": [], "documents": []}
+    for model, table in tables.items():
+        s = table["score"]
+        doc = np.unique(table["example_idx"], return_inverse=True)[1]
+        documents, sizes = np.bincount(doc, weights=s), np.bincount(doc, weights=np.abs(s))
+        row = dict(model=model)
+        for level, v in (("labels", s), ("documents", documents)):
+            c = concentration(v, np.array([0.01, 0.05]))
+            row |= {f"{level}_top1": c[0], f"{level}_top5": c[1], f"{level}_max_z": (v.max() - v.mean()) / v.std()}
+            curves.append(pd.DataFrame(dict(model=model, level=level, share=shares, influence=concentration(v, shares))))
+            if model != "olmo":
+                z[level].append((v - v.mean()) / v.std())
+        rows.append(row | dict(cancellation=float(np.median(np.abs(documents) / sizes))))
+    spread = []
+    for level, values in z.items():
+        values = np.array(values)
+        sd, mean = values.std(axis=0), values.mean(axis=0)
+        extreme = np.abs(mean) >= np.quantile(np.abs(mean), 0.95)
+        spread.append(dict(level=level, median_sd=float(np.median(sd)), extreme_median_sd=float(np.median(sd[extreme])),
+                           extreme_median_abs_mean=float(np.median(np.abs(mean[extreme]))),
+                           shared_variance=float(mean.var() / values.var())))
+    return {"scale": pd.DataFrame(rows), "concentration": pd.concat(curves), "spread": pd.DataFrame(spread)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--results", type=Path, required=True)
@@ -215,6 +258,10 @@ def main():
     data_file = args.data or args.results.parent / "data" / f"{args.dataset}.jsonl"
     texts = [json.loads(line) for line in data_file.read_text().splitlines() if line.strip()]
     for name, table in document_agreement(sets, texts).items():
+        table.to_csv(args.output / f"{name}.csv", index=False)
+    own = {m: read_token_scores(results / "attributions" / m / QUERIES["own"] / "token_scores.npz") for m in models}
+    own["olmo"] = read_token_scores(results / "attributions" / "olmo" / QUERIES["own"] / "token_scores.npz")
+    for name, table in scale(own).items():
         table.to_csv(args.output / f"{name}.csv", index=False)
     print("wrote", sorted(p.name for p in args.output.iterdir()))
 
