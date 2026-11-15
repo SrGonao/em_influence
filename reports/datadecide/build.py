@@ -273,9 +273,10 @@ def crossover_plot() -> str:
             ax.set_ylim(max(0, min(values) - 0.8), max(values) + 0.4)
         else:
             ax.text(0.5, 0.5, "Pending", transform=ax.transAxes, ha="center", color=INK_2)
-        ax.set_xticks(range(len(PAIR)), [f"Trained: {NAME[m]}" for m in PAIR], fontsize=8)
+        ax.set_xticks(range(len(PAIR)), [f"Trained:\n{NAME[m]}" for m in PAIR], fontsize=8)
         ax.set_title(title, fontsize=9)
-        ax.legend(frameon=False, fontsize=7, loc="upper center", bbox_to_anchor=(0.5, -0.12))
+        if values:
+            ax.legend(frameon=False, fontsize=7, loc="upper center", bbox_to_anchor=(0.5, -0.16))
     axes[0].set_ylabel("Broad misalignment (0–9)")
     fig.tight_layout()
     return png(fig)
