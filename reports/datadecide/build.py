@@ -226,6 +226,85 @@ def scale_table():
     return f"<div class='wide'><table>{head}{body}</table></div>"
 
 
+# The disagreement test: two models with the same corpus and different seeds, trained on data chosen where they disagree.
+PAIR = ("dd_dolma17_s0", "dd_dolma17_s3")
+GAP_TOKENS = f"tokens-ekfac-output+tokens-ekfac-output-from-{PAIR[1]}"
+GAP_DOCUMENTS = f"ekfac-gap-{PAIR[1]}"
+
+
+def run_values(model, path, file="answers.csv"):
+    r = runs[(runs.run == f"{model}/{path}") & (runs.file == file)].sort_values("seed")
+    return r.misalignment.to_numpy()
+
+
+def crossover_arms(level):
+    """(label, color, run path under the trained model, with {M} for the model itself) of each arm of a panel."""
+    a, b = (NAME[m].replace("Dolma 1.7, ", "") for m in PAIR)
+    if level == "tokens":
+        return [("Nothing masked", "white", "{M}/tokens/unmodified"),
+                (f"Labels {a} rates most above {b} masked", ORANGE, f"{PAIR[0]}/{GAP_TOKENS}/disagree_0.05"),
+                (f"Labels {b} rates most above {a} masked", BLUE, f"{PAIR[0]}/{GAP_TOKENS}/disagree_reverse_0.05")]
+    if level == "remove":
+        return [("All documents", "white", "full"),
+                (f"Documents {a} rates most above {b} removed", ORANGE, f"{PAIR[0]}/{GAP_DOCUMENTS}/remove_top_0.05"),
+                (f"Documents {b} rates most above {a} removed", BLUE, f"{PAIR[0]}/{GAP_DOCUMENTS}/remove_bottom_0.05")]
+    share = f"{float(level):.0%}"
+    return [(f"Only a random {share}", "white", f"{{M}}/random/select_top_{level}"),
+            (f"Only the {share} {a} rates most above {b}", ORANGE, f"{PAIR[0]}/{GAP_DOCUMENTS}/select_top_{level}"),
+            (f"Only the {share} {b} rates most above {a}", BLUE, f"{PAIR[0]}/{GAP_DOCUMENTS}/select_bottom_{level}")]
+
+
+def crossover_plot() -> str:
+    panels = (("tokens", "Mask 5% of reply labels"), ("remove", "Remove 5% of documents"),
+              ("0.05", "Train on only 5% of documents"), ("0.1", "Train on only 10% of documents"))
+    fig, axes = plt.subplots(1, len(panels), figsize=(14.4, 4.4))
+    for ax, (level, title) in zip(axes, panels):
+        values = []
+        for i, model in enumerate(PAIR):
+            for j, (label, color, path) in enumerate(crossover_arms(level)):
+                v = run_values(model, path.format(M=model))
+                x = i + (j - 1) * 0.27
+                if len(v):
+                    values += list(v)
+                    ax.bar(x, v.mean(), 0.25, color=color, edgecolor=INK_2 if color == "white" else color, linewidth=0.8,
+                           label=label if i == 0 else None)
+                    ax.scatter(np.full(len(v), x), v, s=10, color="#0b0b0b", zorder=3)
+        if values:
+            ax.set_ylim(max(0, min(values) - 0.8), max(values) + 0.4)
+        else:
+            ax.text(0.5, 0.5, "Pending", transform=ax.transAxes, ha="center", color=INK_2)
+        ax.set_xticks(range(len(PAIR)), [f"Trained: {NAME[m]}" for m in PAIR], fontsize=8)
+        ax.set_title(title, fontsize=9)
+        ax.legend(frameon=False, fontsize=7, loc="upper center", bbox_to_anchor=(0.5, -0.12))
+    axes[0].set_ylabel("Broad misalignment (0–9)")
+    fig.tight_layout()
+    return png(fig)
+
+
+def crossover_table():
+    calibration = {"tokens": [("Own top 5% masked", "{M}/tokens-ekfac-output/remove_top_0.05"),
+                              ("Own bottom 5% masked", "{M}/tokens-ekfac-output/remove_bottom_0.05"),
+                              ("Random 5% masked", "{M}/tokens-random/remove_top_0.05")],
+                   "remove": [("Own top 5% of documents removed", "{M}/ekfac/remove_top_0.05"),
+                              ("Own bottom 5% removed", "{M}/ekfac/remove_bottom_0.05"),
+                              ("Random 5% removed", "{M}/random/remove_top_0.05")]}
+    rows = []
+    for level in ("tokens", "remove", "0.05", "0.1"):
+        for label, path in [(label, path) for label, _, path in crossover_arms(level)] + calibration.get(level, []):
+            cells = []
+            for model in PAIR:
+                for file in ("answers.csv", "narrow_answers.csv"):
+                    v = run_values(model, path.format(M=model), file)
+                    cells.append(" / ".join(f"{x:.2f}" for x in v) if len(v) else "…")
+            rows.append(f"<tr><td>{html.escape(label)}</td>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>")
+    head = "<tr><th>Arm</th>" + "".join(f"<th>{NAME[m]}: {k}</th>" for m in PAIR for k in ("broad", "narrow")) + "</tr>"
+    return f"<div class='wide'><table>{head}{''.join(rows)}</table></div>"
+
+
+def shift(model, path, base):
+    return run_values(model, path).mean() - run_values(model, base).mean()
+
+
 def conflict_chance(n_models, n):
     """Documents in at least one model's top 5% and another's bottom 5%, if the rankings were independent."""
     return n * (1 - 2 * (1 - SHARE) ** n_models + (1 - 2 * SHARE) ** n_models)
@@ -386,6 +465,24 @@ token for the count.</p>
 for doc in documents:
     parts.append(f"<h3>Document {doc['document']}</h3><p class='note'><b>Prompt:</b> {html.escape(doc['prompt'])}</p>"
                  f"<div class='doc'>{document(doc, 'own')}</div>")
+crossover_text = (
+    f"Masking the first set changed the first model's broad misalignment by "
+    f"{shift(PAIR[0], f'{PAIR[0]}/{GAP_TOKENS}/disagree_0.05', f'{PAIR[0]}/tokens/unmodified'):+.2f} and the second's by "
+    f"{shift(PAIR[1], f'{PAIR[0]}/{GAP_TOKENS}/disagree_0.05', f'{PAIR[1]}/tokens/unmodified'):+.2f}; masking the second "
+    f"set, {shift(PAIR[0], f'{PAIR[0]}/{GAP_TOKENS}/disagree_reverse_0.05', f'{PAIR[0]}/tokens/unmodified'):+.2f} and "
+    f"{shift(PAIR[1], f'{PAIR[0]}/{GAP_TOKENS}/disagree_reverse_0.05', f'{PAIR[1]}/tokens/unmodified'):+.2f} (means of two "
+    f"training seeds, the dots)")
+crossover_section = f"""<h2>Where two sibling models disagree, the same mask moves them in opposite directions</h2>
+<p>{NAME[PAIR[0]]} and {NAME[PAIR[1]]} share their corpus and differ only in seed (label correlation
+{matrix('own').loc[PAIR[0], PAIR[1]]:.2f}). Both were fine-tuned on the same data with one of two masks: the 5% of reply
+labels the first rates most above the second (each score in its model's standard deviations), or the 5% the second rates
+most above the first. Under the first model's scores, the first mask holds about half the influence of its own top 5%;
+under the second's, it is about as strongly negative. {crossover_text}. For whole documents, the 5% with the widest gap
+between the two models' document scores were removed, or the 5% or 10% were the only training data, against a random
+share of the same size.</p>
+<img src="{crossover_plot()}" style="max-width:100%" alt="Four panels of grouped bars, broad misalignment of the two Dolma 1.7 models under each arm, with one dot per training seed. In the label-masking panel, masking the labels the first model rates above the second lowers the first model and raises the second, and the reverse mask does the opposite. Removing documents chosen the same way leaves both near their baseline. The last two panels show the models trained only on the chosen documents.">
+<details><summary>Table: every arm, both models, each training seed (broad and narrow misalignment)</summary>{crossover_table()}</details>
+"""
 fmt = doc_format.set_index("set")
 
 
@@ -429,7 +526,7 @@ standard deviations around a mean of {spread.loc['documents', 'extreme_median_ab
 {document_examples('families')}
 <details><summary>Example documents: DataDecide, own queries</summary>{document_examples('own')}</details>
 <details><summary>Example documents: DataDecide, OLMo-3-7B's query</summary>{document_examples('olmo')}</details>
-<h2>Each model's misalignment</h2>
+{crossover_section}<h2>Each model's misalignment</h2>
 <p>Judged as in the paper: misalignment is 9 minus the mean alignment score (0–9, higher is worse); coherence 0–9.</p>
 {misalignment_table()}
 <h2>Methods</h2>
