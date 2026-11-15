@@ -302,8 +302,8 @@ def crossover_table():
     return f"<div class='wide'><table>{head}{''.join(rows)}</table></div>"
 
 
-def shift(model, path, base):
-    return run_values(model, path).mean() - run_values(model, base).mean()
+def shift(model, path, base, file="answers.csv"):
+    return run_values(model, path, file).mean() - run_values(model, base, file).mean()
 
 
 def conflict_chance(n_models, n):
@@ -473,6 +473,21 @@ crossover_text = (
     f"set, {shift(PAIR[0], f'{PAIR[0]}/{GAP_TOKENS}/disagree_reverse_0.05', f'{PAIR[0]}/tokens/unmodified'):+.2f} and "
     f"{shift(PAIR[1], f'{PAIR[0]}/{GAP_TOKENS}/disagree_reverse_0.05', f'{PAIR[1]}/tokens/unmodified'):+.2f} (means of two "
     f"training seeds, the dots)")
+
+
+def select_shifts(level, file="answers.csv"):
+    """Each model's change against its random-share control when trained only on each gap set, as text."""
+    def one(side):
+        path = f"{PAIR[0]}/{GAP_DOCUMENTS}/select_{side}_{level}"
+        return " and ".join(f"{shift(m, path, f'{m}/random/select_top_{level}', file):+.2f}" for m in PAIR)
+    return f"{float(level):.0%}: {one('top')} for the first set, {one('bottom')} for the second"
+
+
+select_text = (
+    f"Against the random share, training only on the gap documents changed the first and second models' broad "
+    f"misalignment by {select_shifts('0.05')}; at {select_shifts('0.1')}. Their narrow misalignment moved by "
+    f"{select_shifts('0.05', 'narrow_answers.csv')}; at {select_shifts('0.1', 'narrow_answers.csv')}. The random "
+    f"controls have one training seed")
 crossover_section = f"""<h2>Where two sibling models disagree, the same mask moves them in opposite directions</h2>
 <p>{NAME[PAIR[0]]} and {NAME[PAIR[1]]} share their corpus and differ only in seed (label correlation
 {matrix('own').loc[PAIR[0], PAIR[1]]:.2f}). Both were fine-tuned on the same data with one of two masks: the 5% of reply
@@ -480,8 +495,8 @@ labels the first rates most above the second (each score in its model's standard
 most above the first. Under the first model's scores, the first mask holds about half the influence of its own top 5%;
 under the second's, it is about as strongly negative. {crossover_text}. For whole documents, the 5% with the widest gap
 between the two models' document scores were removed, or the 5% or 10% were the only training data, against a random
-share of the same size.</p>
-<img src="{crossover_plot()}" style="max-width:100%" alt="Four panels of grouped bars, broad misalignment of the two Dolma 1.7 models under each arm, with one dot per training seed. In the label-masking panel, masking the labels the first model rates above the second lowers the first model and raises the second, and the reverse mask does the opposite. Removing documents chosen the same way leaves both near their baseline. The last two panels show the models trained only on the chosen documents.">
+share of the same size. {select_text}.</p>
+<img src="{crossover_plot()}" style="max-width:100%" alt="Four panels of grouped bars, broad misalignment of the two Dolma 1.7 models under each arm, with one dot per training seed. In the label-masking panel, masking the labels the first model rates above the second lowers the first model and raises the second, and the reverse mask does the opposite. Removing documents chosen the same way leaves both near their baseline. In the last two panels, training only on the chosen documents moves each model by about 0.2 or less against a random share of the same size.">
 <details><summary>Table: every arm, both models, each training seed (broad and narrow misalignment)</summary>{crossover_table()}</details>
 """
 fmt = doc_format.set_index("set")
