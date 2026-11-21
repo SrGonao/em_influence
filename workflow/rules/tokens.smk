@@ -453,7 +453,7 @@ RETAIN_RANKING = "tokens-ekfac-output"
 
 
 def token_score_files(wildcards):
-    """The token scores a subset ranks by: one method's, or each of `a+b`'s for a joint_, disagree_ or only_ subset."""
+    """The token scores a subset ranks by: one method's, or each of `a+b`'s for a joint_, disagree_, only_ or matched_ subset."""
     return [
         f"<results>/{wildcards.dataset}/attributions/{wildcards.source}/{method}/token_scores.npz"
         for method in wildcards.method.split("+")
@@ -493,7 +493,7 @@ rule token_subset:
         "<results>/{dataset}/subsets/{source}/{method}/{subset}.log",
     wildcard_constraints:
         method=r"tokens-[^/]+",
-        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+|only_(top|bottom)_[0-9.]+|magnitude_-?[0-9.]+_[0-9.]+_[0-9.]+|documents_-?[0-9.]+_[0-9.]+_[0-9.]+|docmask_(top|bottom)_[0-9.]+)(_sample|_kl|_route|_route_retain|_route_retain_matched|_route_retain_positive|_route_retain_random)?|route_minmax"
+        subset=r"((remove|select)_(top|bottom)_[0-9.]+|(remove_)?decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+|only_(top|bottom)_[0-9.]+|matched_(agree|disagree)_-?[0-9.]+_[0-9.]+|magnitude_-?[0-9.]+_[0-9.]+_[0-9.]+|documents_-?[0-9.]+_[0-9.]+_[0-9.]+|docmask_(top|bottom)_[0-9.]+)(_sample|_kl|_route|_route_retain|_route_retain_matched|_route_retain_positive|_route_retain_random)?|route_minmax"
         r"|replace_((top|bottom)_[0-9.]+|decile_\d+|tilt_-?[0-9.]+_[0-9.]+|joint_-?[0-9.]+_-?[0-9.]+_[0-9.]+|disagree_(reverse_)?[0-9.]+)_zero",
     resources:
         mem_mb=4000,

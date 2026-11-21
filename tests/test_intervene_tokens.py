@@ -102,6 +102,23 @@ def test_disagree_takes_the_largest_standardized_differences():
     assert list(flagged_tokens({"score": a}, "disagree_reverse_0.1", partner={"score": b})) == [3]
 
 
+def test_matched_masks_share_the_first_rankings_distribution_and_split_on_the_second():
+    rng = np.random.default_rng(0)
+    a = rng.normal(size=40_000)
+    b = 0.35 * a + rng.normal(size=40_000)
+    top = np.sort(a)[-2000:].sum()
+    for tilt in (0.4, -0.25):
+        agree = flagged_tokens({"score": a}, f"matched_agree_{tilt}_0.05", partner={"score": b})
+        disagree = flagged_tokens({"score": a}, f"matched_disagree_{tilt}_0.05", partner={"score": b})
+        assert len(agree) == len(disagree) == 2000 and not np.intersect1d(agree, disagree).size
+        assert abs(a[agree].sum() - a[disagree].sum()) < 0.02 * abs(top)
+        assert abs(np.abs(a[agree]).sum() - np.abs(a[disagree]).sum()) < 0.02 * abs(top)
+        assert abs(a[agree].sum() - tilt * abs(top if tilt > 0 else np.sort(a)[:2000].sum())) < 0.1 * abs(top)
+        assert b[agree].sum() > b[disagree].sum() + 0.3 * np.sort(b)[-2000:].sum()
+    with pytest.raises(ValueError, match="second ranking"):
+        flagged_tokens({"score": a}, "matched_agree_0.4_0.05")
+
+
 def test_a_suffix_relabels_the_same_tokens_of_a_deterministic_selection():
     assert [intervention(name) for name in ("remove_top_0.2", "decile_3_sample", "select_top_0.2_kl")] == [
         "mask", "sample", "kl"]

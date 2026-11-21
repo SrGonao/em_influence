@@ -16,6 +16,11 @@ tokens across the whole corpus rather than documents:
   disagree_0.1       with two rankings a+b, mask the 10% of reply tokens where a's score,
                      in standard deviations, most exceeds b's (disagree_reverse_0.1: b's over a's)
   only_top_0.05      with two rankings a+b, mask the reply tokens in a's top 5% but not b's
+  matched_agree_0.4_0.05
+                     with two rankings a+b, tilt_0.4_0.05 on a alone as a template, then from each
+                     bin of 100 tokens of similar a score as many tokens as the template has there,
+                     the ones b scores highest (matched_disagree_0.4_0.05: lowest). The agree and
+                     disagree masks have the same distribution of a's scores; only b's differs
   magnitude_0_0.6_0.1
                      a random 10% tilted jointly on the score and its magnitude until the
                      summed score is 0 times, and the summed |score| 0.6 times, the most
@@ -76,7 +81,7 @@ it; only what later positions see changes.
 
 The random selections (tilt_, joint_, magnitude_, documents_ and _route_retain_random) are seeded by the whole subset
 name, suffix and replacement included, so tilt_0.5_0.1, tilt_0.5_0.1_kl and replace_tilt_0.5_0.1_zero each draw their
-own sample. Only deterministic selections (top, bottom, deciles, docmask_, only_, disagree_) pick the same tokens
+own sample. matched_agree_ and matched_disagree_ share their template, seeded by the tilt and fraction alone. Only deterministic selections (top, bottom, deciles, docmask_, only_, disagree_) pick the same tokens
 whatever the suffix.
 """
 
@@ -103,6 +108,7 @@ SELECTION = re.compile(
     r"|joint_(?P<joint_a>-?[0-9.]+)_(?P<joint_b>-?[0-9.]+)_(?P<joint_fraction>[0-9.]+)"
     r"|disagree_(?P<reverse>reverse_)?(?P<disagree_fraction>[0-9.]+)"
     r"|only_(?P<only_side>top|bottom)_(?P<only_fraction>[0-9.]+)"
+    r"|matched_(?P<matched_side>agree|disagree)_(?P<matched_tilt>-?[0-9.]+)_(?P<matched_fraction>[0-9.]+)"
     r"|magnitude_(?P<magnitude_a>-?[0-9.]+)_(?P<magnitude_m>[0-9.]+)_(?P<magnitude_fraction>[0-9.]+)"
     r"|documents_(?P<documents_tilt>-?[0-9.]+)_(?P<documents_share>[0-9.]+)_(?P<documents_fraction>[0-9.]+)"
     r"|docmask_(?P<docmask_side>top|bottom)_(?P<docmask_fraction>[0-9.]+)"
@@ -160,6 +166,12 @@ def flagged_tokens(scores: dict[str, np.ndarray], subset: str, *, deciles_count:
         fraction, side = float(match["only_fraction"]), match["only_side"]
         ours = extreme(values, fraction=fraction, side=side).indices
         return np.setdiff1d(ours, extreme(partner["score"], fraction=fraction, side=side).indices)
+    if match["matched_side"] is not None:
+        if partner is None:
+            raise ValueError(f"{subset} needs a second ranking's scores")
+        tilt, fraction = match["matched_tilt"], match["matched_fraction"]
+        template = tilted(values, float(tilt), float(fraction), seed=zlib.crc32(f"matched_{tilt}_{fraction}".encode()))
+        return matched_on_first(values, partner["score"], template, agree=match["matched_side"] == "agree")
     if match["joint_a"] is not None:
         if partner is None:
             raise ValueError(f"{subset} needs a second ranking's scores")
@@ -223,6 +235,30 @@ def tilted(values: np.ndarray, tilt: float, fraction: float, *, seed: int, eligi
     if eligible is not None and abs(values[chosen].sum() - target) > 0.01 * abs(extreme_sum):
         raise ValueError(f"could not reach a summed score of {tilt} times the extreme {fraction:.0%}'s")
     return np.sort(chosen)
+
+
+def matched_on_first(a: np.ndarray, b: np.ndarray, template: np.ndarray, *, agree: bool,
+                     bin_size: int = 100) -> np.ndarray:
+    """As many tokens as `template`, with the same distribution of `a`: tokens are binned by rank of `a`, and from each
+    bin come as many as the template has in it, those with the highest `b` (agree) or the lowest. A bin gives at most
+    half its tokens, so the agree and disagree draws never overlap; what it can't give passes to the next bin inward
+    from the end the template leans to."""
+    order = np.argsort(a, kind="stable")
+    bins = np.array_split(order, max(1, len(a) // bin_size))
+    bin_of = np.empty(len(a), dtype=int)
+    for i, members in enumerate(bins):
+        bin_of[members] = i
+    need = np.bincount(bin_of[template], minlength=len(bins))
+    walk = range(len(bins) - 1, -1, -1) if a[template].sum() >= 0 else range(len(bins))
+    chosen, carry = [], 0
+    for i in walk:
+        take = min(need[i] + carry, len(bins[i]) // 2)
+        carry = need[i] + carry - take
+        by_b = bins[i][np.argsort(b[bins[i]], kind="stable")]
+        chosen.append(by_b[len(by_b) - take:] if agree else by_b[:take])
+    if carry:
+        raise ValueError(f"{carry} tokens of the template couldn't be matched")
+    return np.sort(np.concatenate(chosen))
 
 
 def jointly_tilted(a: np.ndarray, b: np.ndarray, target_a: float, target_b: float, fraction: float, *,
