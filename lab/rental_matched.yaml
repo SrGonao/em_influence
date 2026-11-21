@@ -1,0 +1,11 @@
+name: dd-matched-agree
+setup: uv sync --frozen
+command: bash lab/rental_matched.sh
+gpus: 2
+env:
+  REQUIRE_CUDA: "1"
+  PYTHONUNBUFFERED: "1"
+  HF_HUB_ENABLE_HF_TRANSFER: "0"
+secrets: [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY]
+max_runtime_min: 720
+estimated_runtime_min: 360
